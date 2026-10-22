@@ -1,0 +1,34 @@
+import { AssetType, defineAssets } from '@iwsdk/core';
+import room from './scene-assets/room.scene-asset.js';
+
+const publicAssetUrl = (filePath: string): string =>
+  `${import.meta.env.BASE_URL}${filePath.replace(/^\/+/u, '')}`;
+
+export default defineAssets({
+  room,
+  'chapter-panel': {
+    url: publicAssetUrl('ui/chapter.uikitml'),
+    type: AssetType.UIKitML,
+    name: 'Chapter Panel',
+  },
+  'code-panel': {
+    url: publicAssetUrl('ui/code.uikitml'),
+    type: AssetType.UIKitML,
+    name: 'Code Panel',
+  },
+  'nav-panel': {
+    url: publicAssetUrl('ui/nav.uikitml'),
+    type: AssetType.UIKitML,
+    name: 'Navigator',
+  },
+  'builder-panel': {
+    url: publicAssetUrl('ui/builder.uikitml'),
+    type: AssetType.UIKitML,
+    name: 'Circuit Builder',
+  },
+  'gate-dock': {
+    url: publicAssetUrl('ui/dock.uikitml'),
+    type: AssetType.UIKitML,
+    name: 'Gate Dock',
+  },
+});

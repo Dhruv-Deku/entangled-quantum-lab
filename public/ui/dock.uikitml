@@ -1,0 +1,87 @@
+<!--
+  Gate dock: every gesture has a poke-button twin here, plus the gates that
+  have no gesture. Authored at 10x: UIKit units are cm, and the node is scaled 0.1.
+-->
+<style>
+  .dock {
+    flex-direction: column;
+    gap: 10;
+    padding-top: 12;
+    padding-bottom: 12;
+    padding-left: 12;
+    padding-right: 12;
+    background-color: #242528;
+    border-radius: 30;
+    border-width: 1;
+    border-color: #34363b;
+  }
+  .row { flex-direction: row; gap: 8; align-items: center; }
+  .key {
+    width: 52;
+    height: 52;
+    border-radius: 26;
+    align-items: center;
+    justify-content: center;
+    background-color: #2f3135;
+    cursor: pointer;
+  }
+  .wide { width: 92; }
+  .k { font-size: 19; font-weight: 700; color: #e4e6eb; }
+  .ks { font-size: 13; font-weight: 700; color: #e4e6eb; }
+  .gold { font-size: 13; font-weight: 700; color: #e2b04a; }
+  .sep { width: 1; height: 30; background-color: #3a3c41; }
+  .qsel { font-size: 12; color: #9a9da3; }
+  .arrow {
+    width: 40;
+    height: 40;
+    border-radius: 20;
+    align-items: center;
+    justify-content: center;
+    background-color: #2f3135;
+    cursor: pointer;
+  }
+  .slot {
+    width: 58;
+    height: 40;
+    border-radius: 12;
+    align-items: center;
+    justify-content: center;
+    background-color: #2a2c30;
+    cursor: pointer;
+  }
+  .sl { font-size: 12; font-weight: 600; color: #e4e6eb; }
+</style>
+<div class="dock">
+  <div class="row">
+    <div id="g-h" class="key"><div class="k">H</div></div>
+    <div id="g-x" class="key"><div class="k">X</div></div>
+    <div id="g-y" class="key"><div class="k">Y</div></div>
+    <div id="g-z" class="key"><div class="k">Z</div></div>
+    <div id="g-s" class="key"><div class="k">S</div></div>
+    <div id="g-t" class="key"><div class="k">T</div></div>
+    <div class="sep"></div>
+    <div id="g-rl" class="key"><div class="ks">Ry-</div></div>
+    <div id="g-rr" class="key"><div class="ks">Ry+</div></div>
+  </div>
+  <div class="row">
+    <div id="a-cnot" class="key wide"><div class="gold">CNOT</div></div>
+    <div id="a-swap" class="key"><div class="ks">SWAP</div></div>
+    <div id="a-measure" class="key wide"><div class="ks">Measure</div></div>
+    <div id="a-shots" class="key wide"><div class="ks">100 shots</div></div>
+    <div id="a-export" class="key wide"><div class="ks">Qiskit</div></div>
+  </div>
+  <div class="row">
+    <div id="t-prev" class="arrow"><div class="ks">&lt;</div></div>
+    <div id="t-0" class="slot"><div id="t-0-l" class="sl">start</div></div>
+    <div id="t-1" class="slot"><div id="t-1-l" class="sl">-</div></div>
+    <div id="t-2" class="slot"><div id="t-2-l" class="sl">-</div></div>
+    <div id="t-3" class="slot"><div id="t-3-l" class="sl">-</div></div>
+    <div id="t-4" class="slot"><div id="t-4-l" class="sl">-</div></div>
+    <div id="t-5" class="slot"><div id="t-5-l" class="sl">-</div></div>
+    <div id="t-6" class="slot"><div id="t-6-l" class="sl">-</div></div>
+    <div id="t-next" class="arrow"><div class="ks">&gt;</div></div>
+  </div>
+  <div class="row">
+    <div id="dock-status" class="qsel">Selected: q0</div>
+  </div>
+</div>

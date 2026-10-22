@@ -1,0 +1,8 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["node", "vitest/globals"]
+  },
+  "include": ["src/**/*.test.ts", "src/quantum/**/*.ts", "src/gestures/**/*.ts", "src/game/**/*.ts", "src/lab/lab.ts"],
+  "exclude": []
+}

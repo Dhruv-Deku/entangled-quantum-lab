@@ -1,0 +1,87 @@
+<!--
+  Navigator: Chapters / Learn / Sandbox tabs and a grid of what to play.
+  Chapters lists the seven chapters, Learn one lesson per gate or idea,
+  Sandbox some ready-made starting circuits. UIKit units are cm.
+-->
+<style>
+  .nav {
+    flex-direction: column;
+    width: 360;
+    padding-top: 14;
+    padding-bottom: 14;
+    padding-left: 14;
+    padding-right: 14;
+    gap: 10;
+    background-color: #242528;
+    border-radius: 26;
+    border-width: 1;
+    border-color: #34363b;
+  }
+  .tabs {
+    flex-direction: row;
+    gap: 4;
+    padding-top: 4;
+    padding-bottom: 4;
+    padding-left: 4;
+    padding-right: 4;
+    border-radius: 20;
+    background-color: #1b1c1f;
+  }
+  .tab {
+    flex-grow: 1;
+    height: 32;
+    border-radius: 16;
+    align-items: center;
+    justify-content: center;
+    background-color: #1b1c1f;
+    cursor: pointer;
+  }
+  .tl { font-size: 12; font-weight: 700; color: #8a8d93; }
+  .grid { flex-direction: row; flex-wrap: wrap; gap: 6; }
+  .item {
+    width: 106;
+    height: 38;
+    flex-direction: row;
+    align-items: center;
+    gap: 6;
+    padding-left: 10;
+    padding-right: 8;
+    border-radius: 12;
+    background-color: #2d2f33;
+    cursor: pointer;
+  }
+  .num { font-size: 11; font-weight: 700; color: #6b6e75; }
+  .il { font-size: 12; font-weight: 600; color: #e4e6eb; }
+  .foot { flex-direction: row; justify-content: space-between; padding-left: 4; padding-right: 4; }
+  .fl { font-size: 11; color: #8a8d93; }
+</style>
+<div class="nav">
+  <div class="tabs">
+    <div id="tab-campaign" class="tab"><div id="tab-campaign-l" class="tl">Chapters</div></div>
+    <div id="tab-learn" class="tab"><div id="tab-learn-l" class="tl">Learn</div></div>
+    <div id="tab-puzzle" class="tab"><div id="tab-puzzle-l" class="tl">Puzzles</div></div>
+    <div id="tab-build" class="tab"><div id="tab-build-l" class="tl">Build</div></div>
+    <div id="tab-sandbox" class="tab"><div id="tab-sandbox-l" class="tl">Sandbox</div></div>
+  </div>
+  <div class="grid">
+    <div id="n-0" class="item"><div id="n-0-n" class="num">1</div><div id="n-0-l" class="il">-</div></div>
+    <div id="n-1" class="item"><div id="n-1-n" class="num">2</div><div id="n-1-l" class="il">-</div></div>
+    <div id="n-2" class="item"><div id="n-2-n" class="num">3</div><div id="n-2-l" class="il">-</div></div>
+    <div id="n-3" class="item"><div id="n-3-n" class="num">4</div><div id="n-3-l" class="il">-</div></div>
+    <div id="n-4" class="item"><div id="n-4-n" class="num">5</div><div id="n-4-l" class="il">-</div></div>
+    <div id="n-5" class="item"><div id="n-5-n" class="num">6</div><div id="n-5-l" class="il">-</div></div>
+    <div id="n-6" class="item"><div id="n-6-n" class="num">7</div><div id="n-6-l" class="il">-</div></div>
+    <div id="n-7" class="item"><div id="n-7-n" class="num">8</div><div id="n-7-l" class="il">-</div></div>
+    <div id="n-8" class="item"><div id="n-8-n" class="num">9</div><div id="n-8-l" class="il">-</div></div>
+    <div id="n-9" class="item"><div id="n-9-n" class="num">10</div><div id="n-9-l" class="il">-</div></div>
+    <div id="n-10" class="item"><div id="n-10-n" class="num">11</div><div id="n-10-l" class="il">-</div></div>
+    <div id="n-11" class="item"><div id="n-11-n" class="num">12</div><div id="n-11-l" class="il">-</div></div>
+    <div id="n-12" class="item"><div id="n-12-n" class="num">13</div><div id="n-12-l" class="il">-</div></div>
+    <div id="n-13" class="item"><div id="n-13-n" class="num">14</div><div id="n-13-l" class="il">-</div></div>
+    <div id="n-14" class="item"><div id="n-14-n" class="num">15</div><div id="n-14-l" class="il">-</div></div>
+  </div>
+  <div class="foot">
+    <div id="nav-progress" class="fl">0 of 7 chapters</div>
+    <div id="nav-progress-2" class="fl">0 of 12 lessons</div>
+  </div>
+</div>

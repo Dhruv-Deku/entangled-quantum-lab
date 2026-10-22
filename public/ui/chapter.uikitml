@@ -1,0 +1,71 @@
+<!--
+  Chapter card: what to do next, in one or two sentences, plus hands-only buttons.
+  Authored at 10x: UIKit units are cm, and the node is scaled 0.1.
+-->
+<style>
+  .card {
+    flex-direction: column;
+    width: 344;
+    padding-top: 26;
+    padding-bottom: 24;
+    padding-left: 26;
+    padding-right: 26;
+    background-color: #242528;
+    border-radius: 28;
+    border-width: 1;
+    border-color: #34363b;
+  }
+  .eyebrow { font-size: 12; font-weight: 600; color: #9a9da3; }
+  .title { font-size: 28; font-weight: 700; color: #f2f3f5; margin-top: 6; }
+  .body { font-size: 15; line-height: 1.45; color: #b8bbc1; margin-top: 10; }
+  .goal {
+    flex-direction: row;
+    align-items: center;
+    gap: 10;
+    margin-top: 18;
+    padding-top: 12;
+    padding-bottom: 12;
+    padding-left: 14;
+    padding-right: 14;
+    border-radius: 16;
+    background-color: #2d2f33;
+  }
+  .dot { width: 10; height: 10; border-radius: 5; background-color: #6b6e75; }
+  .goal-text { font-size: 14; color: #e4e6eb; }
+  .row { flex-direction: row; gap: 10; margin-top: 18; }
+  .btn {
+    height: 44;
+    padding-left: 16;
+    padding-right: 16;
+    border-radius: 22;
+    align-items: center;
+    justify-content: center;
+    background-color: #34363b;
+    cursor: pointer;
+  }
+  .btn-primary { background-color: #2d7ff9; }
+  .btn-text { font-size: 15; font-weight: 600; color: #e4e6eb; }
+  .btn-text-primary { font-size: 15; font-weight: 600; color: #ffffff; }
+  .progress { flex-direction: row; gap: 5; margin-top: 16; }
+  .pip { width: 32; height: 5; border-radius: 3; background-color: #3a3c41; }
+</style>
+<div class="card">
+  <div id="chapter-eyebrow" class="eyebrow">Chapter 1 of 7</div>
+  <div id="chapter-title" class="title">Superposition</div>
+  <div id="chapter-body" class="body">Pinch the orb and turn your wrist.</div>
+  <div class="goal">
+    <div id="goal-dot" class="dot"></div>
+    <div id="goal-text" class="goal-text">Turn the arrow away from 0</div>
+  </div>
+  <div class="progress">
+    <div id="pip-0" class="pip"></div>
+    <div id="pip-1" class="pip"></div>
+    <div id="pip-2" class="pip"></div>
+    <div id="pip-3" class="pip"></div>
+    <div id="pip-4" class="pip"></div>
+  </div>
+  <div class="row">
+    <div id="btn-next" class="btn btn-primary"><div id="btn-next-label" class="btn-text-primary">Continue</div></div>
+    <div id="btn-replay" class="btn"><div id="btn-replay-label" class="btn-text">Replay</div></div>
+  </div>
+</div>

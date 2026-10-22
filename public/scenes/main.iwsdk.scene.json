@@ -1,0 +1,238 @@
+{
+  "version": "iwsdk.scene.v1",
+  "units": "meters",
+  "components": {
+    "com.iwsdk.components.DomeGradient": {
+      "sky": [
+        0.035,
+        0.037,
+        0.043,
+        1
+      ],
+      "equator": [
+        0.052,
+        0.054,
+        0.062,
+        1
+      ],
+      "ground": [
+        0.02,
+        0.02,
+        0.024,
+        1
+      ],
+      "intensity": 1
+    },
+    "com.iwsdk.components.IBLGradient": {
+      "sky": [
+        0.55,
+        0.57,
+        0.62,
+        1
+      ],
+      "equator": [
+        0.28,
+        0.29,
+        0.31,
+        1
+      ],
+      "ground": [
+        0.08,
+        0.08,
+        0.09,
+        1
+      ],
+      "intensity": 0.9
+    }
+  },
+  "resources": {},
+  "nodes": [
+    {
+      "id": "room",
+      "name": "Room",
+      "content": {
+        "type": "asset",
+        "asset": "room"
+      },
+      "transform": {
+        "position": [
+          0,
+          0,
+          0
+        ]
+      },
+      "components": {
+        "VirtualRoom": {}
+      }
+    },
+    {
+      "id": "key-light",
+      "name": "Key Light",
+      "transform": {
+        "position": [
+          -0.8,
+          2.1,
+          0.6
+        ],
+        "rotationDeg": [
+          -55,
+          -35,
+          0
+        ]
+      },
+      "components": {
+        "com.iwsdk.components.DirectionalLight": {
+          "color": [
+            1,
+            0.93,
+            0.85,
+            1
+          ],
+          "intensity": 1.6,
+          "castShadow": false
+        }
+      }
+    },
+    {
+      "id": "fill-light",
+      "name": "Fill Light",
+      "transform": {
+        "position": [
+          0,
+          0,
+          0
+        ]
+      },
+      "components": {
+        "com.iwsdk.components.HemisphereLight": {
+          "skyColor": [
+            0.75,
+            0.78,
+            0.85,
+            1
+          ],
+          "groundColor": [
+            0.1,
+            0.1,
+            0.11,
+            1
+          ],
+          "intensity": 0.6
+        }
+      }
+    },
+    {
+      "id": "chapter-panel",
+      "name": "Chapter Panel",
+      "content": {
+        "type": "asset",
+        "asset": "chapter-panel"
+      },
+      "transform": {
+        "position": [
+          -0.42,
+          0.98,
+          -0.5
+        ],
+        "rotationDeg": [
+          0,
+          25,
+          0
+        ],
+        "scale": 0.07
+      },
+      "components": {
+        "RayInteractable": {},
+        "PokeInteractable": {}
+      }
+    },
+    {
+      "id": "gate-dock",
+      "name": "Gate Dock",
+      "content": {
+        "type": "asset",
+        "asset": "gate-dock"
+      },
+      "transform": {
+        "position": [
+          0,
+          0.78,
+          -0.26
+        ],
+        "rotationDeg": [
+          -55,
+          0,
+          0
+        ],
+        "scale": 0.06
+      },
+      "components": {
+        "RayInteractable": {},
+        "PokeInteractable": {}
+      }
+    },
+    {
+      "id": "code-panel",
+      "name": "Code Panel",
+      "content": {
+        "type": "asset",
+        "asset": "code-panel"
+      },
+      "transform": {
+        "position": [
+          0,
+          1.1,
+          -0.7
+        ],
+        "scale": 0.07
+      },
+      "components": {
+        "RayInteractable": {},
+        "PokeInteractable": {}
+      }
+    },
+    {
+      "id": "nav-panel",
+      "name": "Navigator",
+      "content": {
+        "type": "asset",
+        "asset": "nav-panel"
+      },
+      "transform": {
+        "position": [
+          -0.45,
+          1.2,
+          -0.5
+        ],
+        "scale": 0.06
+      },
+      "components": {
+        "RayInteractable": {},
+        "PokeInteractable": {}
+      }
+    },
+    {
+      "id": "builder-panel",
+      "name": "Circuit Builder",
+      "content": {
+        "type": "asset",
+        "asset": "builder-panel"
+      },
+      "transform": {
+        "position": [
+          0,
+          -50,
+          0
+        ],
+        "scale": 0.05
+      },
+      "components": {
+        "RayInteractable": {},
+        "PokeInteractable": {}
+      }
+    }
+  ],
+  "authoring": {
+    "views": []
+  }
+}

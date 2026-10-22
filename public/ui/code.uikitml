@@ -1,0 +1,63 @@
+<!--
+  Export panel: the circuit you built, as Qiskit code. Authored at 10x:
+  UIKit units are cm, and the node is scaled 0.1.
+-->
+<style>
+  .card {
+    flex-direction: column;
+    width: 360;
+    padding-top: 20;
+    padding-bottom: 20;
+    padding-left: 22;
+    padding-right: 22;
+    background-color: #1b1c1f;
+    border-radius: 24;
+    border-width: 1;
+    border-color: #34363b;
+  }
+  .head { flex-direction: row; justify-content: space-between; align-items: center; }
+  .btns { flex-direction: row; gap: 8; }
+  .title { font-size: 18; font-weight: 700; color: #f2f3f5; }
+  .note { font-size: 11; color: #8a8d93; margin-top: 4; }
+  .code { flex-direction: column; margin-top: 12; gap: 3; }
+  .ln { font-size: 12; color: #c9ccd1; }
+  .close {
+    height: 34;
+    padding-left: 14;
+    padding-right: 14;
+    border-radius: 17;
+    align-items: center;
+    justify-content: center;
+    background-color: #34363b;
+    cursor: pointer;
+  }
+  .ct { font-size: 13; font-weight: 600; color: #e4e6eb; }
+</style>
+<div class="card">
+  <div class="head">
+    <div class="title">Your circuit in Qiskit</div>
+    <div class="btns">
+      <div id="code-link" class="close"><div class="ct">Copy link</div></div>
+      <div id="code-close" class="close"><div class="ct">Close</div></div>
+    </div>
+  </div>
+  <div id="code-note" class="note">Runs as-is on a real quantum computer.</div>
+  <div id="code-text" class="code">
+    <div id="code-0" class="ln">-</div>
+    <div id="code-1" class="ln">-</div>
+    <div id="code-2" class="ln">-</div>
+    <div id="code-3" class="ln">-</div>
+    <div id="code-4" class="ln">-</div>
+    <div id="code-5" class="ln">-</div>
+    <div id="code-6" class="ln">-</div>
+    <div id="code-7" class="ln">-</div>
+    <div id="code-8" class="ln">-</div>
+    <div id="code-9" class="ln">-</div>
+    <div id="code-10" class="ln">-</div>
+    <div id="code-11" class="ln">-</div>
+    <div id="code-12" class="ln">-</div>
+    <div id="code-13" class="ln">-</div>
+    <div id="code-14" class="ln">-</div>
+    <div id="code-15" class="ln">-</div>
+  </div>
+</div>
