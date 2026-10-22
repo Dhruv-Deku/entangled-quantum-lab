@@ -35,8 +35,8 @@
   .row { flex-direction: row; gap: 10; margin-top: 18; }
   .btn {
     height: 44;
-    padding-left: 16;
-    padding-right: 16;
+    padding-left: 15;
+    padding-right: 15;
     border-radius: 22;
     align-items: center;
     justify-content: center;
@@ -67,5 +67,6 @@
   <div class="row">
     <div id="btn-next" class="btn btn-primary"><div id="btn-next-label" class="btn-text-primary">Continue</div></div>
     <div id="btn-replay" class="btn"><div id="btn-replay-label" class="btn-text">Replay</div></div>
+    <div id="btn-notes" class="btn"><div class="btn-text">Notes</div></div>
   </div>
 </div>

@@ -23,6 +23,8 @@ import type { CampaignView } from './campaign';
 import { campaign } from './instance';
 import { PRESETS } from './presets';
 import { BuilderPanel } from './builder-ui';
+import { notesFor } from './notes';
+import { NotesPanel } from './notes-ui';
 import { BUILDS, parOf } from './builder';
 import { starsFor } from './puzzles';
 
@@ -39,6 +41,8 @@ const PLACEMENT = {
   // the builder takes the dock's place in the Build tab, a little further out
   'builder-panel': { pos: new Vector3(0.44, 0.14, 0.03), rot: new Euler((-22 * Math.PI) / 180, (-32 * Math.PI) / 180, 0, 'YXZ') },
   'code-panel': { pos: new Vector3(0.02, 0.34, -0.22), rot: new Euler(-0.05, 0, 0, 'YXZ') },
+  // notes: in front of the circuit board, low enough to read without looking up
+  'notes-panel': { pos: new Vector3(0, 0.3, -0.17), rot: new Euler(-0.1, 0, 0, 'YXZ') },
   // upper right, opposite the chapter card and above the dock
   'nav-panel': { pos: new Vector3(0.47, 0.26, -0.06), rot: new Euler(-0.12, (-32 * Math.PI) / 180, 0, 'YXZ') },
 } as const;
@@ -100,6 +104,8 @@ export class UISystem extends createSystem({
   private nav: UIKitMLAsset | null = null;
   private builderAsset: UIKitMLAsset | null = null;
   private builder: BuilderPanel | null = null;
+  private notesAsset: UIKitMLAsset | null = null;
+  private notes: NotesPanel | null = null;
   /** Which tab the navigator shows (it follows the mode, but can be browsed). */
   private tab: CampaignView['mode'] = 'campaign';
   private slotStart = 0;
@@ -157,24 +163,25 @@ export class UISystem extends createSystem({
   }
 
   private bind(): boolean {
-    if (this.chapter && this.dock && this.nav && this.builder) return true;
+    if (this.chapter && this.dock && this.nav && this.builder && this.notes) return true;
     this.chapter = this.world.getSceneObject<UIKitMLAsset>('chapter-panel') ?? null;
     this.dock = this.world.getSceneObject<UIKitMLAsset>('gate-dock') ?? null;
     this.code = this.world.getSceneObject<UIKitMLAsset>('code-panel') ?? null;
     this.nav = this.world.getSceneObject<UIKitMLAsset>('nav-panel') ?? null;
     this.builderAsset = this.world.getSceneObject<UIKitMLAsset>('builder-panel') ?? null;
-    if (!this.chapter || !this.dock || !this.code || !this.nav || !this.builderAsset) return false;
+    this.notesAsset = this.world.getSceneObject<UIKitMLAsset>('notes-panel') ?? null;
+    if (!this.chapter || !this.dock || !this.code || !this.nav || !this.builderAsset || !this.notesAsset) return false;
     this.code.visible = false;
 
     // panels take poke and ray input but must never capture the grab pointer,
     // or a hand reaching for an orb just above the dock grabs the dock instead
-    for (const panel of [this.chapter, this.dock, this.code, this.nav, this.builderAsset]) {
+    for (const panel of [this.chapter, this.dock, this.code, this.nav, this.builderAsset, this.notesAsset]) {
       panel.traverse((o) => {
         (o as unknown as { pointerEventsType: unknown }).pointerEventsType = { deny: 'grab' };
       });
     }
 
-    const ids = ['chapter-eyebrow', 'chapter-title', 'chapter-body', 'goal-dot', 'goal-text', 'btn-next', 'btn-next-label', 'btn-replay', 'btn-replay-label', 'pip-0', 'pip-1', 'pip-2', 'pip-3', 'pip-4'];
+    const ids = ['chapter-eyebrow', 'chapter-title', 'chapter-body', 'goal-dot', 'goal-text', 'btn-next', 'btn-next-label', 'btn-replay', 'btn-replay-label', 'btn-notes', 'pip-0', 'pip-1', 'pip-2', 'pip-3', 'pip-4'];
     for (const id of ids) this.els.set(id, this.chapter.requireElementById(id));
     const navIds = ['tab-campaign', 'tab-campaign-l', 'tab-learn', 'tab-learn-l', 'tab-puzzle', 'tab-puzzle-l', 'tab-build', 'tab-build-l', 'tab-sandbox', 'tab-sandbox-l', 'nav-progress', 'nav-progress-2'];
     for (let i = 0; i < NAV_SLOTS; i++) navIds.push(`n-${i}`, `n-${i}-n`, `n-${i}-l`);
@@ -255,6 +262,12 @@ export class UISystem extends createSystem({
     });
 
     this.builder = new BuilderPanel(this.builderAsset, campaign.build, () => feedback('select'));
+    this.notes = new NotesPanel(this.notesAsset, () => undefined);
+    on('btn-notes', () => this.toggleNotes());
+    // the I key (desktop) asks for notes through a window event, to keep input and UI decoupled
+    const onNotesKey = () => (this.notes?.open ? this.notes.advance() : this.toggleNotes());
+    window.addEventListener('entangled:notes', onNotesKey);
+    this.cleanupFuncs.push(() => window.removeEventListener('entangled:notes', onNotesKey));
     this.cleanupFuncs.push(
       campaign.build.on(() => {
         this.dirty = true;
@@ -278,6 +291,13 @@ export class UISystem extends createSystem({
 
   private render(v: CampaignView): void {
     if (!this.chapter) return;
+    // the Notes button only shows where there are notes; open notes follow the chapter or lesson
+    const n = this.currentNotes(v);
+    this.els.get('btn-notes')?.setProperties({ display: n ? 'flex' : 'none' });
+    if (this.notes?.open) {
+      if (!n) this.notes.close();
+      else if (n.title !== this.notes.title) this.notes.show(n.eyebrow, n.title, n.paras);
+    }
     if (v.mode !== 'sandbox' || v.preset >= 0) this.sharedOpen = false;
     if (v.intro) {
       this.text('chapter-eyebrow', 'Welcome');
@@ -366,6 +386,33 @@ export class UISystem extends createSystem({
     const cue = `${v.mode}-${v.chapterIndex}-${v.lessonIndex}-${v.stepIndex}-${v.stepDone}-${v.chapterDone}`;
     if ((v.stepDone || v.chapterDone) && cue !== this.lastCue) feedback('success');
     this.lastCue = cue;
+  }
+
+  /** What the Notes button would open right now, if anything. */
+  private currentNotes(v: CampaignView = campaign.view): { eyebrow: string; title: string; paras: string[] } | null {
+    if (v.mode === 'build') {
+      const paras = notesFor('Circuit diagrams');
+      return paras && { eyebrow: 'Builder notes', title: 'Circuit diagrams', paras };
+    }
+    if ((v.mode === 'campaign' || v.mode === 'learn') && v.chapter && !v.intro) {
+      const paras = notesFor(v.chapter.title);
+      const eyebrow = v.mode === 'learn' ? `Lesson ${v.lessonIndex + 1} notes` : `Chapter ${v.chapterIndex + 1} notes`;
+      return paras && { eyebrow, title: v.chapter.title, paras };
+    }
+    return null;
+  }
+
+  private toggleNotes(): void {
+    if (!this.notes) return;
+    if (this.notes.open) {
+      this.notes.close();
+      return;
+    }
+    const n = this.currentNotes();
+    if (!n) return feedback('reject');
+    if (this.code) this.code.visible = false;
+    this.notes.show(n.eyebrow, n.title, n.paras);
+    feedback('select');
   }
 
   /** The chapter card while the builder is open: the challenge, its par and how it is going. */
@@ -504,6 +551,7 @@ export class UISystem extends createSystem({
   /** Show the circuit so far as Qiskit code (also copied to the clipboard on desktop). */
   private showCode(sound = true): void {
     if (!this.code) return;
+    if (this.notes?.open) this.notes.close();
     const code = toQiskit(lab.n, lab.history.ops);
     const body = code.split('\n').filter((l) => l && !l.startsWith('#') && !l.startsWith('from') && !l.startsWith('print'));
     const shown = body.length > CODE_LINES ? ['...', ...body.slice(-(CODE_LINES - 1))] : body;
@@ -545,7 +593,7 @@ export class UISystem extends createSystem({
     const want = this.pokeOn ? near > 0.14 : near > 0.2;
     if (want === this.pokeOn) return;
     this.pokeOn = want;
-    for (const id of ['chapter-panel', 'gate-dock', 'code-panel', 'nav-panel', 'builder-panel']) {
+    for (const id of ['chapter-panel', 'gate-dock', 'code-panel', 'nav-panel', 'builder-panel', 'notes-panel']) {
       const e = this.world.getSceneEntity(id);
       if (!e) continue;
       if (want && !e.hasComponent(PokeInteractable)) e.addComponent(PokeInteractable);
@@ -579,6 +627,14 @@ export class UISystem extends createSystem({
       this.builderAsset!.position.copy(PARKED);
     }
     this.place(this.code!, 'code-panel');
+    // notes sit where the code panel does; only one of the two is open at a time
+    if (this.notes!.open) {
+      this.place(this.notesAsset!, 'notes-panel');
+      this.notesAsset!.visible = true;
+    } else {
+      this.notesAsset!.visible = false;
+      this.notesAsset!.position.copy(PARKED);
+    }
     this.place(this.nav!, 'nav-panel');
     campaign.update(Math.min(delta, 0.05));
 

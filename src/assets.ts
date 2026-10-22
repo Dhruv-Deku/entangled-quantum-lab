@@ -26,6 +26,11 @@ export default defineAssets({
     type: AssetType.UIKitML,
     name: 'Circuit Builder',
   },
+  'notes-panel': {
+    url: publicAssetUrl('ui/notes.uikitml'),
+    type: AssetType.UIKitML,
+    name: 'Notes',
+  },
   'gate-dock': {
     url: publicAssetUrl('ui/dock.uikitml'),
     type: AssetType.UIKitML,

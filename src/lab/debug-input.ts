@@ -32,6 +32,7 @@ const KEYS: [string, string][] = [
   ['L', 'Learn: one lesson per gate'],
   ['Q', 'Puzzles: match the target, beat par'],
   ['B', 'Build: circuit builder (cross-dot grid)'],
+  ['I', 'Notes: read about this chapter or lesson (again: next page)'],
   ['In Build', 'arrows move; H X Y Z S T place; Shift+S/T dagger; V SX; 1 2 3 Rx Ry Rz; C dot; O open dot; P plus; W swap; Backspace erase'],
   ['P', 'Play the chapters from Chapter 1'],
 ];
@@ -156,6 +157,9 @@ export class DebugInputSystem extends createSystem({}) {
       case 'b':
         campaign.enterBuild();
         feedback('select');
+        break;
+      case 'i':
+        window.dispatchEvent(new Event('entangled:notes'));
         break;
       case 'd':
         // dev only: dump state for automated checks

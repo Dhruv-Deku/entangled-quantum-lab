@@ -126,4 +126,9 @@ Choices made for Entangled, newest last, with the reason for each.
 - **The builder replaces the dock in the Build tab** (same place, same reach); hidden panels are
   parked far below the floor so no pointer can hit them. The grid is saved with the session.
 - **New gate `sxdg`** (square root of X, dagger) with Qiskit and PennyLane export names.
+- **Notes are separate from the card text**: the card stays one or two sentences of "what to do",
+  and the Notes panel holds the "why" (3-5 paragraphs ending with a key idea) for every chapter,
+  lesson and the builder. Notes are written in ASCII (|0>, sqrt(2)) and tested for it, because
+  the panel font draws anything else as a square. Read-aloud uses the Web Speech API; it turns
+  |01> into "zero one" and skips matrices and code, and the button hides where speech is missing.
 

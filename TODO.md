@@ -35,6 +35,7 @@ Deadline Nov 18, 2026 (ours: Nov 17). Feature freeze Nov 14. Cut from the bottom
 - [x] Ch 8 Superdense coding, Ch 9 Deutsch, Ch 10 Bernstein-Vazirani (4 qubits)
 - [x] 15 lessons (added SWAP, Kickback, No cloning)
 - [x] Gate effects: rotation path arc, gate name label, CNOT spark
+- [x] Notes: plain-English explanations for all 10 chapters, 15 lessons and the builder, with read-aloud
 - [x] Build tab: cross-dot circuit builder, 10 new tools, 10 unitary-checked challenges up to a Toffoli from two-qubit gates
 - [x] Chapter picker (1–7 on the card), finished chapters remembered
 

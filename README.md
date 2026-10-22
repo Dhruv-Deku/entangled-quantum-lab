@@ -14,7 +14,7 @@ your circuit exports to Qiskit.
 ```sh
 npm install
 npm run dev        # managed browser with the Quest 3 emulator (IWER)
-npm test           # 122 unit tests: physics, gestures, ghost-hand demos, 10 chapters, 15 lessons, puzzles, builder, share links
+npm test           # 125 unit tests: physics, gestures, ghost-hand demos, 10 chapters, 15 lessons, notes, puzzles, builder, share links
 npm run typecheck
 npm run build
 ```
@@ -52,6 +52,7 @@ depends on a single input path.
 | – | SWAP the selected qubit with the next | SWAP | W |
 | – | Puzzles | navigator: Puzzles | Q |
 | – | Build: circuit builder | navigator: Build | B (then arrows + letters) |
+| – | Notes: read (or listen to) the explanation | Notes on the card | I |
 | – | Copy a share link to this circuit | Qiskit, then Copy link | – |
 
 Gesture thresholds live in `src/gestures/config.ts` (with hysteresis, hold times
@@ -117,6 +118,18 @@ an arrowhead, so every single-qubit gate reads as what it is: a rotation. The
 gate's name ("H", "Ry +45°") rises out of the orb; two-qubit gates send a gold
 spark from control to target; a measurement shows "M = 1". A wrist turn is shown
 live by the hand and is not replayed when it is released.
+
+## Notes
+
+![Notes for the Z gate lesson](docs/screenshots/notes-z-gate.png)
+
+Every chapter, every lesson and the builder has **Notes**: three to five short
+paragraphs in plain English that explain the idea behind it, the math in simple
+form (|0>, sqrt(2), matrices), the Qiskit call, and where it is used in the real
+world, ending with one highlighted key idea. The card's Notes button opens them a
+page at a time; **Listen** reads the page aloud with the browser's speech engine,
+so nothing has to be read in the headset. All notes text is checked in the tests
+to be plain ASCII (the panel font has no special symbols) and to fit the panel.
 
 ## Build: circuit builder
 
