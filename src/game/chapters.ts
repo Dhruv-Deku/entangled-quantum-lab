@@ -49,8 +49,8 @@ export interface Step {
   action?: { label: string; run: (lab: Lab, memory: Record<string, unknown>) => void };
   /** What the ghost hand shows; a function when the step has several moves. */
   hint?: Hint | ((ctx: GoalContext) => Hint | null);
-  /** Target Bloch vector per qubit, drawn as a ghost arrow inside the orb (null: none). */
-  target?: (Vec3 | null)[];
+  /** Target Bloch vector per qubit, drawn as a ghost arrow inside the orb (null: none); a function when it depends on earlier steps. */
+  target?: (Vec3 | null)[] | ((memory: Record<string, unknown>) => (Vec3 | null)[]);
 }
 
 export interface Chapter {
@@ -641,4 +641,106 @@ export const CHAPTERS: Chapter[] = [
     ],
     outro: 'Bernstein-Vazirani: n questions become one. The same trick sits inside larger quantum algorithms.',
   },
+  {
+    title: 'The Mystery Qubit',
+    chip: 'Mystery',
+    qubits: 1,
+    steps: [
+      {
+        text: 'A sealed box makes copies of a qubit nobody will describe. Looking destroys a copy and gives one bit, so look at 100 copies along Z.',
+        goal: 'Look along Z',
+        keys: 'Press Enter',
+        enter: (lab, memory) => {
+          memory.mystery ??= mysteryState(lab.random(), lab.random());
+        },
+        action: { label: 'Look Z', run: look('z') },
+        done: ({ memory }) => memory.z !== undefined,
+        payoff: ({ memory }) => `${readout(memory, 'z')} The arrow sits at about ${signed(estimate(memory, 'z'))} on the Z axis.`,
+      },
+      {
+        text: 'Z alone cannot tell sideways arrows apart: they all give 50/50. Look along X: each copy gets a Hadamard first, which swings X onto Z.',
+        goal: 'Look along X',
+        keys: 'Press Enter',
+        action: { label: 'Look X', run: look('x') },
+        done: ({ memory }) => memory.x !== undefined,
+        payoff: ({ memory }) => `${readout(memory, 'x')} So x is about ${signed(estimate(memory, 'x'))}.`,
+      },
+      {
+        text: 'One axis left. For Y, each copy gets S dagger and then a Hadamard, which swings Y onto Z.',
+        goal: 'Look along Y',
+        keys: 'Press Enter',
+        action: { label: 'Look Y', run: look('y') },
+        done: ({ memory }) => memory.y !== undefined,
+        payoff: ({ memory }) => `${readout(memory, 'y')} So y is about ${signed(estimate(memory, 'y'))}. Three numbers: the whole state.`,
+      },
+      {
+        text: 'Your estimate is the faint arrow. Rebuild it on your own qubit: turn your wrist to tilt it, then T turns it around the vertical axis.',
+        goal: 'Match the faint arrow',
+        keys: 'Hold an arrow key, then press T',
+        hint: ({ state, memory }) => (fidelity(guess(memory), state, 0) < 0.95 ? twist(0) : null),
+        target: (memory) => [guess(memory)],
+        done: ({ state, memory }) => fidelity(guess(memory), state, 0) >= 0.95,
+        complete: ({ lab }) => lab.commitRotation(),
+        payoff: ({ state, memory }) => `Your qubit matches your estimate (fidelity ${fidelity(guess(memory), state, 0).toFixed(2)}).`,
+      },
+      {
+        text: 'Moment of truth: tap Reveal to compare your rebuilt qubit with the real one.',
+        goal: 'Reveal the mystery state',
+        keys: 'Press Enter',
+        target: (memory) => (memory.revealed ? [memory.mystery as Vec3] : [guess(memory)]),
+        action: {
+          label: 'Reveal',
+          run: (lab, memory) => {
+            memory.revealed = true;
+          },
+        },
+        done: ({ memory }) => memory.revealed === true,
+        payoff: ({ state, memory }) =>
+          `The real state is the new faint arrow. Your copy matches it with fidelity ${fidelity(memory.mystery as Vec3, state, 0).toFixed(2)}, from 300 copies and nothing else.`,
+      },
+    ],
+    outro: 'That was quantum state tomography: rebuilding an unknown state from many measurements. Labs use it to check every new qubit they make.',
+  },
 ];
+
+/**
+ * The Mystery Qubit: a random state, kept away from the poles so that X and Y
+ * matter (polar angle 35 to 145 degrees, any azimuth).
+ */
+export function mysteryState(u: number, v: number): Vec3 {
+  const theta = (35 + 110 * u) * (Math.PI / 180);
+  const phi = 2 * Math.PI * v;
+  return [Math.sin(theta) * Math.cos(phi), Math.sin(theta) * Math.sin(phi), Math.cos(theta)];
+}
+
+const AXIS = { x: 0, y: 1, z: 2 } as const;
+
+/**
+ * Card button: measure 100 fresh copies of the mystery state along one axis and
+ * show the counts on the rain. Each copy reads 0 with probability (1 + r)/2,
+ * where r is the state's component along that axis.
+ */
+function look(axis: 'x' | 'y' | 'z') {
+  return (lab: Lab, memory: Record<string, unknown>) => {
+    const m = memory.mystery as Vec3;
+    const p0 = (1 + m[AXIS[axis]]) / 2;
+    let zeros = 0;
+    for (let i = 0; i < 100; i++) if (lab.random() < p0) zeros++;
+    memory[axis] = zeros;
+    lab.showShots(Uint32Array.from([zeros, 100 - zeros]));
+  };
+}
+
+const estimate = (memory: Record<string, unknown>, axis: 'x' | 'y' | 'z') => ((memory[axis] as number) - 50) / 50;
+const signed = (v: number) => `${v >= 0 ? '+' : '-'}${Math.abs(v).toFixed(2)}`;
+const readout = (memory: Record<string, unknown>, axis: 'x' | 'y' | 'z') => {
+  const zeros = memory[axis] as number;
+  return `${zeros} read 0, ${100 - zeros} read 1.`;
+};
+
+/** The player's estimate as a unit vector (counts are noisy, so the raw vector is rarely length 1). */
+export function guess(memory: Record<string, unknown>): Vec3 {
+  const v: Vec3 = [estimate(memory, 'x'), estimate(memory, 'y'), estimate(memory, 'z')];
+  const len = Math.hypot(...v);
+  return len < 1e-9 ? [0, 0, 1] : [v[0] / len, v[1] / len, v[2] / len];
+}

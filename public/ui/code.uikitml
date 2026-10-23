@@ -1,5 +1,5 @@
 <!--
-  Export panel: the circuit you built, as Qiskit code. Authored at 10x:
+  Export panel: the circuit you built, as Qiskit or OpenQASM 3 code, with Simplify. Authored at 10x:
   UIKit units are cm, and the node is scaled 0.1.
 -->
 <style>
@@ -17,6 +17,7 @@
   }
   .head { flex-direction: row; justify-content: space-between; align-items: center; }
   .btns { flex-direction: row; gap: 8; }
+  .tools { margin-top: 10; }
   .title { font-size: 18; font-weight: 700; color: #f2f3f5; }
   .note { font-size: 11; color: #8a8d93; margin-top: 4; }
   .code { flex-direction: column; margin-top: 12; gap: 3; }
@@ -35,11 +36,13 @@
 </style>
 <div class="card">
   <div class="head">
-    <div class="title">Your circuit in Qiskit</div>
-    <div class="btns">
-      <div id="code-link" class="close"><div class="ct">Copy link</div></div>
-      <div id="code-close" class="close"><div class="ct">Close</div></div>
-    </div>
+    <div id="code-title" class="title">Your circuit in Qiskit</div>
+    <div id="code-close" class="close"><div class="ct">Close</div></div>
+  </div>
+  <div class="btns tools">
+    <div id="code-format" class="close"><div id="code-format-label" class="ct">QASM</div></div>
+    <div id="code-simplify" class="close"><div id="code-simplify-label" class="ct">Simplify</div></div>
+    <div id="code-link" class="close"><div class="ct">Copy link</div></div>
   </div>
   <div id="code-note" class="note">Runs as-is on a real quantum computer.</div>
   <div id="code-text" class="code">

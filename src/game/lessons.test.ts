@@ -81,7 +81,7 @@ describe('learn: every lesson', () => {
   it('the target arrow is where the solved state actually points', () => {
     for (const [i, lesson] of LESSONS.entries()) {
       const target = lesson.steps[0].target;
-      if (!target) continue;
+      if (!target || typeof target === 'function') continue;
       const lab = new Lab(1, mulberry32(5));
       const c = new Campaign(lab);
       c.startLesson(i);

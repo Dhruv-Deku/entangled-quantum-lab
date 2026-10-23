@@ -131,7 +131,7 @@ export class TutorSystem extends createSystem({}) {
     }
     // a lesson's target arrows, kept up after the goal is met so the ring can turn mint
     const v = campaign.view;
-    const targets = v.mode !== 'sandbox' && !v.intro ? v.step?.target ?? null : null;
+    const targets = v.mode !== 'sandbox' && !v.intro ? v.targets : null;
     const tkey = `${v.mode}-${v.chapterIndex}-${v.lessonIndex}-${v.puzzleIndex}-${labSys.orbCount}-${targets ? JSON.stringify(targets) : ''}`;
     if (tkey !== this.targetKey) {
       this.targetKey = tkey;

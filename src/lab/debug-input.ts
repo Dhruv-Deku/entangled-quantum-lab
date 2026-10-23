@@ -33,6 +33,8 @@ const KEYS: [string, string][] = [
   ['Q', 'Puzzles: match the target, beat par'],
   ['B', 'Build: circuit builder (cross-dot grid)'],
   ['I', 'Notes: read about this chapter or lesson (again: next page)'],
+  ['K', 'Code panel: your circuit as Qiskit or OpenQASM'],
+  ['G  /  O', 'Code panel: switch Qiskit / QASM, simplify the circuit'],
   ['In Build', 'arrows move; H X Y Z S T place; Shift+S/T dagger; V SX; 1 2 3 Rx Ry Rz; C dot; O open dot; P plus; W swap; Backspace erase'],
   ['P', 'Play the chapters from Chapter 1'],
 ];
@@ -160,6 +162,12 @@ export class DebugInputSystem extends createSystem({}) {
         break;
       case 'i':
         window.dispatchEvent(new Event('entangled:notes'));
+        break;
+      case 'k':
+      case 'g':
+      case 'o':
+        // the code panel, through a window event like notes: k opens or closes it, g switches format, o simplifies
+        window.dispatchEvent(new CustomEvent('entangled:code', { detail: { k: 'toggle', g: 'format', o: 'simplify' }[k.toLowerCase()] }));
         break;
       case 'd':
         // dev only: dump state for automated checks

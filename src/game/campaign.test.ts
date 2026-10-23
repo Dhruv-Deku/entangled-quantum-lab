@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { Lab } from '../lab/lab';
 import { mulberry32 } from '../quantum/measure';
+import { blochVector } from '../quantum/bloch';
 import { Campaign } from './campaign';
+import { guess, mysteryState } from './chapters';
 
 /** Advance the campaign until the current step's goal is met and the next step starts. */
 function settle(c: Campaign, seconds = 3): void {
@@ -328,5 +330,54 @@ describe('campaign: every chapter is completable with the same actions the gestu
     }
     expect(seen.size).toBe(7);
   });
-});
 
+  it('Chapter 11: three looks rebuild the mystery state, with wrist turns and T only', () => {
+    let close = 0;
+    for (let seed = 1; seed <= 30; seed++) {
+      const { lab, c } = setup(seed);
+      c.startChapter(10);
+      expect(lab.n).toBe(1);
+      for (const axis of ['z', 'x', 'y']) {
+        expect(c.view.action).toBe(`Look ${axis.toUpperCase()}`);
+        c.next();
+        settle(c);
+      }
+      expect(c.stepIndex).toBe(3);
+      const memory = c.toJSON().memory as Record<string, unknown>;
+      const g = guess(memory);
+      expect(c.view.targets?.[0]).toEqual(g);
+      // the gestures: tilt with the wrist (Ry), then turn around the vertical axis in T steps of 45 degrees
+      lab.rotate(0, Math.acos(g[2]));
+      lab.commitRotation();
+      const k = ((Math.round(Math.atan2(g[1], g[0]) / (Math.PI / 4)) % 8) + 8) % 8;
+      for (let i = 0; i < k; i++) lab.gate('t', 0);
+      settle(c);
+      expect(c.stepIndex).toBe(4);
+      c.next(); // Reveal
+      settle(c);
+      expect(c.chapterDone).toBe(true);
+      const m = memory.mystery as [number, number, number];
+      const r = blochVector(lab.state, 0);
+      if ((1 + m[0] * r[0] + m[1] * r[1] + m[2] * r[2]) / 2 > 0.9) close++;
+    }
+    // 100 shots per axis are noisy, but nearly every run lands close to the truth
+    expect(close).toBeGreaterThanOrEqual(27);
+  });
+
+  it('Chapter 11: the mystery state stays off the poles, and each look shows 100 copies', () => {
+    const lab = new Lab(1, mulberry32(3));
+    const c = new Campaign(lab);
+    c.startChapter(10);
+    const m = (c.toJSON().memory as { mystery: [number, number, number] }).mystery;
+    expect(Math.hypot(...m)).toBeCloseTo(1, 9);
+    expect(Math.abs(m[2])).toBeLessThan(Math.cos((35 * Math.PI) / 180) + 1e-9);
+    expect(mysteryState(0, 0)[2]).toBeCloseTo(Math.cos((35 * Math.PI) / 180), 9);
+    let shown: Uint32Array | null = null;
+    lab.on((e) => {
+      if (e.type === 'shots') shown = e.counts;
+    });
+    c.next();
+    expect(shown).not.toBeNull();
+    expect(shown![0] + shown![1]).toBe(100);
+  });
+});

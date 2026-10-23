@@ -15,7 +15,8 @@ import { LabSystem } from '../lab/lab-system';
 import { MAX_ORBS } from '../lab/lab';
 import { loadSave, writeSave } from '../lab/save';
 import type { Op } from '../quantum/circuit';
-import { toQiskit } from '../quantum/export';
+import { toQasm, toQiskit } from '../quantum/export';
+import { simplify } from '../quantum/optimize';
 import { decodeCircuit, encodeCircuit, SHARE_PREFIX } from '../quantum/share';
 import { qubitColor } from '../lab/visuals';
 import type { GateName } from '../quantum/gates';
@@ -40,7 +41,7 @@ const PLACEMENT = {
   'gate-dock': { pos: new Vector3(0.4, 0.09, 0.07), rot: new Euler((-38 * Math.PI) / 180, (-36 * Math.PI) / 180, 0, 'YXZ') },
   // the builder takes the dock's place in the Build tab, a little further out
   'builder-panel': { pos: new Vector3(0.44, 0.14, 0.03), rot: new Euler((-22 * Math.PI) / 180, (-32 * Math.PI) / 180, 0, 'YXZ') },
-  'code-panel': { pos: new Vector3(0.02, 0.34, -0.22), rot: new Euler(-0.05, 0, 0, 'YXZ') },
+  'code-panel': { pos: new Vector3(0.02, 0.31, -0.22), rot: new Euler(-0.05, 0, 0, 'YXZ') },
   // notes: in front of the circuit board, low enough to read without looking up
   'notes-panel': { pos: new Vector3(0, 0.3, -0.17), rot: new Euler(-0.1, 0, 0, 'YXZ') },
   // upper right, opposite the chapter card and above the dock
@@ -101,6 +102,16 @@ export class UISystem extends createSystem({
   private chapter: UIKitMLAsset | null = null;
   private dock: UIKitMLAsset | null = null;
   private code: UIKitMLAsset | null = null;
+  /** Code panel language. */
+  private codeFormat: 'qiskit' | 'qasm' = 'qiskit';
+  /** Sandbox circuit before Simplify, kept until the circuit changes, so Undo can bring it back. */
+  private unsimplified: { n: number; ops: Op[]; after: string } | null = null;
+  /** Outside the sandbox Simplify only previews: the panel shows the shorter circuit, the lab keeps yours. */
+  private preview: string | null = null;
+  /** A note that belongs to one exact circuit (keyed by its ops); dropped once the circuit changes. */
+  private codeNote: { key: string; text: string } | null = null;
+  /** Set while Simplify reloads the lab: the reload passes through an empty circuit, which must not count as a change. */
+  private reloading = false;
   private nav: UIKitMLAsset | null = null;
   private builderAsset: UIKitMLAsset | null = null;
   private builder: BuilderPanel | null = null;
@@ -189,7 +200,7 @@ export class UISystem extends createSystem({
     const dockIds = ['g-h', 'g-x', 'g-y', 'g-z', 'g-s', 'g-t', 'g-rl', 'g-rr', 'a-cnot', 'a-swap', 'a-measure', 'a-shots', 'a-export', 't-prev', 't-next', 'dock-status'];
     for (let i = 0; i < SLOTS; i++) dockIds.push(`t-${i}`, `t-${i}-l`);
     for (const id of dockIds) this.els.set(id, this.dock.requireElementById(id));
-    for (const id of ['code-close', 'code-note', 'code-link']) this.els.set(id, this.code.requireElementById(id));
+    for (const id of ['code-close', 'code-note', 'code-link', 'code-title', 'code-format', 'code-format-label', 'code-simplify', 'code-simplify-label']) this.els.set(id, this.code.requireElementById(id));
     for (let i = 0; i < CODE_LINES; i++) this.els.set(`code-${i}`, this.code.requireElementById(`code-${i}`));
     for (const [id, el] of this.els) el.name = id;
 
@@ -256,6 +267,19 @@ export class UISystem extends createSystem({
     }
     on('a-export', () => this.showCode());
     on('code-link', () => this.copyLink());
+    on('code-format', () => this.switchFormat());
+    on('code-simplify', () => this.simplifyCircuit());
+    // K, G and O on desktop
+    const onCodeKey = (e: Event) => {
+      const what = (e as CustomEvent<string>).detail;
+      if (what === 'toggle') {
+        if (this.code?.visible) this.code.visible = false;
+        else this.showCode();
+      } else if (what === 'format') this.switchFormat();
+      else if (what === 'simplify') this.simplifyCircuit();
+    };
+    window.addEventListener('entangled:code', onCodeKey);
+    this.cleanupFuncs.push(() => window.removeEventListener('entangled:code', onCodeKey));
     on('code-close', () => {
       this.code!.visible = false;
       feedback('select');
@@ -302,7 +326,7 @@ export class UISystem extends createSystem({
     if (v.intro) {
       this.text('chapter-eyebrow', 'Welcome');
       this.text('chapter-title', 'Entangled');
-      this.text('chapter-body', 'Hold a qubit in your hand. Ten short chapters, about fifteen minutes. A ghost hand shows every move, and every move has a button too.');
+      this.text('chapter-body', 'Hold a qubit in your hand. Eleven short chapters, about fifteen minutes. A ghost hand shows every move, and every move has a button too.');
       this.text('goal-text', this.immersive ? 'Tap Start, or pinch the orb and turn it' : 'Press Enter, or hold an arrow key');
       this.bg('goal-dot', C.current);
       for (let i = 0; i < 5; i++) this.els.get(`pip-${i}`)?.setProperties({ display: 'none' });
@@ -548,12 +572,80 @@ export class UISystem extends createSystem({
     feedback('select');
   }
 
-  /** Show the circuit so far as Qiskit code (also copied to the clipboard on desktop). */
+  /** Switch the code panel between Qiskit and OpenQASM 3. */
+  private switchFormat(): void {
+    this.codeFormat = this.codeFormat === 'qiskit' ? 'qasm' : 'qiskit';
+    this.showCode();
+  }
+
+  /**
+   * Simplify: cancel, merge and commute gates (src/quantum/optimize.ts). In the
+   * sandbox the circuit is replaced, and the button becomes Undo until it
+   * changes; elsewhere the panel previews the shorter version and the chapter's
+   * own circuit is left alone.
+   */
+  private simplifyCircuit(): void {
+    const ops = lab.history.ops.slice();
+    const key = JSON.stringify(ops);
+    if (this.unsimplified && this.unsimplified.after === key) {
+      const { n, ops: before } = this.unsimplified;
+      this.unsimplified = null;
+      this.codeNote = { key: JSON.stringify(before), text: `Back to your original ${before.length} steps.` };
+      this.reload(n, before);
+      this.showCode();
+      return;
+    }
+    if (this.preview === key) {
+      this.preview = null;
+      this.codeNote = null;
+      this.showCode();
+      return;
+    }
+    const r = simplify(ops);
+    if (r.ops.length === ops.length) {
+      this.codeNote = { key, text: 'Already as short as these rules make it: nothing cancels, merges or slides together.' };
+      this.showCode(false);
+      feedback('reject');
+      return;
+    }
+    const what = `${ops.length} steps to ${r.ops.length} (${r.cancelled} cancelled, ${r.merged} merged)`;
+    if (campaign.mode === 'sandbox') {
+      const after = JSON.stringify(r.ops);
+      this.unsimplified = { n: lab.n, ops, after };
+      this.codeNote = { key: after, text: `Simplified: ${what}. Same circuit, fewer gates. Undo brings yours back.` };
+      this.reload(lab.n, r.ops);
+    } else {
+      this.preview = key;
+      this.codeNote = { key, text: `Simplified copy: ${what}. Your circuit here is unchanged.` };
+    }
+    this.showCode();
+  }
+
+  private reload(n: number, ops: Op[]): void {
+    this.reloading = true;
+    try {
+      lab.load(n, ops);
+    } finally {
+      this.reloading = false;
+    }
+    // the card redrew mid-reload (on the reset), so draw it again with the new circuit
+    this.render(campaign.view);
+  }
+
+  /** Show the circuit so far as Qiskit or OpenQASM code (also copied to the clipboard on desktop). */
   private showCode(sound = true): void {
-    if (!this.code) return;
+    if (!this.code || this.reloading) return;
     if (this.notes?.open) this.notes.close();
-    const code = toQiskit(lab.n, lab.history.ops);
-    const body = code.split('\n').filter((l) => l && !l.startsWith('#') && !l.startsWith('from') && !l.startsWith('print'));
+    const ops = lab.history.ops;
+    const key = JSON.stringify(ops);
+    if (this.unsimplified && this.unsimplified.after !== key) this.unsimplified = null;
+    if (this.preview !== null && this.preview !== key) this.preview = null;
+    if (this.codeNote && this.codeNote.key !== key) this.codeNote = null;
+    const shownOps = this.preview !== null ? simplify(ops).ops : ops;
+    const qasm = this.codeFormat === 'qasm';
+    const code = qasm ? toQasm(lab.n, shownOps) : toQiskit(lab.n, shownOps);
+    const skip = qasm ? ['//', 'include'] : ['#', 'from', 'print'];
+    const body = code.split('\n').filter((l) => l && !skip.some((p) => l.startsWith(p)));
     const shown = body.length > CODE_LINES ? ['...', ...body.slice(-(CODE_LINES - 1))] : body;
     // UIKit text ignores line breaks, so each code line is its own element
     for (let i = 0; i < CODE_LINES; i++) {
@@ -561,7 +653,16 @@ export class UISystem extends createSystem({
       if (i < shown.length) el?.setProperties({ text: shown[i], display: 'flex' });
       else el?.setProperties({ display: 'none' });
     }
-    this.text('code-note', `${lab.history.ops.length} steps. Runs as-is in Qiskit${this.immersive ? '.' : '; copied to your clipboard.'}`);
+    const lang = qasm ? 'OpenQASM 3' : 'Qiskit';
+    this.text('code-title', `Your circuit in ${lang}`);
+    this.text('code-format-label', qasm ? 'Qiskit' : 'QASM');
+    this.text('code-simplify-label', this.unsimplified ? 'Undo' : this.preview !== null ? 'Original' : 'Simplify');
+    this.bg('code-simplify', this.unsimplified || this.preview !== null ? '#2d7ff9' : '#34363b');
+    this.text(
+      'code-note',
+      this.codeNote?.text ??
+        `${ops.length} steps. ${qasm ? 'Opens in IBM Quantum, Qiskit, Braket and most other tools' : 'Runs as-is in Qiskit'}${this.immersive ? '.' : '; copied to your clipboard.'}`,
+    );
     this.code.visible = true;
     if (sound) {
       feedback('select');
@@ -570,7 +671,7 @@ export class UISystem extends createSystem({
       } catch {
         // clipboard unavailable (headset browser, permissions): the panel still shows the code
       }
-      console.info('[Entangled] Qiskit export\n' + code);
+      console.info(`[Entangled] ${lang} export\n` + code);
     }
   }
 

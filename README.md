@@ -7,7 +7,7 @@ TypeScript.
 
 Every number on screen comes from a real statevector simulator: Bloch arrows
 shrink honestly when qubits entangle, measurement follows the Born rule, and
-your circuit exports to Qiskit.
+your circuit exports to Qiskit and OpenQASM 3.
 
 ![Chapter 10, Hidden Number: four qubits, the circuit board above them and 100 shots that all read 1101](docs/screenshots/ch10-hidden-number.png)
 
@@ -16,7 +16,7 @@ your circuit exports to Qiskit.
 ```sh
 npm install
 npm run dev        # managed browser with the Quest 3 emulator (IWER)
-npm test           # 125 unit tests: physics, gestures, ghost-hand demos, 10 chapters, 15 lessons, notes, puzzles, builder, share links
+npm test           # 138 unit tests: physics, gestures, ghost-hand demos, 11 chapters, 15 lessons, notes, puzzles, builder, share links, simplifier, OpenQASM
 npm run typecheck
 npm run build
 ```
@@ -58,6 +58,8 @@ depends on a single input path.
 | – | Build: circuit builder | navigator: Build | B (then arrows + letters) |
 | – | Notes: read (or listen to) the explanation | Notes on the card | I |
 | – | Copy a share link to this circuit | Qiskit, then Copy link | – |
+| – | Code panel: Qiskit or OpenQASM 3 | Qiskit, then QASM | K, then G |
+| – | Simplify the circuit (Undo brings it back) | Qiskit, then Simplify | O |
 
 Gesture thresholds live in `src/gestures/config.ts` (with hysteresis, hold times
 and a shared cooldown, so fist, spread and pinch never trigger each other).
@@ -72,7 +74,7 @@ src/gestures/  hand-joint features and the gesture state machine (tested with a
                synthetic hand, including tracking noise)
 src/lab/       the lab model, 3D orbs, threads, GHZ ring, probability rain,
                gesture and desktop input systems, sound, autosave
-src/game/      ten chapters, fifteen lessons, twelve puzzles, the circuit builder,
+src/game/      eleven chapters, fifteen lessons, twelve puzzles, the circuit builder,
                notes, sandbox presets, the campaign state machine, hands-only
                panels, the ghost-hand tutor
 public/ui/     UIKitML panels (chapter card, gate dock, code, navigator, builder,
@@ -91,6 +93,7 @@ public/ui/     UIKitML panels (chapter card, gate dock, code, navigator, builder
 8. **Two Bits, One Qubit** – superdense coding: a random two-bit message travels on one qubit of a shared pair, 100 shots out of 100.
 9. **One Question** – Deutsch: a sealed box is constant or balanced; one question through phase kickback tells which, for all four boxes.
 10. **Hidden Number** – Bernstein-Vazirani on 4 qubits: a random 3-bit number read in one question instead of three.
+11. **The Mystery Qubit** – state tomography: a sealed box hides a random state; look at 100 copies along Z, X and Y, rebuild the arrow with your wrist and T, then reveal how close you came.
 
 | Chapter 3: measure one qubit and the other always agrees | Chapter 8: two bits sent on one qubit, 100 of 100 shots |
 | --- | --- |
@@ -167,6 +170,38 @@ block the easy way out, par is the reference solution's step count, and stars
 work like puzzles. Desktop: arrows move a cursor; H X Y Z S T place gates (Shift
 for the daggers), V is SX, 1 2 3 are Rx Ry Rz, C a dot, O an open dot, P a plus,
 W a swap mark.
+
+## The Mystery Qubit
+
+![Chapter 11: three looks of 100 copies each, the rebuilt qubit and the revealed state, fidelity 0.96](docs/screenshots/ch11-mystery-qubit.png)
+
+One copy of an unknown qubit tells you one bit. The box makes copies, so you
+look at 100 of them along each axis (a Hadamard first for X, S dagger and H for
+Y) and the counts land on the rain. Your estimate appears as a faint arrow; you
+rebuild it on your own qubit with a wrist turn and T gates (45 degree steps
+around the vertical axis), then Reveal draws the real state and the fidelity.
+With 100 copies per axis it lands within about 0.1 of the truth, which the tests
+check across 30 random states.
+
+## Simplify, Qiskit and OpenQASM
+
+![The code panel in OpenQASM 3 after Simplify: 7 steps down to 2](docs/screenshots/code-simplify-qasm.png)
+
+The code panel shows your circuit as **Qiskit** or **OpenQASM 3** (the text
+format IBM Quantum, Qiskit and Amazon Braket read); any controlled gate is
+written exactly with `ctrl @`. **Simplify** shortens the circuit the way a
+compiler's first passes do: gates that undo each other cancel (H H, S S dagger,
+CNOT CNOT), gates that add up merge (T T is S, two SX are X, rotations add), and
+gates slide past others they commute with so more of them meet, e.g. a Z on a
+CNOT's control passes through it. Measurements and classically controlled gates
+never move. In the sandbox the circuit is replaced and Undo brings yours back;
+in a chapter the panel only previews the shorter version.
+
+Both exports and the simplifier were cross-checked against Qiskit 2.5 (the QASM
+loaded with `qiskit.qasm3.loads`, every circuit compared as a full unitary) on
+60 random circuits with every gate, one and two controls, swaps and iSWAP. The
+unit tests check the simplifier on 300 random circuits, and that every pair of
+gates it calls commuting really does.
 
 ## Circuit board
 

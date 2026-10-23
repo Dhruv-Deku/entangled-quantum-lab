@@ -72,6 +72,12 @@ export const NOTES: Record<string, string[]> = {
     'Hadamards on the inputs turn those signs straight into the bits of s. One question reads the whole string: 3 bits here, but it works the same for a million.',
     'Key idea: n questions become one. The same pattern of superposition, phase kickback and interference sits inside bigger algorithms, including Simon\'s and Shor\'s.',
   ],
+  'The Mystery Qubit': [
+    'One copy of a qubit tells you almost nothing: a measurement gives a single bit and destroys the rest, and an unknown qubit cannot be copied. But if a machine can make the same state again and again, many measurements can rebuild it.',
+    'Measuring along Z gives P(0) = (1 + z)/2, so z = P(0) - P(1). To measure along X, first apply H, which swings the X axis onto Z. For Y, apply S dagger and then H. Three axes give the three numbers of the arrow: x, y and z.',
+    'With 100 copies per axis each number is off by about 0.1, so your rebuilt arrow lands close to the real one but not on it. Four times the copies halves the error. Qiskit does this with StateTomography in qiskit_experiments.',
+    'Key idea: one copy tells you almost nothing, many copies tell you everything. Tomography is how labs check every new qubit and gate they build.',
+  ],
 
   // ---------- lessons ----------
   Hadamard: [

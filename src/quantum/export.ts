@@ -147,3 +147,59 @@ export function toPennyLane(n: number, ops: readonly Op[]): string {
     '',
   ].join('\n');
 }
+
+/** Gate names in OpenQASM 3's stdgates.inc (SX dagger has none, so it is written as inv @ sx). */
+const QASM_GATE: Record<GateName, string> = {
+  x: 'x', y: 'y', z: 'z', h: 'h', s: 's', sdg: 'sdg', t: 't', tdg: 'tdg',
+  sx: 'sx', sxdg: 'inv @ sx', rx: 'rx', ry: 'ry', rz: 'rz', p: 'p', u: 'U',
+};
+
+const ctrl = (k: number) => (k === 0 ? '' : k === 1 ? 'ctrl @ ' : `ctrl(${k}) @ `);
+
+/**
+ * OpenQASM 3, the text format IBM Quantum, Qiskit, Amazon Braket and most other
+ * toolchains read. Controls use the ctrl @ modifier, so any controlled gate the
+ * lab can make has an exact line here.
+ */
+export function toQasm(n: number, ops: readonly Op[]): string {
+  const q = (k: number) => `q[${k}]`;
+  const body: string[] = [];
+  let iswap = false;
+  for (const op of ops) {
+    switch (op.kind) {
+      case 'gate': {
+        const params = op.params?.length ? `(${op.params.map(angle).join(', ')})` : '';
+        const controls = op.controls ?? [];
+        const line = `${ctrl(controls.length)}${QASM_GATE[op.gate]}${params} ${[...controls, op.target].map(q).join(', ')};`;
+        body.push(op.condition ? `if (c[${op.condition.bit}] == ${op.condition.value ? 'true' : 'false'}) ${line}` : line);
+        break;
+      }
+      case 'swap': {
+        const controls = op.controls ?? [];
+        body.push(`${ctrl(controls.length)}swap ${[...controls, op.a, op.b].map(q).join(', ')};`);
+        break;
+      }
+      case 'iswap':
+        iswap = true;
+        body.push(`iswap ${q(op.a)}, ${q(op.b)};`);
+        break;
+      case 'measure':
+        body.push(`c[${op.bit ?? op.qubit}] = measure ${q(op.qubit)};`);
+        break;
+      case 'reset':
+        body.push(`reset ${q(op.qubit)};`);
+        break;
+    }
+  }
+  return [
+    '// Exported from Entangled',
+    'OPENQASM 3.0;',
+    'include "stdgates.inc";',
+    // the same decomposition Qiskit uses for its iSwapGate
+    ...(iswap ? ['gate iswap a, b { s a; s b; h a; cx a, b; cx b, a; h b; }'] : []),
+    `qubit[${n}] q;`,
+    `bit[${n}] c;`,
+    ...body,
+    '',
+  ].join('\n');
+}

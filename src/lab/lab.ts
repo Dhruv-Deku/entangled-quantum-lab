@@ -139,6 +139,11 @@ export class Lab {
     return counts;
   }
 
+  /** Put shots that came from outside the register (copies of a sealed qubit) on the rain. */
+  showShots(counts: Uint32Array): void {
+    this.emit({ type: 'shots', counts, shots: counts.reduce((a, b) => a + b, 0) });
+  }
+
   /** Add wrist rotation to qubit q; previewed live until committed. */
   rotate(q: number, delta: number): void {
     if (this.pending && this.pending.qubit !== q) this.commitRotation();

@@ -1,5 +1,6 @@
 import type { Lab, LabEvent } from '../lab/lab';
 import type { Op } from '../quantum/circuit';
+import type { Vec3 } from '../quantum/gates';
 import { CHAPTERS, type Chapter, type GoalContext, type Hint, type Step } from './chapters';
 import { LESSONS } from './lessons';
 import { PRESETS } from './presets';
@@ -40,6 +41,8 @@ export interface CampaignView {
   /** The current step's text and goal, worked out for this run (they can depend on earlier steps). */
   text: string | null;
   goal: string | null;
+  /** Target arrows for the current step, worked out for this run. */
+  targets: (Vec3 | null)[] | null;
 }
 
 type Listener = (v: CampaignView) => void;
@@ -137,6 +140,7 @@ export class Campaign {
       preset: this.preset,
       text: step ? (typeof step.text === 'function' ? step.text(this.memory) : step.text) : null,
       goal: step ? (typeof step.goal === 'function' ? step.goal(this.memory) : step.goal) : null,
+      targets: step?.target ? (typeof step.target === 'function' ? step.target(this.memory) : step.target) : null,
     };
   }
 
