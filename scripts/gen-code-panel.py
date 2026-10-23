@@ -8,7 +8,7 @@ Run: python scripts/gen-code-panel.py
 from pathlib import Path
 
 LINES = 10
-TABS = [('qiskit', 'Qiskit'), ('qasm', 'OpenQASM 3'), ('pennylane', 'PennyLane'), ('chip', 'On chip')]
+TABS = [('qiskit', 'Qiskit'), ('qasm', 'QASM 3'), ('pennylane', 'PennyLane'), ('chip', 'On chip'), ('maths', 'Maths')]
 
 style = """
 <style>

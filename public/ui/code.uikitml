@@ -83,9 +83,10 @@
   </div>
   <div class="tabs">
     <div id="code-tab-qiskit" class="tab"><div id="code-tab-qiskit-l" class="tl">Qiskit</div></div>
-    <div id="code-tab-qasm" class="tab"><div id="code-tab-qasm-l" class="tl">OpenQASM 3</div></div>
+    <div id="code-tab-qasm" class="tab"><div id="code-tab-qasm-l" class="tl">QASM 3</div></div>
     <div id="code-tab-pennylane" class="tab"><div id="code-tab-pennylane-l" class="tl">PennyLane</div></div>
     <div id="code-tab-chip" class="tab"><div id="code-tab-chip-l" class="tl">On chip</div></div>
+    <div id="code-tab-maths" class="tab"><div id="code-tab-maths-l" class="tl">Maths</div></div>
   </div>
   <div id="code-note" class="note">-</div>
   <div class="code">

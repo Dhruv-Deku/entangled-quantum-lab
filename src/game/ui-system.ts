@@ -755,7 +755,7 @@ export class UISystem extends createSystem({
       const line = all[first + i];
       this.els.get(`code-r-${i}`)?.setProperties({ display: line ? 'flex' : 'none' });
       if (!line) continue;
-      const space = /^\s/.test(line.rest);
+      const space = /^\s/.test(line.rest) || /\s$/.test(line.head);
       this.text(`code-n-${i}`, String(first + i + 1));
       this.els.get(`code-h-${i}`)?.setProperties({ text: line.head || ' ', display: line.head ? 'flex' : 'none' });
       this.els.get(`code-t-${i}`)?.setProperties({
@@ -775,13 +775,15 @@ export class UISystem extends createSystem({
     }
     const range = count > 1 ? `lines ${first + 1}-${Math.min(all.length, first + CODE_LINES)} of ${all.length}` : `${all.length} lines`;
     this.text('code-eyebrow', `Code  /  ${ops.length} steps on ${lab.n} qubit${lab.n === 1 ? '' : 's'}  /  ${range}`);
-    this.text('code-title', onChip ? 'Your circuit on the T5 chip' : `Your circuit in ${lang}`);
+    const onMaths = this.codeFormat === 'maths';
+    labSys?.showMaths(onMaths && this.code.visible);
+    this.text('code-title', onChip ? 'Your circuit on the T5 chip' : onMaths ? 'The maths of this step' : `Your circuit in ${lang}`);
     this.els.get('code-simplify')?.setProperties({ display: onChip ? 'none' : 'flex' });
     this.els.get('code-run')?.setProperties({ display: onChip ? 'flex' : 'none' });
     this.bg('code-run', typeof routed === 'string' ? '#26272b' : C.primary);
     this.text('code-simplify-label', this.unsimplified ? 'Undo' : this.preview !== null ? 'Original' : 'Simplify');
     this.bg('code-simplify', this.unsimplified || this.preview !== null ? C.primary : '#34363b');
-    const where = { qiskit: 'Runs as-is in Qiskit', qasm: 'Opens in IBM Quantum, Qiskit, Braket and most other tools', pennylane: 'Runs as-is in PennyLane', chip: '' }[this.codeFormat];
+    const where = { qiskit: 'Runs as-is in Qiskit', qasm: 'Opens in IBM Quantum, Qiskit, Braket and most other tools', pennylane: 'Runs as-is in PennyLane', chip: '', maths: 'Scrub the timeline to see any step. The board above shows it typeset' }[this.codeFormat];
     const chipNote = !routed
       ? ''
       : typeof routed === 'string'
@@ -883,6 +885,7 @@ export class UISystem extends createSystem({
     const hardware = this.code!.visible && this.codeFormat === 'chip';
     if (chip) chip.root.visible = hardware;
     if (!hardware) this.world.getSystem(LabSystem)?.showHardware(null);
+    if (!this.code!.visible || this.codeFormat !== 'maths') this.world.getSystem(LabSystem)?.showMaths(false);
     // notes sit where the code panel does; only one of the two is open at a time
     if (this.notes!.open) {
       this.placeBlend(this.notesAsset!, 'notes-panel', 'notes-zoom', this.zoomT, this.notesScale, this.notesOpenT);

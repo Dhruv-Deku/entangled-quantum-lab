@@ -1,6 +1,8 @@
 import { CanvasTexture, Mesh, MeshBasicMaterial, PlaneGeometry, SRGBColorSpace } from '@iwsdk/core';
 import type { Op } from '../quantum/circuit';
 import type { Schedule } from '../quantum/pulses';
+import { exact } from '../quantum/exact';
+import { dirac, factor, gateFormula, gateName, ket, kronLabel, localMatrix, qubitsOf } from '../quantum/matrix';
 import type { QState } from '../quantum/state';
 import { qubitColor } from './visuals';
 
@@ -167,6 +169,97 @@ export class CircuitBoard {
       g.fillStyle = BLUE;
       g.fillRect(tx(Math.min(total, cursor)) - 1.5, top - 40, 3, H - 150);
     }
+    this.tex.needsUpdate = true;
+  }
+
+  /**
+   * The maths of one step: the gate's matrix (exact entries, a shared factor
+   * pulled out, kets on the rows), its formula, where it sits in the register
+   * as a tensor product, the state before and after as column vectors (up to
+   * three qubits), and the new state in Dirac notation with its probabilities.
+   */
+  renderMaths(n: number, op: Op | null, step: number, steps: number, before: QState, after: QState): void {
+    const g = this.g;
+    g.clearRect(0, 0, W, H);
+    roundRect(g, 4, 4, W - 8, H - 8, 40);
+    g.fillStyle = 'rgba(29,30,33,0.94)';
+    g.fill();
+    g.lineWidth = 2;
+    g.strokeStyle = '#34363b';
+    g.stroke();
+    if (!op) {
+      text(g, 'The maths', 44, 58, DIM, '600 26px');
+      rich(g, `No steps yet:   |ψ⟩ = ${ket(0, n)}`, 44, 200, 44, INK, 600);
+      rich(g, 'Every qubit starts in |0⟩. Each step multiplies the state by one matrix: |ψ⟩ → U|ψ⟩.', 44, 270, 26, DIM, 500);
+      this.tex.needsUpdate = true;
+      return;
+    }
+    const qs = qubitsOf(op);
+    const name = gateName(op);
+    text(g, `Step ${step} of ${steps}  /  ${name} on ${qs.map((q) => `q${q}`).join(', ')}`, 44, 62, DIM, '600 30px');
+    rich(g, `U = ${kronLabel(n, op)}`, W - 44, 62, 34, INK, 700, 'right');
+    rich(g, gateFormula(op), 44, 116, 30, '#c9ccd1', 500);
+
+    // the gate's matrix on the qubits it touches
+    const { m } = localMatrix(op);
+    const k = qs.length;
+    const f = factor(m.flat());
+    const size = k === 1 ? 54 : k === 2 ? 40 : 26;
+    const cells = m.map((row) => row.map(([re, im]) => (f ? exact(re / f.scale, im / f.scale) : exact(re, im)).text));
+    const colW = Math.max(...cells.flat().map((c) => measureRich(g, c, size, 600))) + (k === 3 ? 18 : 30);
+    const rowH = k === 1 ? 96 : k === 2 ? 70 : 44;
+    const mTop = 172 + Math.max(0, (8 * 44 - (1 << k) * rowH) / 2);
+    let x = 44;
+    x += rich(g, `${op.kind === 'measure' ? `P_{${op.outcome ?? 0}}` : name} = `, x, mTop + ((1 << k) * rowH) / 2 + 14, 40, INK, 700) + 6;
+    if (f) x += rich(g, f.label.text, x, mTop + ((1 << k) * rowH) / 2 + size * 0.35, size, INK, 600) + 10;
+    const left = x, width = colW * (1 << k), height = (1 << k) * rowH;
+    bracket(g, left, mTop, height, 1);
+    bracket(g, left + width + 14, mTop, height, -1);
+    cells.forEach((row, r) =>
+      row.forEach((c, col) => {
+        const cx = left + 7 + col * colW + colW / 2;
+        rich(g, c, cx, mTop + r * rowH + rowH / 2 + size * 0.35, size, c === '0' ? '#55585e' : INK, 600, 'center');
+      }),
+    );
+    // row kets of the touched qubits, highest first
+    const sub = qs.slice().reverse().map((q) => `q${q}`).join(' ');
+    text(g, sub, left + width / 2 + 7, mTop - 14, '#6b6e75', '600 20px', 'center');
+    for (let r = 0; r < 1 << k; r++) text(g, ket(r, k), left + width + 28, mTop + r * rowH + rowH / 2 + 8, '#6b6e75', '500 22px');
+
+    // the state before and after, as columns (three qubits or fewer)
+    const vx = Math.max(left + width + 150, 860);
+    if (n <= 3) {
+      const dim = 1 << n;
+      const vh = Math.min(76, 352 / dim);
+      const vtop = 186 + (352 - dim * vh) / 2;
+      const vsize = n === 3 ? 26 : 38;
+      const column = (s: QState, x0: number, label: string, color: string) => {
+        const vals = Array.from({ length: dim }, (_, i) => exact(s.re[i], s.im[i]).text);
+        const w = Math.max(70, ...vals.map((v) => measureRich(g, v, vsize, 600))) + 26;
+        rich(g, label, x0 + w / 2 + 7, vtop - 18, 26, color, 700, 'center');
+        bracket(g, x0, vtop, dim * vh, 1);
+        bracket(g, x0 + w + 14, vtop, dim * vh, -1);
+        vals.forEach((v, i) => rich(g, v, x0 + 7 + w / 2, vtop + i * vh + vh / 2 + vsize * 0.35, vsize, v === '0' ? '#55585e' : INK, 600, 'center'));
+        return w + 14;
+      };
+      for (let i = 0; i < dim; i++) text(g, ket(i, n), vx - 12, vtop + i * vh + vh / 2 + 8, '#6b6e75', '500 22px', 'right');
+      let cx = vx;
+      cx += column(before, cx, 'before', DIM) + 34;
+      rich(g, '→', cx, vtop + (dim * vh) / 2 + 14, 48, GOLD, 700);
+      cx += 80;
+      column(after, cx, 'after', INK);
+    } else {
+      rich(g, `${n} qubits: ${1 << n} amplitudes, too many to list as a column.`, vx, 300, 24, DIM, 500);
+    }
+
+    // the new state, and what measuring it would give
+    rich(g, `|ψ⟩ = ${dirac(after, 5)}`, 44, H - 66, 40, INK, 600);
+    const probs: string[] = [];
+    for (let i = 0; i < after.dim && probs.length < 5; i++) {
+      const p = after.re[i] ** 2 + after.im[i] ** 2;
+      if (p > 1e-6) probs.push(`P(${i.toString(2).padStart(n, '0')}) = ${exact(p, 0).text}`);
+    }
+    rich(g, probs.join('    '), 44, H - 24, 24, DIM, 500);
     this.tex.needsUpdate = true;
   }
 
@@ -348,6 +441,55 @@ function text(g: CanvasRenderingContext2D, s: string, x: number, y: number, colo
   g.textAlign = align;
   g.fillText(s, x, y);
   g.textAlign = 'left';
+}
+
+/** Split text with ^{sup} and _{sub} markup into runs. */
+function runsOf(s: string): { t: string; mode: 0 | 1 | -1 }[] {
+  const out: { t: string; mode: 0 | 1 | -1 }[] = [];
+  const re = /\^\{([^}]*)\}|_\{([^}]*)\}/g;
+  let last = 0;
+  for (let m = re.exec(s); m; m = re.exec(s)) {
+    if (m.index > last) out.push({ t: s.slice(last, m.index), mode: 0 });
+    out.push(m[1] !== undefined ? { t: m[1], mode: 1 } : { t: m[2], mode: -1 });
+    last = m.index + m[0].length;
+  }
+  if (last < s.length) out.push({ t: s.slice(last), mode: 0 });
+  return out;
+}
+
+function measureRich(g: CanvasRenderingContext2D, s: string, size: number, weight: number): number {
+  let w = 0;
+  for (const r of runsOf(s)) {
+    g.font = `${weight} ${r.mode ? size * 0.65 : size}px Inter, system-ui, sans-serif`;
+    w += g.measureText(r.t).width;
+  }
+  return w;
+}
+
+/** Draw maths text with superscripts and subscripts; returns its width. */
+function rich(g: CanvasRenderingContext2D, s: string, x: number, y: number, size: number, color: string, weight: number, align: 'left' | 'center' | 'right' = 'left'): number {
+  const w = measureRich(g, s, size, weight);
+  let cx = align === 'left' ? x : align === 'center' ? x - w / 2 : x - w;
+  g.fillStyle = color;
+  g.textAlign = 'left';
+  for (const r of runsOf(s)) {
+    g.font = `${weight} ${r.mode ? size * 0.65 : size}px Inter, system-ui, sans-serif`;
+    g.fillText(r.t, cx, y + (r.mode === 1 ? -size * 0.42 : r.mode === -1 ? size * 0.22 : 0));
+    cx += g.measureText(r.t).width;
+  }
+  return w;
+}
+
+/** A square matrix bracket: dir 1 opens to the right, -1 to the left. */
+function bracket(g: CanvasRenderingContext2D, x: number, top: number, h: number, dir: 1 | -1): void {
+  g.strokeStyle = '#c9ccd1';
+  g.lineWidth = 2.5;
+  g.beginPath();
+  g.moveTo(x + 9 * dir, top);
+  g.lineTo(x, top);
+  g.lineTo(x, top + h);
+  g.lineTo(x + 9 * dir, top + h);
+  g.stroke();
 }
 
 /** '#rrggbb' plus an alpha, as rgba(). */

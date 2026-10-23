@@ -16,7 +16,7 @@ your circuit exports to Qiskit and OpenQASM 3.
 ```sh
 npm install
 npm run dev        # managed browser with the Quest 3 emulator (IWER)
-npm test           # 159 unit tests: physics, gestures, ghost-hand demos, 11 chapters, 15 lessons, notes, puzzles, builder, share links, simplifier, OpenQASM, code window, chip routing, noise and pulse schedules
+npm test           # 170 unit tests: physics, gestures, ghost-hand demos, 11 chapters, 15 lessons, notes, puzzles, builder, share links, simplifier, OpenQASM, code window, chip routing, noise, pulse schedules, gate matrices and exact maths
 npm run typecheck
 npm run build
 ```
@@ -62,6 +62,7 @@ depends on a single input path.
 | – | Zoom the code window and notes (bigger, at eye level) | Zoom | = |
 | – | Page through long code | Back / More | Up / Down |
 | – | Route onto the 5-qubit chip and run with hardware errors | Qiskit, On chip, Run on chip | K, G to On chip, O |
+| – | The maths of each step: matrix, formula, state vectors | Qiskit, Maths | K, G to Maths, then Ctrl+Z / Ctrl+Y |
 | – | Simplify the circuit (Undo brings it back) | Qiskit, then Simplify | O |
 
 Gesture thresholds live in `src/gestures/config.ts` (with hysteresis, hold times
@@ -213,6 +214,30 @@ loaded with `qiskit.qasm3.loads`, every circuit compared as a full unitary) on
 60 random circuits with every gate, one and two controls, swaps and iSWAP. The
 unit tests check the simplifier on 300 random circuits, and that every pair of
 gates it calls commuting really does.
+
+## The maths of every step
+
+![The Maths tab: CX as a 4x4 matrix with kets on the rows, its formula, U = CX, the state before and after as column vectors, and the new state in Dirac notation](docs/screenshots/maths-board.png)
+
+The code window's **Maths** tab turns the circuit board into a page of linear
+algebra for the current step, and follows the timeline, so Ctrl+Z / Ctrl+Y (or
+tapping a step) walks through the whole circuit one matrix at a time:
+
+- **the gate as a matrix** on the qubits it touches (2x2, 4x4 for two-qubit
+  gates, 8x8 for a Toffoli or Fredkin), rows labelled with kets in Qiskit's
+  order, zeros dimmed, and a shared factor pulled out, so H reads
+  1/√2 [[1, 1], [1, −1]];
+- **its formula**: H = (X + Z)/√2, Ry(θ) = e^{−iθY/2} = cos(θ/2) I − i sin(θ/2) Y
+  with the step's θ filled in, C-U = |0⟩⟨0| ⊗ I + |1⟩⟨1| ⊗ U, and for a
+  measurement the projector P = |1⟩⟨1| with |ψ⟩ → P|ψ⟩ / ‖P|ψ⟩‖;
+- **where it sits in the register** as a tensor product: U = I ⊗ H ⊗ I;
+- **the state before and after** as column vectors (up to three qubits), and
+  **the new state in Dirac notation** with the probability of each outcome.
+
+Amplitudes are written exactly when they are simple (1/√2, i/2, √3/2,
+e^{iπ/4}/√2) and as decimals otherwise. The panel shows the same in plain
+text. Tests check the matrices (Qiskit qubit order, unitarity, the Toffoli
+permutation, projectors), the exact forms and the Dirac strings.
 
 ## On a real chip
 

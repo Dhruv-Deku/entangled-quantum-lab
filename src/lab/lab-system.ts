@@ -73,6 +73,8 @@ export class LabSystem extends createSystem({
   private pulseKey = '';
   /** A run playing on the board: seconds elapsed and total (-1: none). */
   private pulseClock = -1;
+  /** Maths tab: the board shows the current step's matrix and state instead of the circuit. */
+  private mathsOn = false;
   private pulseSeconds = 0;
   private boardTarget: QState | null = null;
   private boardVersion = -1;
@@ -340,7 +342,7 @@ export class LabSystem extends createSystem({
     if (this.chip.root.visible) this.chip.update(dt);
     if (this.fridge.root.visible) this.fridge.update(dt);
     // on the chip tab the board rises above the code window so the pulse schedule shows
-    const boardY = this.pulseView ? 0.5 : 0.27;
+    const boardY = this.pulseView || this.mathsOn ? 0.5 : 0.27;
     this.board.root.position.y += (boardY - this.board.root.position.y) * (1 - Math.exp(-dt * 8));
     if (this.placePending) {
       this.player.head.updateWorldMatrix(true, false);
@@ -429,7 +431,11 @@ export class LabSystem extends createSystem({
       this.boardVersion = this.stateVersion;
       this.boardTimer = 0;
       const h = lab.history.toJSON();
-      if (!this.pulseView) this.board.render(lab.n, h.ops, lab.history.cursor, lab.state, this.boardTarget);
+      if (this.mathsOn) {
+        const k = lab.history.cursor;
+        const ops = lab.history.ops;
+        this.board.renderMaths(lab.n, k > 0 ? ops[k - 1] : null, k, h.ops.length, lab.history.stateAt(Math.max(0, k - 1)), lab.history.state);
+      } else if (!this.pulseView) this.board.render(lab.n, h.ops, lab.history.cursor, lab.state, this.boardTarget);
     }
     if (this.pulseView && this.pulseClock >= 0) {
       this.pulseClock += dt;
@@ -460,6 +466,13 @@ export class LabSystem extends createSystem({
     } else {
       this.boardVersion = -1;
     }
+  }
+
+  /** The maths tab: the board follows the timeline cursor and shows that step's maths. */
+  showMaths(on: boolean): void {
+    if (on === this.mathsOn) return;
+    this.mathsOn = on;
+    this.boardVersion = -1;
   }
 
   /** Play a run: the board's cursor sweeps the schedule and pulses travel down the fridge's lines. */

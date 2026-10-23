@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Op } from '../quantum/circuit';
-import { codeLines, pages, program, splitLine } from './code-view';
+import { codeLines, mathsText, pages, program, splitLine } from './code-view';
 
 const bell: Op[] = [
   { kind: 'gate', gate: 'h', target: 0 },
@@ -42,5 +42,15 @@ describe('code window', () => {
     expect(pages(0, 14)).toBe(1);
     expect(pages(14, 14)).toBe(1);
     expect(pages(15, 14)).toBe(2);
+  });
+
+  it('the Maths tab: the last step as plain text the panel font can draw', () => {
+    const text = mathsText(2, bell.slice(0, 2));
+    expect(text).toContain('Step 2: CX on q0, q1');
+    expect(text).toContain('U = CX');
+    expect(text).toContain('|psi> = 1/sqrt2 (|00> + |11>)');
+    expect(text.split('\n').filter((l) => l.startsWith('['))).toHaveLength(4);
+    expect(/^[\x20-\x7E\n]+$/.test(text)).toBe(true);
+    expect(mathsText(1, [{ kind: 'gate', gate: 'h', target: 0 }])).toContain('Matrix = 1/sqrt2 *');
   });
 });
