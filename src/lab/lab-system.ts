@@ -22,7 +22,8 @@ import { Qubit, VirtualRoom } from './components';
 import { lab } from './instance';
 import { partialState, type LabEvent } from './lab';
 import { RainVisual } from './rain';
-import { CircuitBoard } from './circuit-board';
+import { CircuitBoard, type PulseView } from './circuit-board';
+import { FridgeVisual } from './fridge';
 import { ChipVisual } from './chip';
 import { T5 } from '../quantum/routing';
 import { feedback } from './feedback';
@@ -65,6 +66,14 @@ export class LabSystem extends createSystem({
   private board!: CircuitBoard;
   /** The 5-qubit chip on the desk, shown while the code window's Chip tab is open. */
   chip!: ChipVisual;
+  /** The dilution refrigerator the chip lives in, shown with it. */
+  fridge!: FridgeVisual;
+  /** Chip tab: the board shows the pulse schedule instead of the circuit. */
+  private pulseView: PulseView | null = null;
+  private pulseKey = '';
+  /** A run playing on the board: seconds elapsed and total (-1: none). */
+  private pulseClock = -1;
+  private pulseSeconds = 0;
   private boardTarget: QState | null = null;
   private boardVersion = -1;
   private boardTimer = 0;
@@ -109,6 +118,12 @@ export class LabSystem extends createSystem({
     this.chip.root.scale.setScalar(1.05);
     this.chip.root.visible = false;
     ws.add(this.chip.root);
+    // the fridge stands at the back left, mirroring the chip
+    this.fridge = new FridgeVisual(T5.qubits);
+    this.fridge.root.position.set(-0.37, 0.0, -0.33);
+    this.fridge.root.rotation.y = 0.5;
+    this.fridge.root.visible = false;
+    ws.add(this.fridge.root);
 
     this.syncOrbs(true);
     this.cleanupFuncs.push(lab.on((e) => this.onLabEvent(e)));
@@ -323,6 +338,10 @@ export class LabSystem extends createSystem({
   update(delta: number): void {
     const dt = Math.min(delta, 0.05);
     if (this.chip.root.visible) this.chip.update(dt);
+    if (this.fridge.root.visible) this.fridge.update(dt);
+    // on the chip tab the board rises above the code window so the pulse schedule shows
+    const boardY = this.pulseView ? 0.5 : 0.27;
+    this.board.root.position.y += (boardY - this.board.root.position.y) * (1 - Math.exp(-dt * 8));
     if (this.placePending) {
       this.player.head.updateWorldMatrix(true, false);
       // wait for tracking: a seated head is well above the floor
@@ -410,7 +429,44 @@ export class LabSystem extends createSystem({
       this.boardVersion = this.stateVersion;
       this.boardTimer = 0;
       const h = lab.history.toJSON();
-      this.board.render(lab.n, h.ops, lab.history.cursor, lab.state, this.boardTarget);
+      if (!this.pulseView) this.board.render(lab.n, h.ops, lab.history.cursor, lab.state, this.boardTarget);
     }
+    if (this.pulseView && this.pulseClock >= 0) {
+      this.pulseClock += dt;
+      // about 20 redraws a second is plenty for a sweeping cursor
+      if (this.boardTimer > 0.05 || this.pulseClock >= this.pulseSeconds) {
+        this.boardTimer = 0;
+        const done = this.pulseClock >= this.pulseSeconds;
+        this.board.renderPulses(this.pulseView, done ? null : (this.pulseClock / this.pulseSeconds) * this.pulseView.schedule.duration);
+        if (done) this.pulseClock = -1;
+      }
+    }
+  }
+
+  /**
+   * The chip tab: show the pulse schedule on the board and the fridge beside
+   * it (null puts the circuit back). Calling it again with the same view does nothing.
+   */
+  showHardware(view: PulseView | null): void {
+    const key = view ? JSON.stringify([view.title, view.holders, view.schedule.duration, view.schedule.pulses.length]) : '';
+    if (key === this.pulseKey) return;
+    this.pulseKey = key;
+    this.pulseView = view;
+    this.pulseClock = -1;
+    this.fridge.root.visible = !!view;
+    if (view) {
+      this.fridge.setHolders(view.holders);
+      this.board.renderPulses(view, null);
+    } else {
+      this.boardVersion = -1;
+    }
+  }
+
+  /** Play a run: the board's cursor sweeps the schedule and pulses travel down the fridge's lines. */
+  playHardware(seconds: number): void {
+    if (!this.pulseView) return;
+    this.pulseClock = 0;
+    this.pulseSeconds = seconds;
+    this.fridge.play(this.pulseView.schedule.pulses, this.pulseView.schedule.duration, seconds);
   }
 }

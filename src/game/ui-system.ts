@@ -29,7 +29,8 @@ import { BUILDS, parOf } from './builder';
 import { starsFor } from './puzzles';
 import { codeLines, FORMAT_NAMES, FORMATS, pages, program, routeOrError, type Format } from './code-view';
 import { agreement, NO_NOISE, runOnChip, TYPICAL_NOISE } from '../quantum/hardware';
-import { T5 } from '../quantum/routing';
+import { T5, type Routed } from '../quantum/routing';
+import { schedule } from '../quantum/pulses';
 
 type El = ReturnType<UIKitMLAsset['requireElementById']>;
 
@@ -642,7 +643,9 @@ export class UISystem extends createSystem({
       ? Array.from(runOnChip(routed, lab.n, T5.qubits, 4000, Math.random, NO_NOISE).counts, (c) => c / 4000)
       : Array.from(lab.history.state.probabilities());
     const score = agreement(noisy.counts, ideal);
-    this.world.getSystem(LabSystem)?.chip.play(routed);
+    const labSys = this.world.getSystem(LabSystem);
+    labSys?.chip.play(routed);
+    labSys?.playHardware(Math.max(1.6, routed.ops.length * 0.16 + 0.4));
     lab.showShots(noisy.counts);
     this.codeNote = {
       key: JSON.stringify(ops),
@@ -650,6 +653,18 @@ export class UISystem extends createSystem({
     };
     this.showCode(false);
     feedback('shots');
+  }
+
+  /** The board's pulse view for a routed circuit. */
+  private pulseView(routed: Routed) {
+    const holders = new Array<number>(T5.qubits).fill(-1);
+    routed.initial.forEach((p, i) => (holders[p] = i));
+    return {
+      schedule: schedule(routed.ops, T5.qubits),
+      qubits: T5.qubits,
+      holders,
+      title: `Pulse schedule on T5${routed.swaps ? `  /  ${routed.swaps} routing SWAP${routed.swaps === 1 ? '' : 's'}` : ''}`,
+    };
   }
 
   private pageCode(dir: number): void {
@@ -724,8 +739,10 @@ export class UISystem extends createSystem({
     const lang = FORMAT_NAMES[this.codeFormat];
     const onChip = this.codeFormat === 'chip';
     const routed = onChip ? routeOrError(lab.n, shownOps) : null;
-    const chipVisual = this.world.getSystem(LabSystem)?.chip;
+    const labSys = this.world.getSystem(LabSystem);
+    const chipVisual = labSys?.chip;
     if (routed && typeof routed !== 'string' && chipVisual && !chipVisual.playing) chipVisual.showLayout(routed.initial);
+    labSys?.showHardware(routed && typeof routed !== 'string' ? this.pulseView(routed) : null);
     const code = program(this.codeFormat, lab.n, shownOps);
     // a page at a time
     const all = codeLines(this.codeFormat, lab.n, shownOps);
@@ -863,7 +880,9 @@ export class UISystem extends createSystem({
     }
     this.placeBlend(this.code!, 'code-panel', 'code-zoom', this.zoomT, this.codeScale, this.codeOpenT);
     const chip = this.world.getSystem(LabSystem)?.chip;
-    if (chip) chip.root.visible = this.code!.visible && this.codeFormat === 'chip';
+    const hardware = this.code!.visible && this.codeFormat === 'chip';
+    if (chip) chip.root.visible = hardware;
+    if (!hardware) this.world.getSystem(LabSystem)?.showHardware(null);
     // notes sit where the code panel does; only one of the two is open at a time
     if (this.notes!.open) {
       this.placeBlend(this.notesAsset!, 'notes-panel', 'notes-zoom', this.zoomT, this.notesScale, this.notesOpenT);

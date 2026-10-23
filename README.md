@@ -16,7 +16,7 @@ your circuit exports to Qiskit and OpenQASM 3.
 ```sh
 npm install
 npm run dev        # managed browser with the Quest 3 emulator (IWER)
-npm test           # 154 unit tests: physics, gestures, ghost-hand demos, 11 chapters, 15 lessons, notes, puzzles, builder, share links, simplifier, OpenQASM, code window, chip routing and noise
+npm test           # 159 unit tests: physics, gestures, ghost-hand demos, 11 chapters, 15 lessons, notes, puzzles, builder, share links, simplifier, OpenQASM, code window, chip routing, noise and pulse schedules
 npm run typecheck
 npm run build
 ```
@@ -243,6 +243,30 @@ layouts), the decompositions, and that the noise model behaves: no noise
 matches the ideal, readout flips about 2%, and SWAPs cost fidelity.
 
 ![The T5 chip from the headset, beside the code window](docs/screenshots/chip-headset.png)
+
+### Inside the machine
+
+![From the headset during a run: the dilution refrigerator, the pulse schedule with its sweeping cursor, the code window, the chip and the falling shots](docs/screenshots/quantum-hardware.png)
+
+On the chip tab the rest of the machine appears. A **dilution refrigerator**
+stands at the back left: five copper cooling stages from 50 K down to 15 mK on
+steel rods, a coaxial line per qubit coiling down to the chip package, and a
+status light on the top flange (blue when ready, mint when a run finishes).
+During a run each drive pulse travels down its qubit's line as a bead in that
+qubit's colour, two-qubit pulses go down in gold, and readout tones come back
+up in white.
+
+The circuit board rises above the code window and shows the **pulse
+schedule**: what the routed circuit looks like to the control electronics. One
+line per physical qubit; single-qubit gates are 36 ns Gaussian pulses whose
+height is the rotation angle; Z, S, T and other Z rotations take no time at all
+(the electronics just shift the phase of later pulses, so they are drawn as
+ticks); two-qubit gates are 280 ns cross-resonance pulses in gold; a SWAP is
+three of them; readout is a 1.2 us tone. Gates start as early as their qubits
+are free, so the timeline shows real parallelism and how much time routing
+SWAPs add. A blue cursor sweeps across it while the run plays.
+
+![The pulse schedule up close: gold cross-resonance pulses, routing SWAPs, readouts, and the run cursor at about 4 us of 11](docs/screenshots/pulse-schedule.png)
 
 Windows now settle into place when they open, and Zoom glides between sizes
 instead of jumping.
