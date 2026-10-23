@@ -1,0 +1,90 @@
+<!--
+  Noise lab: turn a real chip's noise on, set T1, T2 and the gate error, and
+  run zero-noise extrapolation. UIKit units are cm.
+-->
+<style>
+  .card {
+    flex-direction: column;
+    width: 420;
+    gap: 10;
+    padding-top: 20;
+    padding-bottom: 18;
+    padding-left: 22;
+    padding-right: 22;
+    background-color: #1b1c1f;
+    border-radius: 26;
+    border-width: 1;
+    border-color: #34363b;
+  }
+  .head { flex-direction: row; justify-content: space-between; align-items: center; }
+  .titles { flex-direction: column; gap: 2; }
+  .eyebrow { font-size: 11; font-weight: 600; color: #8a8d93; }
+  .title { font-size: 20; font-weight: 700; color: #f2f3f5; }
+  .note { font-size: 12; line-height: 1.4; color: #b8bbc1; }
+  .row {
+    flex-direction: row;
+    align-items: center;
+    gap: 10;
+    padding-top: 8;
+    padding-bottom: 8;
+    padding-left: 12;
+    padding-right: 10;
+    border-radius: 14;
+    background-color: #242528;
+  }
+  .label { width: 110; font-size: 13; font-weight: 600; color: #e4e6eb; }
+  .value { width: 78; font-size: 13; font-weight: 700; color: #f2f3f5; }
+  .bar { width: 90; height: 6; border-radius: 3; background-color: #34363b; flex-direction: row; }
+  .fill { height: 6; border-radius: 3; background-color: #c9ccd1; }
+  .btn {
+    height: 32;
+    padding-left: 13;
+    padding-right: 13;
+    border-radius: 16;
+    align-items: center;
+    justify-content: center;
+    background-color: #34363b;
+    cursor: pointer;
+  }
+  .sq { width: 32; padding-left: 0; padding-right: 0; }
+  .bt { font-size: 13; font-weight: 700; color: #e4e6eb; }
+  .btns { flex-direction: row; gap: 8; align-items: center; }
+</style>
+<div class="card">
+  <div class="head">
+    <div class="titles">
+      <div class="eyebrow">Noise lab</div>
+      <div id="noise-title" class="title">A real chip is noisy</div>
+    </div>
+    <div class="btns">
+      <div id="noise-toggle" class="btn"><div id="noise-toggle-label" class="bt">Turn on</div></div>
+      <div id="noise-close" class="btn"><div class="bt">Close</div></div>
+    </div>
+  </div>
+  <div id="noise-note" class="note">-</div>
+  <div class="row">
+    <div class="label">T1 (relaxation)</div>
+    <div id="noise-t1" class="value">-</div>
+    <div class="bar"><div id="noise-t1-fill" class="fill"></div></div>
+    <div id="noise-t1-down" class="btn sq"><div class="bt">-</div></div>
+    <div id="noise-t1-up" class="btn sq"><div class="bt">+</div></div>
+  </div>
+  <div class="row">
+    <div class="label">T2 (dephasing)</div>
+    <div id="noise-t2" class="value">-</div>
+    <div class="bar"><div id="noise-t2-fill" class="fill"></div></div>
+    <div id="noise-t2-down" class="btn sq"><div class="bt">-</div></div>
+    <div id="noise-t2-up" class="btn sq"><div class="bt">+</div></div>
+  </div>
+  <div class="row">
+    <div class="label">Gate error</div>
+    <div id="noise-p" class="value">-</div>
+    <div class="bar"><div id="noise-p-fill" class="fill"></div></div>
+    <div id="noise-p-down" class="btn sq"><div class="bt">-</div></div>
+    <div id="noise-p-up" class="btn sq"><div class="bt">+</div></div>
+  </div>
+  <div class="btns">
+    <div id="noise-zne" class="btn"><div class="bt">Mitigate (ZNE)</div></div>
+    <div id="noise-status" class="note">-</div>
+  </div>
+</div>

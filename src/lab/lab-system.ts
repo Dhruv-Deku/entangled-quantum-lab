@@ -24,6 +24,8 @@ import { partialState, type LabEvent } from './lab';
 import { RainVisual } from './rain';
 import { CircuitBoard, type LandscapeView, type PulseView } from './circuit-board';
 import { FridgeVisual } from './fridge';
+import { noiseLab } from './noise-lab';
+import { runNoisy } from '../quantum/density';
 import { ChipVisual } from './chip';
 import { T5 } from '../quantum/routing';
 import { feedback } from './feedback';
@@ -75,6 +77,9 @@ export class LabSystem extends createSystem({
   private pulseClock = -1;
   /** Maths tab: the board shows the current step's matrix and state instead of the circuit. */
   private mathsOn = false;
+  /** Noise lab open: the board shows the density matrix. */
+  private densityOn = false;
+  private noiseVersion = -1;
   /** QAOA steps: the board shows the graph and the cost landscape. */
   private landscapeView: LandscapeView | null = null;
   private landscapeKey = '';
@@ -345,7 +350,7 @@ export class LabSystem extends createSystem({
     if (this.chip.root.visible) this.chip.update(dt);
     if (this.fridge.root.visible) this.fridge.update(dt);
     // on the chip tab the board rises above the code window so the pulse schedule shows
-    const boardY = this.pulseView || this.mathsOn || this.landscapeView ? 0.5 : 0.27;
+    const boardY = this.pulseView || this.mathsOn || this.landscapeView || this.densityOn ? 0.5 : 0.27;
     this.board.root.position.y += (boardY - this.board.root.position.y) * (1 - Math.exp(-dt * 8));
     if (this.placePending) {
       this.player.head.updateWorldMatrix(true, false);
@@ -386,8 +391,11 @@ export class LabSystem extends createSystem({
 
     // Bloch vectors and pair strengths: recompute only when the state can have changed
     const n = Math.min(state.n, this.orbs.length);
-    if (animating || lab.rotating || this.cachedVersion !== this.stateVersion) {
-      for (let q = 0; q < n; q++) this.blochCache[q] = blochVector(state, q);
+    if (animating || lab.rotating || this.cachedVersion !== this.stateVersion || this.noiseVersion !== noiseLab.version) {
+      // the noise lab shows the mixed state: arrows shrink inside the spheres
+      const rho = noiseLab.on && !animating && !lab.rotating ? noiseLab.rho(lab.n, lab.history.ops) : null;
+      for (let q = 0; q < n; q++) this.blochCache[q] = rho ? rho.bloch(q) : blochVector(state, q);
+      if (!animating) this.noiseVersion = noiseLab.version;
       for (let a = 0; a < n; a++) for (let b = a + 1; b < n; b++) this.strengths.set(`${a}-${b}`, pairStrength(state, a, b));
       // qubits entangled with the rest but with no single entangled partner: a GHZ-style group
       this.groupMembers = [];
@@ -434,7 +442,10 @@ export class LabSystem extends createSystem({
       this.boardVersion = this.stateVersion;
       this.boardTimer = 0;
       const h = lab.history.toJSON();
-      if (this.mathsOn) {
+      if (this.densityOn) {
+        const rho = noiseLab.on ? noiseLab.rho(lab.n, lab.history.ops) : runNoisy(lab.n, lab.history.ops, { t1: Infinity, t2: Infinity, depol: 0 });
+        this.board.renderDensity(rho, noiseLab.noise, noiseLab.on, noiseLab.zne);
+      } else if (this.mathsOn) {
         const k = lab.history.cursor;
         const ops = lab.history.ops;
         this.board.renderMaths(lab.n, k > 0 ? ops[k - 1] : null, k, h.ops.length, lab.history.stateAt(Math.max(0, k - 1)), lab.history.state);
@@ -469,6 +480,18 @@ export class LabSystem extends createSystem({
     } else {
       this.boardVersion = -1;
     }
+  }
+
+  /** The noise lab's board: the density matrix, Bloch lengths and the ZNE plot. */
+  showDensity(on: boolean): void {
+    if (on === this.densityOn) return;
+    this.densityOn = on;
+    this.boardVersion = -1;
+  }
+
+  /** Redraw the board now (noise settings changed). */
+  refreshBoard(): void {
+    this.boardVersion = -1;
   }
 
   /** QAOA steps: the graph and the landscape (null puts the circuit back). Same view again does nothing. */

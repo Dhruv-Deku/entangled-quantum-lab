@@ -30,6 +30,7 @@ const KEYS: [string, string][] = [
   ['Enter', 'Continue, or the card button (Oracle, Storm…)'],
   ['[  ]', 'Previous / next chapter, lesson or sandbox preset'],
   ['A', 'Course: everything, in order, with quizzes'],
+  ['E', 'Sandbox: noise lab (Shift+E on/off, , . T1, Shift+M mitigate)'],
   ['1  2  3', 'Answer a quiz on the card'],
   ['J', 'Course: Show me (does the task for you)'],
   ['L', 'Learn: one lesson per gate'],
@@ -115,6 +116,10 @@ export class DebugInputSystem extends createSystem({}) {
         if (lab.gate(k.toLowerCase() as 'h')) feedback('gate');
         break;
       case 'm':
+        if (k === 'M' && campaign.mode === 'sandbox') {
+          window.dispatchEvent(new CustomEvent('entangled:noise', { detail: 'zne' }));
+          break;
+        }
         if (lab.measure() !== null) feedback('measure');
         break;
       case 'w':
@@ -161,6 +166,14 @@ export class DebugInputSystem extends createSystem({}) {
       case 'l':
         campaign.enterLearn();
         feedback('select');
+        break;
+      case 'e':
+        // e opens the noise lab; Shift+E turns the noise on or off
+        window.dispatchEvent(new CustomEvent('entangled:noise', { detail: k === 'E' ? 'toggle' : 'panel' }));
+        break;
+      case ',':
+      case '.':
+        if (campaign.mode === 'sandbox') window.dispatchEvent(new CustomEvent('entangled:noise', { detail: k === '.' ? 't1-up' : 't1-down' }));
         break;
       case 'a':
         campaign.enterCourse();

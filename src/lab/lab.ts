@@ -131,10 +131,13 @@ export class Lab {
     return op;
   }
 
+  /** When set (the noise lab), shots come from here instead of the ideal state. */
+  sampler: ((count: number) => Uint32Array) | null = null;
+
   /** 100 shots of the current state, without collapsing it. */
   shots(count = 100): Uint32Array {
     this.commitRotation();
-    const counts = sample(this.history.state, count, this.rng);
+    const counts = this.sampler ? this.sampler(count) : sample(this.history.state, count, this.rng);
     this.emit({ type: 'shots', counts, shots: count });
     return counts;
   }

@@ -30,11 +30,11 @@ describe('QAOA for MaxCut', () => {
 
   it('optimizing lowers the energy; one layer on the square reaches a ratio of about 0.75, two layers more', () => {
     const p1 = optimize(SQUARE, [0.4], [0.3]);
-    expect(p1.at(-1)!.energy).toBeLessThan(p1[0].energy);
-    const r1 = approximationRatio(SQUARE, p1.at(-1)!.energy);
+    expect(p1[p1.length - 1].energy).toBeLessThan(p1[0].energy);
+    const r1 = approximationRatio(SQUARE, p1[p1.length - 1].energy);
     expect(r1).toBeGreaterThan(0.72);
     expect(r1).toBeLessThan(0.76);
     const p2 = optimize(SQUARE, [0.4, 0.8], [0.6, 0.3], 120);
-    expect(approximationRatio(SQUARE, p2.at(-1)!.energy)).toBeGreaterThan(r1 + 0.05);
+    expect(approximationRatio(SQUARE, p2[p2.length - 1].energy)).toBeGreaterThan(r1 + 0.05);
   });
 });

@@ -31,6 +31,11 @@ export default defineAssets({
     type: AssetType.UIKitML,
     name: 'Notes',
   },
+  'noise-panel': {
+    url: publicAssetUrl('ui/noise.uikitml'),
+    type: AssetType.UIKitML,
+    name: 'Noise lab',
+  },
   'gate-dock': {
     url: publicAssetUrl('ui/dock.uikitml'),
     type: AssetType.UIKitML,

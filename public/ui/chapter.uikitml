@@ -87,6 +87,6 @@
   <div class="row">
     <div id="btn-next" class="btn btn-primary"><div id="btn-next-label" class="btn-text-primary">Continue</div></div>
     <div id="btn-replay" class="btn"><div id="btn-replay-label" class="btn-text">Replay</div></div>
-    <div id="btn-notes" class="btn"><div class="btn-text">Notes</div></div>
+    <div id="btn-notes" class="btn"><div id="btn-notes-label" class="btn-text">Notes</div></div>
   </div>
 </div>

@@ -2,6 +2,7 @@ import { CanvasTexture, Mesh, MeshBasicMaterial, PlaneGeometry, SRGBColorSpace }
 import type { Op } from '../quantum/circuit';
 import type { Schedule } from '../quantum/pulses';
 import { exact } from '../quantum/exact';
+import type { Density, DeviceNoise } from '../quantum/density';
 import { bestCut, BETA_MAX, GAMMA_MAX, type Graph } from '../quantum/qaoa';
 import { dirac, factor, gateFormula, gateName, ket, kronLabel, localMatrix, qubitsOf } from '../quantum/matrix';
 import type { QState } from '../quantum/state';
@@ -376,6 +377,108 @@ export class CircuitBoard {
       g.strokeStyle = MINT;
       g.stroke();
       if (qaoa.p > 1) text(g, 'showing the first layer\'s dials', x0 + w, y0 - 14, DIM, '500 18px', 'right');
+    }
+    this.tex.needsUpdate = true;
+  }
+
+  /**
+   * The noise lab: the density matrix as a grid (square size = |rho_ij|;
+   * populations on the diagonal, coherences off it), each qubit's Bloch length,
+   * the purity, and the zero-noise extrapolation plot once it has run.
+   */
+  renderDensity(rho: Density, noise: DeviceNoise, on: boolean, zneRes: { scales: number[]; values: number[]; mitigated: number; ideal: number } | null): void {
+    const g = this.g;
+    g.clearRect(0, 0, W, H);
+    roundRect(g, 4, 4, W - 8, H - 8, 40);
+    g.fillStyle = 'rgba(29,30,33,0.94)';
+    g.fill();
+    g.lineWidth = 2;
+    g.strokeStyle = '#34363b';
+    g.stroke();
+    const pct = (p: number) => `${(p * 100).toFixed(p < 0.001 ? 2 : 1)}%`;
+    text(g, on ? `Noise lab  /  T1 ${noise.t1} us   T2 ${noise.t2} us   gate error ${pct(noise.depol)} (x10 for two qubits)` : 'Noise lab  /  noise off: the ideal, pure state', 44, 62, DIM, '600 26px');
+    const purity = rho.purity();
+    text(g, `purity ${purity.toFixed(3)}`, W - 44, 62, purity > 0.999 ? INK : GOLD, '700 30px', 'right');
+
+    // the matrix
+    const dim = rho.dim;
+    const size = Math.min(420 / dim, 64);
+    const x0 = 60, y0 = 110;
+    rich(g, 'ρ', x0 - 30, y0 + (dim * size) / 2 + 12, 36, INK, 700, 'center');
+    for (let i = 0; i < dim; i++)
+      for (let j = 0; j < dim; j++) {
+        const m = Math.hypot(rho.re[i * dim + j], rho.im[i * dim + j]);
+        g.fillStyle = '#26272b';
+        g.fillRect(x0 + j * size + 1, y0 + i * size + 1, size - 2, size - 2);
+        if (m < 1e-4) continue;
+        const s = Math.max(2, (size - 6) * Math.sqrt(Math.min(1, m)));
+        g.fillStyle = i === j ? INK : '#8fb7ff';
+        g.fillRect(x0 + j * size + (size - s) / 2, y0 + i * size + (size - s) / 2, s, s);
+      }
+    if (dim <= 8) for (let i = 0; i < dim; i++) text(g, ket(i, rho.n), x0 + dim * size + 12, y0 + i * size + size / 2 + 7, '#6b6e75', '500 18px');
+    text(g, 'diagonal: probabilities    off-diagonal: coherences', x0, y0 + dim * size + 34, DIM, '500 20px');
+
+    // Bloch lengths
+    const bx = 640;
+    text(g, 'Bloch arrow length', bx, 128, DIM, '600 22px');
+    for (let q = 0; q < rho.n; q++) {
+      const [x, y, z] = rho.bloch(q);
+      const len = Math.min(1, Math.hypot(x, y, z));
+      const yy = 170 + q * 62;
+      text(g, `q${q}`, bx, yy + 10, qubitColor(q), '700 24px');
+      g.fillStyle = '#26272b';
+      g.fillRect(bx + 52, yy - 6, 220, 16);
+      g.fillStyle = qubitColor(q);
+      g.fillRect(bx + 52, yy - 6, 220 * len, 16);
+      text(g, len.toFixed(2), bx + 290, yy + 10, INK, '600 22px');
+    }
+    text(g, 'Shorter than 1: mixed (noise or entanglement)', bx, 170 + rho.n * 62 + 10, DIM, '500 18px');
+
+    // zero-noise extrapolation
+    const px = 1040, py = 120, pw = 500, ph = 380;
+    text(g, 'Zero-noise extrapolation', px, py - 8 + 8, DIM, '600 22px');
+    if (!zneRes) {
+      rich(g, 'Tap Mitigate: run at 1x, 2x, 3x noise and extrapolate', px, py + 60, 22, DIM, 500);
+      rich(g, 'the fidelity with the ideal state back to zero noise.', px, py + 92, 22, DIM, 500);
+    } else {
+      const top = py + 30, left = px + 50, w = pw - 70, h = ph - 90;
+      const vals = [...zneRes.values, zneRes.mitigated, zneRes.ideal];
+      const lo = Math.min(...vals, 0) - 0.05, hi = Math.max(...vals, 0) + 0.05;
+      const sx = (s: number) => left + (s / 3) * w, sy = (v: number) => top + h - ((v - lo) / (hi - lo)) * h;
+      g.strokeStyle = '#34363b';
+      g.lineWidth = 2;
+      g.strokeRect(left, top, w, h);
+      // ideal
+      g.setLineDash([8, 8]);
+      g.strokeStyle = '#6b6e75';
+      g.beginPath();
+      g.moveTo(left, sy(zneRes.ideal));
+      g.lineTo(left + w, sy(zneRes.ideal));
+      g.stroke();
+      // the fitted parabola through the three points
+      const [x0z, x1z, x2z] = zneRes.scales, [y0z, y1z, y2z] = zneRes.values;
+      const fit = (x: number) => (y0z * (x - x1z) * (x - x2z)) / ((x0z - x1z) * (x0z - x2z)) + (y1z * (x - x0z) * (x - x2z)) / ((x1z - x0z) * (x1z - x2z)) + (y2z * (x - x0z) * (x - x1z)) / ((x2z - x0z) * (x2z - x1z));
+      g.strokeStyle = '#c9ccd1';
+      g.beginPath();
+      for (let k = 0; k <= 30; k++) {
+        const x = (k / 30) * 3;
+        if (k) g.lineTo(sx(x), sy(fit(x)));
+        else g.moveTo(sx(x), sy(fit(x)));
+      }
+      g.stroke();
+      g.setLineDash([]);
+      zneRes.scales.forEach((s, i) => {
+        circle(g, sx(s), sy(zneRes.values[i]), 9);
+        g.fillStyle = INK;
+        g.fill();
+        text(g, `${s}x`, sx(s), top + h + 28, DIM, '500 18px', 'center');
+      });
+      circle(g, sx(0), sy(zneRes.mitigated), 11);
+      g.lineWidth = 4;
+      g.strokeStyle = MINT;
+      g.stroke();
+      text(g, '0', sx(0), top + h + 28, DIM, '500 18px', 'center');
+      text(g, `fidelity: raw ${zneRes.values[0].toFixed(3)}  ->  mitigated ${zneRes.mitigated.toFixed(3)}   (ideal 1)`, px, top + h + 66, INK, '600 20px');
     }
     this.tex.needsUpdate = true;
   }

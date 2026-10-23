@@ -27,6 +27,7 @@ import { notesFor } from './notes';
 import { NotesPanel } from './notes-ui';
 import { BUILDS, parOf } from './builder';
 import { starsFor } from './puzzles';
+import { DEPOL_STEPS, noiseLab, T1_STEPS, T2_STEPS } from '../lab/noise-lab';
 import { codeLines, FORMAT_NAMES, FORMATS, linesOf, pages, program, routeOrError, type Format } from './code-view';
 import { landscape, SQUARE, toPennyLaneQaoa } from '../quantum/qaoa';
 import { agreement, NO_NOISE, runOnChip, TYPICAL_NOISE } from '../quantum/hardware';
@@ -63,6 +64,19 @@ const NAV_SLOTS = 15;
 const TABS = ['course', 'campaign', 'learn', 'puzzle', 'build', 'sandbox'] as const;
 /** Where hidden panels park, out of reach of every pointer. */
 const PARKED = new Vector3(0, -50, 0);
+
+/** Draw `count` shots from a probability list. */
+function sampleProbs(p: ArrayLike<number>, count: number, rnd: () => number): Uint32Array {
+  const counts = new Uint32Array(p.length);
+  let total = 0;
+  for (let i = 0; i < p.length; i++) total += p[i];
+  for (let s = 0; s < count; s++) {
+    let r = rnd() * total, k = 0;
+    while (k < p.length - 1 && r >= p[k]) r -= p[k++];
+    counts[k]++;
+  }
+  return counts;
+}
 
 /** Short timeline label for one op: H0, Ry1, CX01, M0=1 ... */
 export function opLabel(op: Op): string {
@@ -142,6 +156,9 @@ export class UISystem extends createSystem({
   private builderAsset: UIKitMLAsset | null = null;
   private builder: BuilderPanel | null = null;
   private notesAsset: UIKitMLAsset | null = null;
+  private noiseAsset: UIKitMLAsset | null = null;
+  /** The noise lab panel is open (sandbox only). */
+  private noiseOpen = false;
   private notes: NotesPanel | null = null;
   /** Which tab the navigator shows (it follows the mode, but can be browsed). */
   private tab: CampaignView['mode'] = 'campaign';
@@ -207,12 +224,13 @@ export class UISystem extends createSystem({
     this.nav = this.world.getSceneObject<UIKitMLAsset>('nav-panel') ?? null;
     this.builderAsset = this.world.getSceneObject<UIKitMLAsset>('builder-panel') ?? null;
     this.notesAsset = this.world.getSceneObject<UIKitMLAsset>('notes-panel') ?? null;
-    if (!this.chapter || !this.dock || !this.code || !this.nav || !this.builderAsset || !this.notesAsset) return false;
+    this.noiseAsset = this.world.getSceneObject<UIKitMLAsset>('noise-panel') ?? null;
+    if (!this.chapter || !this.dock || !this.code || !this.nav || !this.builderAsset || !this.notesAsset || !this.noiseAsset) return false;
     this.code.visible = false;
 
     // panels take poke and ray input but must never capture the grab pointer,
     // or a hand reaching for an orb just above the dock grabs the dock instead
-    for (const panel of [this.chapter, this.dock, this.code, this.nav, this.builderAsset, this.notesAsset]) {
+    for (const panel of [this.chapter, this.dock, this.code, this.nav, this.builderAsset, this.notesAsset, this.noiseAsset]) {
       panel.traverse((o) => {
         (o as unknown as { pointerEventsType: unknown }).pointerEventsType = { deny: 'grab' };
       });
@@ -231,6 +249,10 @@ export class UISystem extends createSystem({
     for (const f of FORMATS) codeIds.push(`code-tab-${f}`, `code-tab-${f}-l`);
     for (let i = 0; i < CODE_LINES; i++) codeIds.push(`code-r-${i}`, `code-n-${i}`, `code-h-${i}`, `code-t-${i}`);
     for (const id of codeIds) this.els.set(id, this.code.requireElementById(id));
+    const noiseIds = ['noise-title', 'noise-toggle', 'noise-toggle-label', 'noise-close', 'noise-note', 'noise-zne', 'noise-status'];
+    for (const k of ['t1', 't2', 'p']) noiseIds.push(`noise-${k}`, `noise-${k}-fill`, `noise-${k}-down`, `noise-${k}-up`);
+    for (const id of noiseIds) this.els.set(id, this.noiseAsset.requireElementById(id));
+    this.els.set('btn-notes-label', this.chapter.requireElementById('btn-notes-label'));
     this.codeScale = this.code.scale.x;
     this.notesScale = this.notesAsset.scale.x;
     for (const [id, el] of this.els) el.name = id;
@@ -328,7 +350,41 @@ export class UISystem extends createSystem({
 
     this.builder = new BuilderPanel(this.builderAsset, campaign.build, () => feedback('select'));
     this.notes = new NotesPanel(this.notesAsset, () => undefined, () => this.toggleZoom());
-    on('btn-notes', () => this.toggleNotes());
+    on('btn-notes', () => (campaign.mode === 'sandbox' ? this.toggleNoise() : this.toggleNotes()));
+    on('noise-toggle', () => {
+      noiseLab.toggle();
+      feedback('select');
+    });
+    on('noise-close', () => this.toggleNoise());
+    on('noise-zne', () => {
+      noiseLab.mitigate(lab.n, lab.history.ops);
+      feedback('shots');
+    });
+    for (const [k, key] of [['t1', 't1'], ['t2', 't2'], ['p', 'depol']] as const) {
+      on(`noise-${k}-down`, () => noiseLab.step(key, -1));
+      on(`noise-${k}-up`, () => noiseLab.step(key, 1));
+    }
+    // noisy shots sample the mixed state's probabilities
+    lab.sampler = null;
+    this.cleanupFuncs.push(
+      noiseLab.onChange(() => {
+        lab.sampler = noiseLab.on ? (count) => sampleProbs(noiseLab.rho(lab.n, lab.history.ops).probabilities(), count, () => lab.random()) : null;
+        this.world.getSystem(LabSystem)?.refreshBoard();
+        this.renderNoise();
+        this.dirty = true;
+      }),
+    );
+    const onNoiseKey = (e: Event) => {
+      const what = (e as CustomEvent<string>).detail;
+      if (what === 'panel') return this.toggleNoise();
+      if (!this.noiseOpen) return;
+      if (what === 'toggle') noiseLab.toggle();
+      else if (what === 'zne' && noiseLab.on) noiseLab.mitigate(lab.n, lab.history.ops);
+      else if (what === 't1-up' || what === 't1-down') noiseLab.step('t1', what === 't1-up' ? 1 : -1);
+    };
+    window.addEventListener('entangled:noise', onNoiseKey);
+    this.cleanupFuncs.push(() => window.removeEventListener('entangled:noise', onNoiseKey));
+    this.renderNoise();
     // the I key (desktop) asks for notes through a window event, to keep input and UI decoupled
     const onNotesKey = () => (this.notes?.open ? this.notes.advance() : this.toggleNotes());
     window.addEventListener('entangled:notes', onNotesKey);
@@ -358,7 +414,15 @@ export class UISystem extends createSystem({
     if (!this.chapter) return;
     // the Notes button only shows where there are notes; open notes follow the chapter or lesson
     const n = this.currentNotes(v);
-    this.els.get('btn-notes')?.setProperties({ display: n ? 'flex' : 'none' });
+    // in the sandbox the third card button opens the noise lab
+    const sandbox = v.mode === 'sandbox' && !v.intro;
+    this.els.get('btn-notes')?.setProperties({ display: n || sandbox ? 'flex' : 'none' });
+    this.text('btn-notes-label', sandbox ? (this.noiseOpen ? 'Close noise' : 'Noise') : 'Notes');
+    // the noise lab is a sandbox tool: leaving the sandbox turns it off
+    if (!sandbox && (this.noiseOpen || noiseLab.on)) {
+      this.noiseOpen = false;
+      if (noiseLab.on) noiseLab.toggle();
+    }
     if (this.notes?.open) {
       if (!n) this.notes.close();
       else if (n.title !== this.notes.title) this.notes.show(n.eyebrow, n.title, n.paras);
@@ -482,6 +546,45 @@ export class UISystem extends createSystem({
     }
     if (!v.stepDone) this.text('goal-text', v.wrong !== null ? 'Not quite. Try another answer.' : this.immersive ? 'Tap an answer' : 'Pick an answer  (press 1, 2 or 3)');
     this.bg('goal-dot', v.stepDone ? C.done : v.wrong !== null ? '#ff8a7a' : C.current);
+  }
+
+  /** Open or close the noise lab (sandbox only). */
+  private toggleNoise(): void {
+    if (campaign.mode !== 'sandbox') return feedback('reject');
+    this.noiseOpen = !this.noiseOpen;
+    if (this.noiseOpen) {
+      if (this.code) this.code.visible = false;
+      if (this.notes?.open) this.notes.close();
+    }
+    this.renderNoise();
+    this.render(campaign.view);
+    feedback('select');
+  }
+
+  private renderNoise(): void {
+    if (!this.noiseAsset) return;
+    const { on, noise, zne } = noiseLab;
+    this.text('noise-toggle-label', on ? 'Turn off' : 'Turn on');
+    this.bg('noise-toggle', on ? C.primary : '#34363b');
+    this.text('noise-title', on ? 'The chip is noisy' : 'Noise is off');
+    this.text(
+      'noise-note',
+      on
+        ? 'The orbs now show the noisy, mixed state: arrows shrink inside the spheres, and shots sample it. T1 is how long |1> lasts; T2 how long a superposition keeps its phase.'
+        : 'Turn noise on to run every gate as a real chip would: errors, energy loss (T1) and dephasing (T2). The board shows the density matrix.',
+    );
+    const frac = (list: number[], v: number) => Math.max(0.04, (list.findIndex((x) => x >= v - 1e-12) + 1) / list.length);
+    this.text('noise-t1', `${noise.t1} us`);
+    this.text('noise-t2', `${noise.t2} us`);
+    this.text('noise-p', `${(noise.depol * 100).toFixed(noise.depol < 0.001 && noise.depol > 0 ? 2 : 1)}%`);
+    this.els.get('noise-t1-fill')?.setProperties({ width: 90 * frac(T1_STEPS, noise.t1) });
+    this.els.get('noise-t2-fill')?.setProperties({ width: 90 * frac(T2_STEPS, noise.t2) });
+    this.els.get('noise-p-fill')?.setProperties({ width: 90 * frac(DEPOL_STEPS, noise.depol) });
+    this.text(
+      'noise-status',
+      zne ? `fidelity ${zne.values[0].toFixed(3)} -> ${zne.mitigated.toFixed(3)} mitigated (ideal 1)` : on ? 'Run noise at 1x, 2x, 3x and extrapolate to zero.' : 'Turn noise on to mitigate it.',
+    );
+    this.bg('noise-zne', on ? '#34363b' : '#26272b');
   }
 
   /** What the Notes button would open right now, if anything. */
@@ -709,6 +812,15 @@ export class UISystem extends createSystem({
     const playing = v.mode === 'course' || v.mode === 'campaign' || v.mode === 'learn' || v.mode === 'puzzle';
     const step = playing && !v.intro ? v.step : null;
     const codeOpen = this.code!.visible;
+    // the noise lab takes the board while it is open
+    labSys.showDensity(this.noiseOpen);
+    if (this.noiseOpen) {
+      labSys.chip.root.visible = false;
+      labSys.showHardware(null);
+      labSys.showMaths(false);
+      labSys.showLandscape(null);
+      return;
+    }
     const codeChip = codeOpen && this.codeFormat === 'chip';
     const wantHardware = codeChip || !!step?.hardware;
     const wantMaths = !wantHardware && ((codeOpen && this.codeFormat === 'maths') || step?.board === 'maths');
@@ -901,7 +1013,7 @@ export class UISystem extends createSystem({
     const want = this.pokeOn ? near > 0.14 : near > 0.2;
     if (want === this.pokeOn) return;
     this.pokeOn = want;
-    for (const id of ['chapter-panel', 'gate-dock', 'code-panel', 'nav-panel', 'builder-panel', 'notes-panel']) {
+    for (const id of ['chapter-panel', 'gate-dock', 'code-panel', 'nav-panel', 'builder-panel', 'notes-panel', 'noise-panel']) {
       const e = this.world.getSceneEntity(id);
       if (!e) continue;
       if (want && !e.hasComponent(PokeInteractable)) e.addComponent(PokeInteractable);
@@ -969,6 +1081,13 @@ export class UISystem extends createSystem({
     } else {
       this.notesAsset!.visible = false;
       this.notesAsset!.position.copy(PARKED);
+    }
+    if (this.noiseOpen) {
+      this.place(this.noiseAsset!, 'notes-panel');
+      this.noiseAsset!.visible = true;
+    } else {
+      this.noiseAsset!.visible = false;
+      this.noiseAsset!.position.copy(PARKED);
     }
     this.place(this.nav!, 'nav-panel');
     campaign.update(Math.min(delta, 0.05));

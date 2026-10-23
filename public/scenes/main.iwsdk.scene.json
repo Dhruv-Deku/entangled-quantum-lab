@@ -250,6 +250,26 @@
         "RayInteractable": {},
         "PokeInteractable": {}
       }
+    },
+    {
+      "id": "noise-panel",
+      "name": "Noise lab",
+      "content": {
+        "type": "asset",
+        "asset": "noise-panel"
+      },
+      "transform": {
+        "position": [
+          0,
+          -50,
+          0
+        ],
+        "scale": 0.052
+      },
+      "components": {
+        "RayInteractable": {},
+        "PokeInteractable": {}
+      }
     }
   ],
   "authoring": {

@@ -13,7 +13,7 @@ describe('notes', () => {
   it('use only characters the panel font can draw, fit the panel, and end with the key idea', () => {
     for (const [title, paras] of Object.entries(NOTES)) {
       expect(paras.length, title).toBeGreaterThanOrEqual(3);
-      expect(paras.at(-1), title).toMatch(/^Key idea: /);
+      expect(paras[paras.length - 1], title).toMatch(/^Key idea: /);
       for (const p of paras) {
         expect(/^[\x20-\x7E]+$/.test(p), `${title}: non-ASCII in "${p.slice(0, 40)}..."`).toBe(true);
         expect(p.length, `${title}: paragraph too long`).toBeLessThanOrEqual(320);
