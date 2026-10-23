@@ -1,0 +1,61 @@
+<!--
+  Step debugger: step through the circuit, see why each step changed the
+  state, a live probability histogram, and breakpoints. UIKit units are cm.
+-->
+<style>
+  .card {
+    flex-direction: column;
+    width: 440;
+    gap: 9;
+    padding-top: 18;
+    padding-bottom: 16;
+    padding-left: 22;
+    padding-right: 22;
+    background-color: #1b1c1f;
+    border-radius: 26;
+    border-width: 1;
+    border-color: #34363b;
+  }
+  .head { flex-direction: row; justify-content: space-between; align-items: center; }
+  .titles { flex-direction: column; gap: 2; flex-shrink: 1; }
+  .eyebrow { font-size: 11; font-weight: 600; color: #8a8d93; }
+  .title { font-size: 17; font-weight: 700; color: #f2f3f5; }
+  .why { font-size: 12; line-height: 1.4; color: #c9ccd1; }
+  .hist { flex-direction: row; gap: 6; height: 96; align-items: flex-end; padding-top: 8; padding-bottom: 4; padding-left: 8; padding-right: 8; border-radius: 14; background-color: #141517; }
+  .col { flex-direction: column; align-items: center; gap: 3; flex-grow: 1; }
+  .bar { width: 26; height: 2; border-radius: 3; background-color: #c9ccd1; }
+  .bl { font-size: 9; font-weight: 700; color: #8a8d93; }
+  .pv { font-size: 9; color: #c9ccd1; }
+  .btn { height: 30; padding-left: 12; padding-right: 12; border-radius: 15; align-items: center; justify-content: center; background-color: #34363b; cursor: pointer; }
+  .bt { font-size: 12; font-weight: 700; color: #e4e6eb; }
+  .btns { flex-direction: row; gap: 6; align-items: center; }
+</style>
+<div class="card">
+  <div class="head">
+    <div class="titles">
+      <div id="dbg-eyebrow" class="eyebrow">Debugger</div>
+      <div id="dbg-title" class="title">-</div>
+    </div>
+    <div id="dbg-close" class="btn"><div class="bt">Close</div></div>
+  </div>
+  <div id="dbg-why-0" class="why">-</div>
+  <div id="dbg-why-1" class="why">-</div>
+  <div id="dbg-why-2" class="why">-</div>
+  <div class="hist">
+    <div id="dbg-c-0" class="col"><div id="dbg-p-0" class="pv">-</div><div id="dbg-b-0" class="bar"></div><div id="dbg-l-0" class="bl">-</div></div>
+    <div id="dbg-c-1" class="col"><div id="dbg-p-1" class="pv">-</div><div id="dbg-b-1" class="bar"></div><div id="dbg-l-1" class="bl">-</div></div>
+    <div id="dbg-c-2" class="col"><div id="dbg-p-2" class="pv">-</div><div id="dbg-b-2" class="bar"></div><div id="dbg-l-2" class="bl">-</div></div>
+    <div id="dbg-c-3" class="col"><div id="dbg-p-3" class="pv">-</div><div id="dbg-b-3" class="bar"></div><div id="dbg-l-3" class="bl">-</div></div>
+    <div id="dbg-c-4" class="col"><div id="dbg-p-4" class="pv">-</div><div id="dbg-b-4" class="bar"></div><div id="dbg-l-4" class="bl">-</div></div>
+    <div id="dbg-c-5" class="col"><div id="dbg-p-5" class="pv">-</div><div id="dbg-b-5" class="bar"></div><div id="dbg-l-5" class="bl">-</div></div>
+    <div id="dbg-c-6" class="col"><div id="dbg-p-6" class="pv">-</div><div id="dbg-b-6" class="bar"></div><div id="dbg-l-6" class="bl">-</div></div>
+    <div id="dbg-c-7" class="col"><div id="dbg-p-7" class="pv">-</div><div id="dbg-b-7" class="bar"></div><div id="dbg-l-7" class="bl">-</div></div>
+  </div>
+  <div class="btns">
+    <div id="dbg-start" class="btn"><div class="bt">Start</div></div>
+    <div id="dbg-back" class="btn"><div class="bt">Back</div></div>
+    <div id="dbg-step" class="btn"><div class="bt">Step</div></div>
+    <div id="dbg-run" class="btn"><div id="dbg-run-l" class="bt">Run</div></div>
+    <div id="dbg-bp" class="btn"><div id="dbg-bp-l" class="bt">Breakpoint</div></div>
+  </div>
+</div>

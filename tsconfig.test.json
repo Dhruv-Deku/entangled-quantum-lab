@@ -1,7 +1,7 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "types": ["node", "vitest/globals"]
+    "types": ["node", "vitest/globals", "vite/client"]
   },
   "include": ["src/**/*.test.ts", "src/quantum/**/*.ts", "src/gestures/**/*.ts", "src/game/**/*.ts", "src/lab/lab.ts"],
   "exclude": []

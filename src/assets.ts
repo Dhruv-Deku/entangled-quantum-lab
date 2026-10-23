@@ -31,6 +31,11 @@ export default defineAssets({
     type: AssetType.UIKitML,
     name: 'Notes',
   },
+  'debug-panel': {
+    url: publicAssetUrl('ui/debug.uikitml'),
+    type: AssetType.UIKitML,
+    name: 'Debugger',
+  },
   'library-panel': {
     url: publicAssetUrl('ui/library.uikitml'),
     type: AssetType.UIKitML,

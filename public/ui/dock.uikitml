@@ -82,6 +82,12 @@
     <div id="t-next" class="arrow"><div class="ks">&gt;</div></div>
   </div>
   <div class="row">
+    <div id="a-voice" class="key wide"><div id="a-voice-l" class="ks">Voice</div></div>
+    <div id="a-debug" class="key wide"><div id="a-debug-l" class="ks">Debug</div></div>
+    <div id="a-view" class="key wide"><div id="a-view-l" class="ks">View</div></div>
+    <div id="a-share" class="key wide"><div id="a-share-l" class="ks">Share</div></div>
+  </div>
+  <div class="row">
     <div id="dock-status" class="qsel">Selected: q0</div>
   </div>
 </div>

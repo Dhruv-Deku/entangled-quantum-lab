@@ -32,6 +32,8 @@ const KEYS: [string, string][] = [
   ['[  ]', 'Previous / next chapter, lesson or sandbox preset'],
   ['A', 'Course: everything, in order, with quizzes'],
   ['E', 'Sandbox: noise lab (Shift+E on/off, , . T1, Shift+M mitigate)'],
+  ['Shift+D', 'Step debugger (, . step; ; run to breakpoint; \' set breakpoint)'],
+  ['V', 'Voice commands on or off ("Hadamard on qubit zero", "run a thousand shots")'],
   ['F', 'Library (Shift+F save; U switch tab; Shift+Y use first row; Shift+K QR code; Shift+U import)'],
   ['1  2  3', 'Answer a quiz on the card'],
   ['J', 'Course: Show me (does the task for you)'],
@@ -174,6 +176,9 @@ export class DebugInputSystem extends createSystem({}) {
         campaign.enterLearn();
         feedback('select');
         break;
+      case 'v':
+        window.dispatchEvent(new Event('entangled:voice'));
+        break;
       case 'f':
         // f opens the library; Shift+F saves the circuit (or makes a gate on the Gates tab)
         window.dispatchEvent(new CustomEvent('entangled:library', { detail: k === 'F' ? 'save' : 'toggle' }));
@@ -187,7 +192,15 @@ export class DebugInputSystem extends createSystem({}) {
         break;
       case ',':
       case '.':
+        // the debugger (when open) steps; the noise lab (when open) changes T1
+        window.dispatchEvent(new CustomEvent('entangled:debug', { detail: k === '.' ? 'step' : 'back' }));
         if (campaign.mode === 'sandbox') window.dispatchEvent(new CustomEvent('entangled:noise', { detail: k === '.' ? 't1-up' : 't1-down' }));
+        break;
+      case ';':
+        window.dispatchEvent(new CustomEvent('entangled:debug', { detail: 'run' }));
+        break;
+      case "'":
+        window.dispatchEvent(new CustomEvent('entangled:debug', { detail: 'bp' }));
         break;
       case 'a':
         campaign.enterCourse();
@@ -226,6 +239,10 @@ export class DebugInputSystem extends createSystem({}) {
         break;
       }
       case 'd':
+        if (k === 'D') {
+          window.dispatchEvent(new CustomEvent('entangled:debug', { detail: 'toggle' }));
+          break;
+        }
         // dev only: dump state for automated checks
         if (import.meta.env.DEV) {
           const st = lab.history.state;

@@ -31,6 +31,9 @@ import { DEPOL_STEPS, noiseLab, T1_STEPS, T2_STEPS } from '../lab/noise-lab';
 import { library, placeGate } from '../lab/library';
 import { openImportDialog } from '../lab/import-dialog';
 import { codeLines, FORMAT_NAMES, FORMATS, linesOf, pages, program, routeOrError, type Format } from './code-view';
+import { describe as describeVoice, parseVoice, type VoiceCommand } from './voice';
+import { explainStep, histogram, nextStop, stepTitle } from './debugger';
+import { SpeechInput } from '../lab/speech';
 import { landscape, SQUARE, toPennyLaneQaoa } from '../quantum/qaoa';
 import { H2 } from '../quantum/h2-data';
 import { agreement, NO_NOISE, runOnChip, TYPICAL_NOISE } from '../quantum/hardware';
@@ -166,6 +169,11 @@ export class UISystem extends createSystem({
   private notesAsset: UIKitMLAsset | null = null;
   private noiseAsset: UIKitMLAsset | null = null;
   private libAsset: UIKitMLAsset | null = null;
+  private dbgAsset: UIKitMLAsset | null = null;
+  /** Step debugger: open, breakpoints (step numbers), and a run in progress (seconds to the next step). */
+  private dbgOpen = false;
+  private breakpoints = new Set<number>();
+  private dbgRun: { stop: number; timer: number } | null = null;
   /** Library panel: open, which tab, which page, and whether the board shows the QR code. */
   private libOpen = false;
   private libTab: 'circuit' | 'gate' = 'circuit';
@@ -241,12 +249,13 @@ export class UISystem extends createSystem({
     this.notesAsset = this.world.getSceneObject<UIKitMLAsset>('notes-panel') ?? null;
     this.noiseAsset = this.world.getSceneObject<UIKitMLAsset>('noise-panel') ?? null;
     this.libAsset = this.world.getSceneObject<UIKitMLAsset>('library-panel') ?? null;
-    if (!this.chapter || !this.dock || !this.code || !this.nav || !this.builderAsset || !this.notesAsset || !this.noiseAsset || !this.libAsset) return false;
+    this.dbgAsset = this.world.getSceneObject<UIKitMLAsset>('debug-panel') ?? null;
+    if (!this.chapter || !this.dock || !this.code || !this.nav || !this.builderAsset || !this.notesAsset || !this.noiseAsset || !this.libAsset || !this.dbgAsset) return false;
     this.code.visible = false;
 
     // panels take poke and ray input but must never capture the grab pointer,
     // or a hand reaching for an orb just above the dock grabs the dock instead
-    for (const panel of [this.chapter, this.dock, this.code, this.nav, this.builderAsset, this.notesAsset, this.noiseAsset, this.libAsset]) {
+    for (const panel of [this.chapter, this.dock, this.code, this.nav, this.builderAsset, this.notesAsset, this.noiseAsset, this.libAsset, this.dbgAsset]) {
       panel.traverse((o) => {
         (o as unknown as { pointerEventsType: unknown }).pointerEventsType = { deny: 'grab' };
       });
@@ -258,7 +267,7 @@ export class UISystem extends createSystem({
     const navIds = ['tab-course', 'tab-course-l', 'tab-campaign', 'tab-campaign-l', 'tab-learn', 'tab-learn-l', 'tab-puzzle', 'tab-puzzle-l', 'tab-build', 'tab-build-l', 'tab-sandbox', 'tab-sandbox-l', 'nav-progress', 'nav-progress-2'];
     for (let i = 0; i < NAV_SLOTS; i++) navIds.push(`n-${i}`, `n-${i}-n`, `n-${i}-l`);
     for (const id of navIds) this.els.set(id, this.nav.requireElementById(id));
-    const dockIds = ['g-h', 'g-x', 'g-y', 'g-z', 'g-s', 'g-t', 'g-rl', 'g-rr', 'a-cnot', 'a-swap', 'a-measure', 'a-shots', 'a-export', 't-prev', 't-next', 'dock-status'];
+    const dockIds = ['g-h', 'g-x', 'g-y', 'g-z', 'g-s', 'g-t', 'g-rl', 'g-rr', 'a-cnot', 'a-swap', 'a-measure', 'a-shots', 'a-export', 't-prev', 't-next', 'dock-status', 'a-voice', 'a-voice-l', 'a-debug', 'a-debug-l', 'a-view', 'a-view-l', 'a-share', 'a-share-l'];
     for (let i = 0; i < SLOTS; i++) dockIds.push(`t-${i}`, `t-${i}-l`);
     for (const id of dockIds) this.els.set(id, this.dock.requireElementById(id));
     const codeIds = ['code-close', 'code-note', 'code-link', 'code-eyebrow', 'code-title', 'code-zoom', 'code-zoom-label', 'code-simplify', 'code-simplify-label', 'code-run', 'code-ibm', 'code-ibm-l', 'code-up', 'code-down'];
@@ -273,6 +282,9 @@ export class UISystem extends createSystem({
     const libIds = ['lib-title', 'lib-close', 'lib-tab-circuits', 'lib-tab-circuits-l', 'lib-tab-gates', 'lib-tab-gates-l', 'lib-note', 'lib-save', 'lib-save-l', 'lib-import', 'lib-qr', 'lib-qr-l', 'lib-prev', 'lib-next'];
     for (let i = 0; i < LIB_ROWS; i++) libIds.push(`lib-r-${i}`, `lib-n-${i}`, `lib-m-${i}`, `lib-a-${i}`, `lib-a-${i}-l`, `lib-d-${i}`);
     for (const id of libIds) this.els.set(id, this.libAsset.requireElementById(id));
+    const dbgIds = ['dbg-eyebrow', 'dbg-title', 'dbg-close', 'dbg-why-0', 'dbg-why-1', 'dbg-why-2', 'dbg-start', 'dbg-back', 'dbg-step', 'dbg-run', 'dbg-run-l', 'dbg-bp', 'dbg-bp-l'];
+    for (let i = 0; i < 8; i++) dbgIds.push(`dbg-c-${i}`, `dbg-p-${i}`, `dbg-b-${i}`, `dbg-l-${i}`);
+    for (const id of dbgIds) this.els.set(id, this.dbgAsset.requireElementById(id));
     this.codeScale = this.code.scale.x;
     this.notesScale = this.notesAsset.scale.x;
     for (const [id, el] of this.els) el.name = id;
@@ -343,6 +355,43 @@ export class UISystem extends createSystem({
       });
     }
     on('a-export', () => this.showCode());
+    // voice commands
+    this.speech = new SpeechInput(
+      (text) => this.onVoice(text),
+      (listening, error) => {
+        this.text('a-voice-l', listening ? 'Listening' : 'Voice');
+        this.bg('a-voice', listening ? C.primary : '#2d2f33');
+        this.flash(error ?? (listening ? 'Listening: say "Hadamard on qubit zero", "entangle zero and one", "run a thousand shots"...' : 'Voice off.'));
+      },
+    );
+    on('a-voice', () => this.speech?.toggle());
+    on('a-debug', () => this.toggleDebugger());
+    on('dbg-close', () => this.toggleDebugger());
+    on('dbg-start', () => this.dbgSeek(0));
+    on('dbg-back', () => this.dbgSeek(lab.history.cursor - 1));
+    on('dbg-step', () => this.dbgSeek(lab.history.cursor + 1));
+    on('dbg-run', () => this.dbgToggleRun());
+    on('dbg-bp', () => this.dbgToggleBreakpoint());
+    const onDebugKey = (e: Event) => {
+      const what = (e as CustomEvent<string>).detail ?? 'toggle';
+      if (what === 'toggle') return this.toggleDebugger();
+      if (!this.dbgOpen) return;
+      if (what === 'back') this.dbgSeek(lab.history.cursor - 1);
+      else if (what === 'step') this.dbgSeek(lab.history.cursor + 1);
+      else if (what === 'run') this.dbgToggleRun();
+      else if (what === 'bp') this.dbgToggleBreakpoint();
+    };
+    window.addEventListener('entangled:debug', onDebugKey);
+    this.cleanupFuncs.push(() => window.removeEventListener('entangled:debug', onDebugKey));
+    // development: feed text to the voice handler as if it had been heard (for automated checks)
+    if (import.meta.env.DEV) {
+      const onSay = (e: Event) => this.onVoice((e as CustomEvent<string>).detail);
+      window.addEventListener('entangled:say', onSay);
+      this.cleanupFuncs.push(() => window.removeEventListener('entangled:say', onSay));
+    }
+    const onVoiceKey = () => this.speech?.toggle();
+    window.addEventListener('entangled:voice', onVoiceKey);
+    this.cleanupFuncs.push(() => window.removeEventListener('entangled:voice', onVoiceKey), () => this.speech?.stop());
     on('code-link', () => this.copyLink());
     for (const f of FORMATS) on(`code-tab-${f}`, () => this.setFormat(f));
     on('code-simplify', () => this.simplifyCircuit());
@@ -610,9 +659,195 @@ export class UISystem extends createSystem({
     this.bg('goal-dot', v.stepDone ? C.done : v.wrong !== null ? '#ff8a7a' : C.current);
   }
 
+  private speech: SpeechInput | null = null;
+  /** A short message on the dock's status line (what voice heard, and so on), until `until`. */
+  private dockFlash: { text: string; until: number } | null = null;
+
+  private flash(text: string): void {
+    this.dockFlash = { text, until: performance.now() + 4000 };
+    this.renderDock();
+  }
+
+  /** What the microphone heard: understand it, do it, and say what was done. */
+  private onVoice(text: string): void {
+    const cmd = parseVoice(text);
+    if (!cmd) {
+      this.flash(`Heard "${text.trim()}": not a command I know.`);
+      return feedback('reject');
+    }
+    const ok = this.runVoice(cmd);
+    this.flash(`Heard "${text.trim()}": ${ok ? describeVoice(cmd) : `${describeVoice(cmd)} is not possible here`}.`);
+    feedback(ok ? 'select' : 'reject');
+  }
+
+  /** Carry out a voice command with the same calls the buttons and gestures use. Returns false if it does not apply. */
+  private runVoice(c: VoiceCommand): boolean {
+    const inRange = (q: number) => q >= 0 && q < lab.n;
+    switch (c.type) {
+      case 'gate': {
+        const q = c.qubit ?? lab.selected;
+        if (!inRange(q)) return false;
+        lab.select(q);
+        return !!lab.gate(c.gate, q, c.params);
+      }
+      case 'cnot':
+        return inRange(c.control) && inRange(c.target) && c.control !== c.target && !!lab.entangle(c.control, c.target);
+      case 'swap':
+        return inRange(c.a) && inRange(c.b) && c.a !== c.b && !!lab.apply({ kind: 'swap', a: c.a, b: c.b });
+      case 'measure':
+        if (c.qubit === 'all') {
+          for (let q = 0; q < lab.n; q++) lab.measure(q);
+          return true;
+        }
+        return inRange(c.qubit ?? lab.selected) && lab.measure(c.qubit ?? lab.selected) !== null;
+      case 'shots':
+        lab.shots(Math.min(1000, Math.max(1, c.count)));
+        return true;
+      case 'select':
+        if (!inRange(c.qubit)) return false;
+        lab.select(c.qubit);
+        return true;
+      case 'answer':
+        return campaign.answer(c.index);
+      case 'undo':
+        return lab.undo();
+      case 'redo':
+        return lab.redo();
+      case 'reset':
+        campaign.replay();
+        return true;
+      case 'add':
+        if (campaign.mode !== 'sandbox' || lab.n >= MAX_ORBS) return false;
+        lab.reset(lab.n + 1);
+        return true;
+      case 'remove':
+        if (campaign.mode !== 'sandbox' || lab.n <= 1) return false;
+        lab.reset(lab.n - 1);
+        return true;
+      case 'next':
+        campaign.next();
+        return true;
+      case 'showme':
+        return campaign.showMe();
+      case 'notes':
+        this.toggleNotes();
+        return true;
+      case 'code':
+        this.showCode();
+        return true;
+      case 'simplify':
+        this.simplifyCircuit();
+        return true;
+      case 'zoom':
+        this.toggleZoom();
+        return true;
+      case 'noise':
+        if (campaign.mode !== 'sandbox') return false;
+        this.toggleNoise();
+        return true;
+      case 'library':
+        this.toggleLibrary();
+        return true;
+      case 'debug':
+        window.dispatchEvent(new Event('entangled:debug'));
+        return true;
+      case 'view':
+        window.dispatchEvent(new Event('entangled:view'));
+        return true;
+      case 'close':
+        if (this.code) this.code.visible = false;
+        if (this.notes?.open) this.notes.close();
+        this.libOpen = false;
+        this.noiseOpen = false;
+        this.renderLibrary();
+        return true;
+    }
+  }
+
+  /** Open or close the step debugger. */
+  private toggleDebugger(): void {
+    this.dbgOpen = !this.dbgOpen;
+    this.dbgRun = null;
+    if (this.dbgOpen) {
+      if (this.code) this.code.visible = false;
+      if (this.notes?.open) this.notes.close();
+      this.libOpen = false;
+      this.noiseOpen = false;
+    }
+    this.renderDebugger();
+    feedback('select');
+  }
+
+  private dbgSeek(k: number): void {
+    const target = Math.max(0, Math.min(lab.history.length, k));
+    if (target === lab.history.cursor) return;
+    lab.seek(target);
+    feedback('select');
+  }
+
+  /** Run: step forward every half second until the next breakpoint (or the end); again to stop. */
+  private dbgToggleRun(): void {
+    if (this.dbgRun) this.dbgRun = null;
+    else if (lab.history.cursor < lab.history.length) this.dbgRun = { stop: nextStop(lab.history.cursor, lab.history.length, this.breakpoints), timer: 0 };
+    this.renderDebugger();
+  }
+
+  private dbgToggleBreakpoint(): void {
+    const k = lab.history.cursor;
+    if (k === 0) return;
+    if (this.breakpoints.has(k)) this.breakpoints.delete(k);
+    else this.breakpoints.add(k);
+    this.renderDebugger();
+    this.renderDock();
+  }
+
+  private updateDebugger(dt: number): void {
+    if (!this.dbgRun) return;
+    this.dbgRun.timer += dt;
+    if (this.dbgRun.timer < 0.5) return;
+    this.dbgRun.timer = 0;
+    if (lab.history.cursor >= this.dbgRun.stop) {
+      this.dbgRun = null;
+      this.renderDebugger();
+      return;
+    }
+    lab.seek(lab.history.cursor + 1);
+    if (lab.history.cursor >= this.dbgRun.stop) {
+      this.dbgRun = null;
+      if (this.breakpoints.has(lab.history.cursor)) feedback('success');
+      this.renderDebugger();
+    }
+  }
+
+  private renderDebugger(): void {
+    if (!this.dbgAsset || !this.dbgOpen) return;
+    const h = lab.history;
+    const k = h.cursor;
+    const op = k > 0 ? h.ops[k - 1] : null;
+    this.text('dbg-eyebrow', `Debugger  /  ${this.breakpoints.size ? `breakpoints at step ${[...this.breakpoints].sort((a, b) => a - b).join(', ')}` : 'no breakpoints'}`);
+    this.text('dbg-title', stepTitle(op, k, h.length));
+    const why = op ? explainStep(op, h.stateAt(k - 1), h.state) : ['Every qubit starts at 0. Step forward to see what each gate does, and why.'];
+    for (let i = 0; i < 3; i++) this.els.get(`dbg-why-${i}`)?.setProperties({ display: why[i] ? 'flex' : 'none', text: why[i] ?? ' ' });
+    const bars = histogram(h.state);
+    for (let i = 0; i < 8; i++) {
+      const b = bars[i];
+      this.els.get(`dbg-c-${i}`)?.setProperties({ display: b ? 'flex' : 'none' });
+      if (!b) continue;
+      this.els.get(`dbg-b-${i}`)?.setProperties({ height: Math.max(2, 58 * b.p), backgroundColor: b.p > 0.001 ? '#c9ccd1' : '#34363b' });
+      this.text(`dbg-p-${i}`, b.p > 0.001 ? b.p.toFixed(2) : '');
+      this.text(`dbg-l-${i}`, b.label);
+    }
+    this.text('dbg-run-l', this.dbgRun ? 'Stop' : 'Run');
+    this.bg('dbg-run', this.dbgRun ? C.primary : '#34363b');
+    const onBp = this.breakpoints.has(k);
+    this.text('dbg-bp-l', onBp ? 'Clear breakpoint' : 'Breakpoint');
+    this.bg('dbg-bp', onBp ? '#3a2523' : '#34363b');
+  }
+
   /** Open or close the library (any mode; loading a circuit moves to the sandbox). */
   private toggleLibrary(): void {
     this.libOpen = !this.libOpen;
+    if (this.libOpen) this.dbgOpen = false;
     this.libQr = false;
     this.libNote = null;
     if (this.libOpen) {
@@ -887,8 +1122,9 @@ export class UISystem extends createSystem({
     const sel = lab.selected;
     const p1 = lab.history.state.prob1(sel);
     const h = lab.history;
-    this.text('dock-status', `Selected: q${sel}   P(1) = ${p1.toFixed(2)}   Step ${h.cursor} of ${h.length}`);
-    this.els.get('dock-status')?.setProperties({ color: qubitColor(sel) });
+    const flashing = this.dockFlash && performance.now() < this.dockFlash.until;
+    this.text('dock-status', flashing ? this.dockFlash!.text : `Selected: q${sel}   P(1) = ${p1.toFixed(2)}   Step ${h.cursor} of ${h.length}`);
+    this.els.get('dock-status')?.setProperties({ color: flashing ? C.text : qubitColor(sel) });
 
     // timeline: slot 0 is "start" when visible; slot i shows the state after step slotStart + i
     const all = h.toJSON().ops;
@@ -904,9 +1140,14 @@ export class UISystem extends createSystem({
       const color = current ? '#18191b' : future ? '#6b6e75' : !op ? C.text : isCx ? '#e2b04a' : qubitColor(opQubit(op));
       this.text(`t-${i}-l`, label);
       this.els.get(`t-${i}-l`)?.setProperties({ color });
-      this.els.get(`t-${i}`)?.setProperties({ backgroundColor: current ? '#e4e6eb' : k <= all.length ? '#2a2c30' : '#232427' });
+      this.els.get(`t-${i}`)?.setProperties({
+        backgroundColor: current ? '#e4e6eb' : k <= all.length ? '#2a2c30' : '#232427',
+        borderWidth: this.breakpoints.has(k) ? 2 : 0,
+        borderColor: '#ff8a7a',
+      });
     }
     if (this.code?.visible) this.showCode(false);
+    this.renderDebugger();
   }
 
   /** If the address has a share link, open that circuit in the sandbox. Returns true if it did. */
@@ -1324,7 +1565,7 @@ export class UISystem extends createSystem({
     const want = this.pokeOn ? near > 0.14 : near > 0.2;
     if (want === this.pokeOn) return;
     this.pokeOn = want;
-    for (const id of ['chapter-panel', 'gate-dock', 'code-panel', 'nav-panel', 'builder-panel', 'notes-panel', 'noise-panel', 'library-panel']) {
+    for (const id of ['chapter-panel', 'gate-dock', 'code-panel', 'nav-panel', 'builder-panel', 'notes-panel', 'noise-panel', 'library-panel', 'debug-panel']) {
       const e = this.world.getSceneEntity(id);
       if (!e) continue;
       if (want && !e.hasComponent(PokeInteractable)) e.addComponent(PokeInteractable);
@@ -1385,6 +1626,8 @@ export class UISystem extends createSystem({
     }
     this.placeBlend(this.code!, 'code-panel', 'code-zoom', this.zoomT, this.codeScale, this.codeOpenT);
     this.updateBoardMode();
+    const lsys = this.world.getSystem(LabSystem);
+    if (lsys) lsys.boardRaised = this.dbgOpen;
     // notes sit where the code panel does; only one of the two is open at a time
     if (this.notes!.open) {
       this.placeBlend(this.notesAsset!, 'notes-panel', 'notes-zoom', this.zoomT, this.notesScale, this.notesOpenT);
@@ -1392,6 +1635,13 @@ export class UISystem extends createSystem({
     } else {
       this.notesAsset!.visible = false;
       this.notesAsset!.position.copy(PARKED);
+    }
+    if (this.dbgOpen) {
+      this.place(this.dbgAsset!, 'notes-panel');
+      this.dbgAsset!.visible = true;
+    } else {
+      this.dbgAsset!.visible = false;
+      this.dbgAsset!.position.copy(PARKED);
     }
     if (this.libOpen) {
       this.place(this.libAsset!, 'notes-panel');
@@ -1410,6 +1660,11 @@ export class UISystem extends createSystem({
     this.place(this.nav!, 'nav-panel');
     campaign.update(Math.min(delta, 0.05));
     this.pollIbm(Math.min(delta, 0.05));
+    this.updateDebugger(Math.min(delta, 0.05));
+    if (this.dockFlash && performance.now() >= this.dockFlash.until) {
+      this.dockFlash = null;
+      this.renderDock();
+    }
 
     this.updatePokeGate();
 

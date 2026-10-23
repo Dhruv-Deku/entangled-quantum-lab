@@ -356,7 +356,7 @@ export class LabSystem extends createSystem({
     if (this.chip.root.visible) this.chip.update(dt);
     if (this.fridge.root.visible) this.fridge.update(dt);
     // on the chip tab the board rises above the code window so the pulse schedule shows
-    const boardY = this.pulseView || this.mathsOn || this.landscapeView || this.densityOn || this.wheelsOn || this.vqeView !== undefined || this.overlayKey ? 0.5 : 0.27;
+    const boardY = this.boardRaised || this.pulseView || this.mathsOn || this.landscapeView || this.densityOn || this.wheelsOn || this.vqeView !== undefined || this.overlayKey ? 0.5 : 0.27;
     this.board.root.position.y += (boardY - this.board.root.position.y) * (1 - Math.exp(-dt * 8));
     if (this.placePending) {
       this.player.head.updateWorldMatrix(true, false);
@@ -495,6 +495,9 @@ export class LabSystem extends createSystem({
   }
 
   /** Let the UI draw on the board (library thumbnails, a QR code); null gives it back. Same key again does nothing. */
+  /** Lift the board above a window open in front of it (the step debugger). */
+  boardRaised = false;
+
   showOverlay(key: string | null, draw?: (board: CircuitBoard) => void): void {
     const k = key ?? '';
     if (k === this.overlayKey) return;

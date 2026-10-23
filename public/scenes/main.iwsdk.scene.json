@@ -290,6 +290,26 @@
         "RayInteractable": {},
         "PokeInteractable": {}
       }
+    },
+    {
+      "id": "debug-panel",
+      "name": "Debugger",
+      "content": {
+        "type": "asset",
+        "asset": "debug-panel"
+      },
+      "transform": {
+        "position": [
+          0,
+          -50,
+          0
+        ],
+        "scale": 0.052
+      },
+      "components": {
+        "RayInteractable": {},
+        "PokeInteractable": {}
+      }
     }
   ],
   "authoring": {
