@@ -48,6 +48,7 @@
     <div id="notes-prev" class="btn"><div class="bt">Back</div></div>
     <div id="notes-next" class="btn"><div id="notes-next-label" class="bt">Next</div></div>
     <div id="notes-listen" class="btn"><div id="notes-listen-label" class="bt">Listen</div></div>
+    <div id="notes-zoom" class="btn"><div id="notes-zoom-label" class="bt">Zoom</div></div>
     <div id="notes-close" class="btn"><div class="bt">Close</div></div>
   </div>
 </div>

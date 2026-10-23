@@ -23,8 +23,8 @@ export class NotesPanel {
   private speaking = false;
   readonly canSpeak = typeof window !== 'undefined' && 'speechSynthesis' in window;
 
-  constructor(readonly asset: UIKitMLAsset, private onChange: () => void) {
-    for (const id of ['notes-eyebrow', 'notes-page', 'notes-title', 'notes-p-0', 'notes-p-1', 'notes-p-2', 'notes-prev', 'notes-next', 'notes-next-label', 'notes-listen', 'notes-listen-label', 'notes-close']) {
+  constructor(readonly asset: UIKitMLAsset, private onChange: () => void, onZoom: () => void) {
+    for (const id of ['notes-eyebrow', 'notes-page', 'notes-title', 'notes-p-0', 'notes-p-1', 'notes-p-2', 'notes-prev', 'notes-next', 'notes-next-label', 'notes-listen', 'notes-listen-label', 'notes-zoom', 'notes-zoom-label', 'notes-close']) {
       const el = asset.requireElementById(id);
       el.name = id;
       this.els.set(id, el);
@@ -34,6 +34,7 @@ export class NotesPanel {
     on('notes-next', () => (this.page + 1 < this.pages ? this.turn(1) : this.close()));
     on('notes-listen', () => this.toggleSpeech());
     on('notes-close', () => this.close());
+    on('notes-zoom', onZoom);
     this.els.get('notes-listen')!.setProperties({ display: this.canSpeak ? 'flex' : 'none' });
   }
 
@@ -56,6 +57,12 @@ export class NotesPanel {
     this.stopSpeech();
     this.open = false;
     this.onChange();
+  }
+
+  /** Zoom is shared with the code window; this only updates the button. */
+  setZoomed(zoomed: boolean): void {
+    this.text('notes-zoom-label', zoomed ? 'Unzoom' : 'Zoom');
+    this.els.get('notes-zoom')?.setProperties({ backgroundColor: zoomed ? '#2d7ff9' : '#34363b' });
   }
 
   /** The I key: open, then next page, then close after the last page. */

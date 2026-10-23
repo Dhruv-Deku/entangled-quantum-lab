@@ -16,7 +16,7 @@ your circuit exports to Qiskit and OpenQASM 3.
 ```sh
 npm install
 npm run dev        # managed browser with the Quest 3 emulator (IWER)
-npm test           # 138 unit tests: physics, gestures, ghost-hand demos, 11 chapters, 15 lessons, notes, puzzles, builder, share links, simplifier, OpenQASM
+npm test           # 143 unit tests: physics, gestures, ghost-hand demos, 11 chapters, 15 lessons, notes, puzzles, builder, share links, simplifier, OpenQASM, code window
 npm run typecheck
 npm run build
 ```
@@ -58,7 +58,9 @@ depends on a single input path.
 | – | Build: circuit builder | navigator: Build | B (then arrows + letters) |
 | – | Notes: read (or listen to) the explanation | Notes on the card | I |
 | – | Copy a share link to this circuit | Qiskit, then Copy link | – |
-| – | Code panel: Qiskit or OpenQASM 3 | Qiskit, then QASM | K, then G |
+| – | Code window: Qiskit, OpenQASM 3 or PennyLane tabs | Qiskit, then a tab | K, then G |
+| – | Zoom the code window and notes (bigger, at eye level) | Zoom | = |
+| – | Page through long code | Back / More | Up / Down |
 | – | Simplify the circuit (Undo brings it back) | Qiskit, then Simplify | O |
 
 Gesture thresholds live in `src/gestures/config.ts` (with hysteresis, hold times
@@ -183,13 +185,21 @@ around the vertical axis), then Reveal draws the real state and the fidelity.
 With 100 copies per axis it lands within about 0.1 of the truth, which the tests
 check across 30 random states.
 
-## Simplify, Qiskit and OpenQASM
+## Code window: tabs, zoom, simplify
 
-![The code panel in OpenQASM 3 after Simplify: 7 steps down to 2](docs/screenshots/code-simplify-qasm.png)
+![The code window zoomed, seen from the headset: tabs for Qiskit, OpenQASM 3 and PennyLane, numbered lines](docs/screenshots/code-window-zoom.png)
 
-The code panel shows your circuit as **Qiskit** or **OpenQASM 3** (the text
-format IBM Quantum, Qiskit and Amazon Braket read); any controlled gate is
-written exactly with `ctrl @`. **Simplify** shortens the circuit the way a
+The **Qiskit** button opens the code window: the whole program, not just the
+gates, as **Qiskit**, **OpenQASM 3** (the text format IBM Quantum, Qiskit and
+Amazon Braket read; any controlled gate is written exactly with `ctrl @`) or
+**PennyLane**, one tab each. Lines are numbered with the gate or call name
+picked out, ten to a page with Back and More, and a new step keeps you on the
+last page. **Zoom** makes the window 1.3 times bigger and brings it to eye level
+just above the orbs, where code is readable in a headset; Unzoom puts it back.
+The Notes panel shares the same Zoom.
+
+![The code window in OpenQASM 3 after Simplify: 7 steps down to 2](docs/screenshots/code-simplify-qasm.png)
+ **Simplify** shortens the circuit the way a
 compiler's first passes do: gates that undo each other cancel (H H, S S dagger,
 CNOT CNOT), gates that add up merge (T T is S, two SX are X, rotations add), and
 gates slide past others they commute with so more of them meet, e.g. a Z on a

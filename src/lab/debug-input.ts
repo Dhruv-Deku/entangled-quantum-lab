@@ -34,7 +34,9 @@ const KEYS: [string, string][] = [
   ['B', 'Build: circuit builder (cross-dot grid)'],
   ['I', 'Notes: read about this chapter or lesson (again: next page)'],
   ['K', 'Code panel: your circuit as Qiskit or OpenQASM'],
-  ['G  /  O', 'Code panel: switch Qiskit / QASM, simplify the circuit'],
+  ['G  /  O', 'Code window: next language tab, simplify the circuit'],
+  ['=', 'Zoom the code window and notes in or out'],
+  ['Up  Down', 'Code window: previous / next page of code'],
   ['In Build', 'arrows move; H X Y Z S T place; Shift+S/T dagger; V SX; 1 2 3 Rx Ry Rz; C dot; O open dot; P plus; W swap; Backspace erase'],
   ['P', 'Play the chapters from Chapter 1'],
 ];
@@ -166,9 +168,16 @@ export class DebugInputSystem extends createSystem({}) {
       case 'k':
       case 'g':
       case 'o':
-        // the code panel, through a window event like notes: k opens or closes it, g switches format, o simplifies
-        window.dispatchEvent(new CustomEvent('entangled:code', { detail: { k: 'toggle', g: 'format', o: 'simplify' }[k.toLowerCase()] }));
+      case '=':
+      case '+':
+      case 'arrowup':
+      case 'arrowdown': {
+        // the code window, through a window event like notes: open or close, next tab, simplify, zoom, page
+        const detail = ({ k: 'toggle', g: 'format', o: 'simplify', '=': 'zoom', '+': 'zoom', arrowup: 'up', arrowdown: 'down' } as Record<string, string>)[k.toLowerCase()];
+        if (k.startsWith('Arrow')) e.preventDefault();
+        window.dispatchEvent(new CustomEvent('entangled:code', { detail }));
         break;
+      }
       case 'd':
         // dev only: dump state for automated checks
         if (import.meta.env.DEV) {

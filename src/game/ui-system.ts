@@ -15,7 +15,6 @@ import { LabSystem } from '../lab/lab-system';
 import { MAX_ORBS } from '../lab/lab';
 import { loadSave, writeSave } from '../lab/save';
 import type { Op } from '../quantum/circuit';
-import { toQasm, toQiskit } from '../quantum/export';
 import { simplify } from '../quantum/optimize';
 import { decodeCircuit, encodeCircuit, SHARE_PREFIX } from '../quantum/share';
 import { qubitColor } from '../lab/visuals';
@@ -28,6 +27,7 @@ import { notesFor } from './notes';
 import { NotesPanel } from './notes-ui';
 import { BUILDS, parOf } from './builder';
 import { starsFor } from './puzzles';
+import { codeLines, FORMAT_NAMES, FORMATS, pages, program, type Format } from './code-view';
 
 type El = ReturnType<UIKitMLAsset['requireElementById']>;
 
@@ -41,7 +41,10 @@ const PLACEMENT = {
   'gate-dock': { pos: new Vector3(0.4, 0.09, 0.07), rot: new Euler((-38 * Math.PI) / 180, (-36 * Math.PI) / 180, 0, 'YXZ') },
   // the builder takes the dock's place in the Build tab, a little further out
   'builder-panel': { pos: new Vector3(0.44, 0.14, 0.03), rot: new Euler((-22 * Math.PI) / 180, (-32 * Math.PI) / 180, 0, 'YXZ') },
-  'code-panel': { pos: new Vector3(0.02, 0.31, -0.22), rot: new Euler(-0.05, 0, 0, 'YXZ') },
+  'code-panel': { pos: new Vector3(0.02, 0.29, -0.22), rot: new Euler(-0.05, 0, 0, 'YXZ') },
+  // zoomed: bigger, at eye level just behind the orbs (the head is about 0.42 m up, 0.4 m back), facing the player
+  'code-zoom': { pos: new Vector3(0, 0.43, -0.05), rot: new Euler(0, 0, 0, 'YXZ') },
+  'notes-zoom': { pos: new Vector3(0, 0.4, -0.05), rot: new Euler(0, 0, 0, 'YXZ') },
   // notes: in front of the circuit board, low enough to read without looking up
   'notes-panel': { pos: new Vector3(0, 0.3, -0.17), rot: new Euler(-0.1, 0, 0, 'YXZ') },
   // upper right, opposite the chapter card and above the dock
@@ -49,7 +52,9 @@ const PLACEMENT = {
 } as const;
 
 const SLOTS = 7;
-const CODE_LINES = 16;
+const CODE_LINES = 10;
+/** How much bigger a zoomed window is. */
+const ZOOM = 1.3;
 const NAV_SLOTS = 15;
 const TABS = ['campaign', 'learn', 'puzzle', 'build', 'sandbox'] as const;
 /** Where hidden panels park, out of reach of every pointer. */
@@ -102,8 +107,16 @@ export class UISystem extends createSystem({
   private chapter: UIKitMLAsset | null = null;
   private dock: UIKitMLAsset | null = null;
   private code: UIKitMLAsset | null = null;
-  /** Code panel language. */
-  private codeFormat: 'qiskit' | 'qasm' = 'qiskit';
+  /** Code window language and page. */
+  private codeFormat: Format = 'qiskit';
+  private codePage = 0;
+  /** Page count at the last render: someone reading the last page keeps following new steps. */
+  private codePages = 1;
+  /** Zoom: the code window and the notes grow and come closer. */
+  private zoom = false;
+  /** Scene scales of the code window and notes, before any zoom. */
+  private codeScale = 0;
+  private notesScale = 0;
   /** Sandbox circuit before Simplify, kept until the circuit changes, so Undo can bring it back. */
   private unsimplified: { n: number; ops: Op[]; after: string } | null = null;
   /** Outside the sandbox Simplify only previews: the panel shows the shorter circuit, the lab keeps yours. */
@@ -200,8 +213,12 @@ export class UISystem extends createSystem({
     const dockIds = ['g-h', 'g-x', 'g-y', 'g-z', 'g-s', 'g-t', 'g-rl', 'g-rr', 'a-cnot', 'a-swap', 'a-measure', 'a-shots', 'a-export', 't-prev', 't-next', 'dock-status'];
     for (let i = 0; i < SLOTS; i++) dockIds.push(`t-${i}`, `t-${i}-l`);
     for (const id of dockIds) this.els.set(id, this.dock.requireElementById(id));
-    for (const id of ['code-close', 'code-note', 'code-link', 'code-title', 'code-format', 'code-format-label', 'code-simplify', 'code-simplify-label']) this.els.set(id, this.code.requireElementById(id));
-    for (let i = 0; i < CODE_LINES; i++) this.els.set(`code-${i}`, this.code.requireElementById(`code-${i}`));
+    const codeIds = ['code-close', 'code-note', 'code-link', 'code-eyebrow', 'code-title', 'code-zoom', 'code-zoom-label', 'code-simplify', 'code-simplify-label', 'code-up', 'code-down', 'code-lines'];
+    for (const f of FORMATS) codeIds.push(`code-tab-${f}`, `code-tab-${f}-l`);
+    for (let i = 0; i < CODE_LINES; i++) codeIds.push(`code-r-${i}`, `code-n-${i}`, `code-h-${i}`, `code-t-${i}`);
+    for (const id of codeIds) this.els.set(id, this.code.requireElementById(id));
+    this.codeScale = this.code.scale.x;
+    this.notesScale = this.notesAsset.scale.x;
     for (const [id, el] of this.els) el.name = id;
 
     const on = (id: string, fn: () => void) => {
@@ -267,16 +284,21 @@ export class UISystem extends createSystem({
     }
     on('a-export', () => this.showCode());
     on('code-link', () => this.copyLink());
-    on('code-format', () => this.switchFormat());
+    for (const f of FORMATS) on(`code-tab-${f}`, () => this.setFormat(f));
     on('code-simplify', () => this.simplifyCircuit());
-    // K, G and O on desktop
+    on('code-zoom', () => this.toggleZoom());
+    on('code-up', () => this.pageCode(-1));
+    on('code-down', () => this.pageCode(1));
+    // K, G, O, = and the up / down arrows on desktop
     const onCodeKey = (e: Event) => {
       const what = (e as CustomEvent<string>).detail;
       if (what === 'toggle') {
         if (this.code?.visible) this.code.visible = false;
         else this.showCode();
-      } else if (what === 'format') this.switchFormat();
+      } else if (what === 'format') this.setFormat(FORMATS[(FORMATS.indexOf(this.codeFormat) + 1) % FORMATS.length]);
       else if (what === 'simplify') this.simplifyCircuit();
+      else if (what === 'zoom') this.toggleZoom();
+      else if ((what === 'up' || what === 'down') && this.code?.visible) this.pageCode(what === 'up' ? -1 : 1);
     };
     window.addEventListener('entangled:code', onCodeKey);
     this.cleanupFuncs.push(() => window.removeEventListener('entangled:code', onCodeKey));
@@ -286,7 +308,7 @@ export class UISystem extends createSystem({
     });
 
     this.builder = new BuilderPanel(this.builderAsset, campaign.build, () => feedback('select'));
-    this.notes = new NotesPanel(this.notesAsset, () => undefined);
+    this.notes = new NotesPanel(this.notesAsset, () => undefined, () => this.toggleZoom());
     on('btn-notes', () => this.toggleNotes());
     // the I key (desktop) asks for notes through a window event, to keep input and UI decoupled
     const onNotesKey = () => (this.notes?.open ? this.notes.advance() : this.toggleNotes());
@@ -572,10 +594,25 @@ export class UISystem extends createSystem({
     feedback('select');
   }
 
-  /** Switch the code panel between Qiskit and OpenQASM 3. */
-  private switchFormat(): void {
-    this.codeFormat = this.codeFormat === 'qiskit' ? 'qasm' : 'qiskit';
+  /** Show the circuit in another language (a tab of the code window). */
+  private setFormat(f: Format): void {
+    this.codeFormat = f;
+    this.codePage = 0;
     this.showCode();
+  }
+
+  /** Zoom the code window and the notes in or out. */
+  private toggleZoom(): void {
+    this.zoom = !this.zoom;
+    this.notes?.setZoomed(this.zoom);
+    this.text('code-zoom-label', this.zoom ? 'Unzoom' : 'Zoom');
+    this.bg('code-zoom', this.zoom ? C.primary : '#34363b');
+    feedback('select');
+  }
+
+  private pageCode(dir: number): void {
+    this.codePage += dir;
+    this.showCode(false);
   }
 
   /**
@@ -642,27 +679,44 @@ export class UISystem extends createSystem({
     if (this.preview !== null && this.preview !== key) this.preview = null;
     if (this.codeNote && this.codeNote.key !== key) this.codeNote = null;
     const shownOps = this.preview !== null ? simplify(ops).ops : ops;
-    const qasm = this.codeFormat === 'qasm';
-    const code = qasm ? toQasm(lab.n, shownOps) : toQiskit(lab.n, shownOps);
-    const skip = qasm ? ['//', 'include'] : ['#', 'from', 'print'];
-    const body = code.split('\n').filter((l) => l && !skip.some((p) => l.startsWith(p)));
-    const shown = body.length > CODE_LINES ? ['...', ...body.slice(-(CODE_LINES - 1))] : body;
-    // UIKit text ignores line breaks, so each code line is its own element
+    const lang = FORMAT_NAMES[this.codeFormat];
+    const code = program(this.codeFormat, lab.n, shownOps);
+    // a page at a time
+    const all = codeLines(this.codeFormat, lab.n, shownOps);
+    const count = pages(all.length, CODE_LINES);
+    if (!sound && this.codePage === this.codePages - 1) this.codePage = count - 1;
+    this.codePages = count;
+    this.codePage = Math.max(0, Math.min(count - 1, this.codePage));
+    const first = this.codePage * CODE_LINES;
     for (let i = 0; i < CODE_LINES; i++) {
-      const el = this.els.get(`code-${i}`);
-      if (i < shown.length) el?.setProperties({ text: shown[i], display: 'flex' });
-      else el?.setProperties({ display: 'none' });
+      const line = all[first + i];
+      this.els.get(`code-r-${i}`)?.setProperties({ display: line ? 'flex' : 'none' });
+      if (!line) continue;
+      const space = /^\s/.test(line.rest);
+      this.text(`code-n-${i}`, String(first + i + 1));
+      this.els.get(`code-h-${i}`)?.setProperties({ text: line.head || ' ', display: line.head ? 'flex' : 'none' });
+      this.els.get(`code-t-${i}`)?.setProperties({
+        text: line.rest.trim() || ' ',
+        marginLeft: space && line.head ? 5 : 0,
+        color: line.comment ? '#6b6e75' : C.text,
+      });
     }
-    const lang = qasm ? 'OpenQASM 3' : 'Qiskit';
+    this.text('code-lines', count > 1 ? `Lines ${first + 1}-${Math.min(all.length, first + CODE_LINES)} of ${all.length}` : `${all.length} lines`);
+    this.els.get('code-up')?.setProperties({ display: count > 1 ? 'flex' : 'none' });
+    this.els.get('code-down')?.setProperties({ display: count > 1 ? 'flex' : 'none' });
+    this.bg('code-up', this.codePage > 0 ? '#34363b' : '#26272b');
+    this.bg('code-down', this.codePage + 1 < count ? '#34363b' : '#26272b');
+    for (const f of FORMATS) {
+      const on = f === this.codeFormat;
+      this.bg(`code-tab-${f}`, on ? C.text : '#242528');
+      this.els.get(`code-tab-${f}-l`)?.setProperties({ color: on ? '#18191b' : C.textDim });
+    }
+    this.text('code-eyebrow', `Code  /  ${ops.length} steps on ${lab.n} qubit${lab.n === 1 ? '' : 's'}`);
     this.text('code-title', `Your circuit in ${lang}`);
-    this.text('code-format-label', qasm ? 'Qiskit' : 'QASM');
     this.text('code-simplify-label', this.unsimplified ? 'Undo' : this.preview !== null ? 'Original' : 'Simplify');
-    this.bg('code-simplify', this.unsimplified || this.preview !== null ? '#2d7ff9' : '#34363b');
-    this.text(
-      'code-note',
-      this.codeNote?.text ??
-        `${ops.length} steps. ${qasm ? 'Opens in IBM Quantum, Qiskit, Braket and most other tools' : 'Runs as-is in Qiskit'}${this.immersive ? '.' : '; copied to your clipboard.'}`,
-    );
+    this.bg('code-simplify', this.unsimplified || this.preview !== null ? C.primary : '#34363b');
+    const where = { qiskit: 'Runs as-is in Qiskit', qasm: 'Opens in IBM Quantum, Qiskit, Braket and most other tools', pennylane: 'Runs as-is in PennyLane' }[this.codeFormat];
+    this.text('code-note', this.codeNote?.text ?? `${where}${this.immersive ? '.' : '; copied to your clipboard.'}`);
     this.code.visible = true;
     if (sound) {
       feedback('select');
@@ -727,10 +781,12 @@ export class UISystem extends createSystem({
       this.place(this.dock!, 'gate-dock');
       this.builderAsset!.position.copy(PARKED);
     }
-    this.place(this.code!, 'code-panel');
+    this.place(this.code!, this.zoom ? 'code-zoom' : 'code-panel');
+    this.code!.scale.setScalar(this.codeScale * (this.zoom ? ZOOM : 1));
     // notes sit where the code panel does; only one of the two is open at a time
     if (this.notes!.open) {
-      this.place(this.notesAsset!, 'notes-panel');
+      this.place(this.notesAsset!, this.zoom ? 'notes-zoom' : 'notes-panel');
+      this.notesAsset!.scale.setScalar(this.notesScale * (this.zoom ? ZOOM : 1));
       this.notesAsset!.visible = true;
     } else {
       this.notesAsset!.visible = false;
