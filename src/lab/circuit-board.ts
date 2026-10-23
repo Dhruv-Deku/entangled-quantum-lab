@@ -2,9 +2,11 @@ import { CanvasTexture, Mesh, MeshBasicMaterial, PlaneGeometry, SRGBColorSpace }
 import type { Op } from '../quantum/circuit';
 import type { Schedule } from '../quantum/pulses';
 import { exact } from '../quantum/exact';
+import qrcode from 'qrcode-generator';
 import type { Density, DeviceNoise } from '../quantum/density';
 import { bestCut, BETA_MAX, GAMMA_MAX, type Graph } from '../quantum/qaoa';
-import { dirac, factor, gateFormula, gateName, ket, kronLabel, localMatrix, qubitsOf } from '../quantum/matrix';
+import { dirac, factor, gateFormula, gateName, ket, kronLabel, localMatrix, qubitsOf, zyz } from '../quantum/matrix';
+import { angleText } from '../quantum/exact';
 import type { QState } from '../quantum/state';
 import { blochVector as blochVectorOf } from '../quantum/bloch';
 import { qubitColor } from './visuals';
@@ -215,6 +217,12 @@ export class CircuitBoard {
     // the gate's matrix on the qubits it touches
     const { m } = localMatrix(op);
     const k = qs.length;
+    // any one-qubit gate is three rotations: its Euler (ZYZ) angles
+    if (k === 1 && op.kind === 'gate') {
+      const e = zyz(m);
+      const a = (v: number) => angleText(Math.abs(v) < 1e-9 ? 0 : v).text;
+      rich(g, `Euler:  U = e^{iα} Rz(φ) Ry(θ) Rz(λ),   α = ${a(e.alpha)},  θ = ${a(e.theta)},  φ = ${a(e.phi)},  λ = ${a(e.lambda)}`, 44, 158, 24, '#8fb7ff', 500);
+    }
     const f = factor(m.flat());
     const size = k === 1 ? 54 : k === 2 ? 40 : 26;
     const cells = m.map((row) => row.map(([re, im]) => (f ? exact(re / f.scale, im / f.scale) : exact(re, im)).text));
@@ -586,6 +594,84 @@ export class CircuitBoard {
       g.strokeStyle = MINT;
       g.stroke();
     }
+    this.tex.needsUpdate = true;
+  }
+
+  /** The library: up to eight saved circuits or gates as small circuit diagrams. */
+  renderLibrary(title: string, items: { name: string; n: number; ops: readonly Op[] }[], empty: string): void {
+    const g = this.g;
+    g.clearRect(0, 0, W, H);
+    roundRect(g, 4, 4, W - 8, H - 8, 40);
+    g.fillStyle = 'rgba(29,30,33,0.94)';
+    g.fill();
+    g.lineWidth = 2;
+    g.strokeStyle = '#34363b';
+    g.stroke();
+    text(g, title, 44, 62, DIM, '600 28px');
+    if (!items.length) rich(g, empty, 44, 200, 30, DIM, 500);
+    const cols = 4, cw = (W - 88) / cols, chh = 250;
+    items.slice(0, 8).forEach((it, i) => {
+      const x0 = 44 + (i % cols) * cw, y0 = 96 + Math.floor(i / cols) * (chh + 12);
+      roundRect(g, x0 + 6, y0, cw - 12, chh, 20);
+      g.fillStyle = '#242528';
+      g.fill();
+      text(g, it.name.slice(0, 22), x0 + 24, y0 + 38, INK, '700 24px');
+      text(g, `${it.n} qubit${it.n === 1 ? '' : 's'}, ${it.ops.length} steps`, x0 + 24, y0 + 66, DIM, '500 18px');
+      // a tiny diagram: wires, then one mark per step (boxes in the qubit colour, gold links for multi-qubit ops)
+      const top = y0 + 96, span = chh - 120;
+      const wy = (q: number) => (it.n === 1 ? top + span / 2 : top + (span * q) / (it.n - 1));
+      for (let q = 0; q < it.n; q++) {
+        g.fillStyle = WIRE;
+        g.fillRect(x0 + 24, wy(q) - 1, cw - 60, 2);
+      }
+      const steps = it.ops.slice(0, 14);
+      const dx = (cw - 70) / Math.max(1, steps.length);
+      steps.forEach((op, k) => {
+        const x = x0 + 34 + k * dx + dx / 2;
+        const qs = op.kind === 'gate' ? [...(op.controls ?? []), op.target] : op.kind === 'swap' || op.kind === 'iswap' ? [op.a, op.b] : [op.qubit];
+        if (qs.length > 1) {
+          g.fillStyle = GOLD;
+          g.fillRect(x - 1.5, wy(Math.min(...qs)), 3, wy(Math.max(...qs)) - wy(Math.min(...qs)));
+          for (const q of qs) {
+            circle(g, x, wy(q), 6);
+            g.fill();
+          }
+        } else {
+          const q = qs[0];
+          g.fillStyle = op.kind === 'measure' ? '#c9ccd1' : qubitColor(q);
+          g.fillRect(x - 8, wy(q) - 8, 16, 16);
+        }
+      });
+    });
+    this.tex.needsUpdate = true;
+  }
+
+  /** A QR code of a share link, to open the circuit on a phone or another headset. */
+  renderQr(url: string, caption: string): void {
+    const g = this.g;
+    g.clearRect(0, 0, W, H);
+    roundRect(g, 4, 4, W - 8, H - 8, 40);
+    g.fillStyle = 'rgba(29,30,33,0.94)';
+    g.fill();
+    g.lineWidth = 2;
+    g.strokeStyle = '#34363b';
+    g.stroke();
+    const qr = qrcode(0, 'M');
+    qr.addData(url);
+    qr.make();
+    const count = qr.getModuleCount();
+    const size = 520, cell = Math.floor(size / (count + 8));
+    const side = cell * (count + 8);
+    const x0 = 60, y0 = (H - side) / 2;
+    // a QR code needs a light square with a quiet border around it
+    g.fillStyle = '#ffffff';
+    g.fillRect(x0, y0, side, side);
+    g.fillStyle = '#111214';
+    for (let r = 0; r < count; r++) for (let c = 0; c < count; c++) if (qr.isDark(r, c)) g.fillRect(x0 + (c + 4) * cell, y0 + (r + 4) * cell, cell, cell);
+    text(g, 'Share this circuit', x0 + side + 60, 150, INK, '700 40px');
+    rich(g, caption, x0 + side + 60, 210, 26, '#c9ccd1', 500);
+    const shown = url.length > 52 ? `${url.slice(0, 52)}...` : url;
+    text(g, shown, x0 + side + 60, 270, DIM, '500 20px');
     this.tex.needsUpdate = true;
   }
 

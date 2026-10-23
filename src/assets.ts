@@ -31,6 +31,11 @@ export default defineAssets({
     type: AssetType.UIKitML,
     name: 'Notes',
   },
+  'library-panel': {
+    url: publicAssetUrl('ui/library.uikitml'),
+    type: AssetType.UIKitML,
+    name: 'Library',
+  },
   'noise-panel': {
     url: publicAssetUrl('ui/noise.uikitml'),
     type: AssetType.UIKitML,

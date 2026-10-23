@@ -193,3 +193,25 @@ export function toAscii(s: string): string {
     .replace(/…/g, '...')
     .replace(/[^\x20-\x7E]/g, '?');
 }
+
+/**
+ * Euler (ZYZ) decomposition of any single-qubit gate:
+ * U = e^{i alpha} Rz(phi) Ry(theta) Rz(lambda). Every one-qubit gate is three
+ * rotations about two axes; this is how compilers turn any gate into the few a
+ * chip can run.
+ */
+export function zyz(m: C[][]): { alpha: number; theta: number; phi: number; lambda: number } {
+  const [[a, b], [c, d]] = m;
+  // det U = e^{2 i alpha}
+  const detRe = a[0] * d[0] - a[1] * d[1] - (b[0] * c[0] - b[1] * c[1]);
+  const detIm = a[0] * d[1] + a[1] * d[0] - (b[0] * c[1] + b[1] * c[0]);
+  const alpha = Math.atan2(detIm, detRe) / 2;
+  const ca = Math.cos(-alpha), sa = Math.sin(-alpha);
+  // V = e^{-i alpha} U is in SU(2): V = [[e^{-i(phi+lambda)/2} cos, -e^{-i(phi-lambda)/2} sin], [e^{i(phi-lambda)/2} sin, e^{i(phi+lambda)/2} cos]]
+  const rot = ([re, im]: C): C => [re * ca - im * sa, re * sa + im * ca];
+  const v10 = rot(c), v11 = rot(d);
+  const theta = 2 * Math.atan2(Math.hypot(...v10), Math.hypot(...v11));
+  const sum = Math.hypot(...v11) > 1e-9 ? 2 * Math.atan2(v11[1], v11[0]) : 0;
+  const diff = Math.hypot(...v10) > 1e-9 ? 2 * Math.atan2(v10[1], v10[0]) : 0;
+  return { alpha, theta, phi: (sum + diff) / 2, lambda: (sum - diff) / 2 };
+}

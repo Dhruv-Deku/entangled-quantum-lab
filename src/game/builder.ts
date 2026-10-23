@@ -12,7 +12,25 @@ import { QState } from '../quantum/state';
 
 export type Tool =
   | 'h' | 'x' | 'y' | 'z' | 's' | 'sdg' | 't' | 'tdg' | 'sx' | 'sxdg' | 'rx' | 'ry' | 'rz'
-  | 'ctrl' | 'anti' | 'target' | 'swap';
+  | 'ctrl' | 'anti' | 'target' | 'swap'
+  /** Custom gates from the library, in three slots. */
+  | 'g1' | 'g2' | 'g3';
+
+/** A custom gate in a builder slot: k qubits, stored as the ops it expands to (on qubits 0..k-1). */
+export interface CustomGate {
+  name: string;
+  n: number;
+  ops: Op[];
+}
+
+/** Optional per-grid extras: angles of rotation cells, and the custom gates in the three slots. */
+export interface CompileOptions {
+  angles?: (number | null)[][];
+  customs?: readonly (CustomGate | null)[];
+}
+
+export const CUSTOM_TOOLS = ['g1', 'g2', 'g3'] as const;
+export const isCustom = (t: Tool | null): t is 'g1' | 'g2' | 'g3' => t === 'g1' || t === 'g2' || t === 'g3';
 
 export interface ToolInfo {
   /** What the cell shows (ASCII only: the panel font has no special symbols). */
@@ -41,6 +59,9 @@ export const TOOLS: Record<Tool, ToolInfo> = {
   anti: { label: 'anti', about: 'Anti-control (open dot): the column acts only when this qubit is 0.', isNew: true },
   target: { label: '+', about: 'Target (circled plus): an X that is usually controlled. Dot + plus = CNOT.', isNew: true },
   swap: { label: 'x', about: 'Swap mark: two in one column swap those qubits. Add a dot for a Fredkin.', isNew: true },
+  g1: { label: 'G1', about: 'Your custom gate 1: one block across as many qubits as it has.', isNew: true },
+  g2: { label: 'G2', about: 'Your custom gate 2: one block across as many qubits as it has.', isNew: true },
+  g3: { label: 'G3', about: 'Your custom gate 3: one block across as many qubits as it has.', isNew: true },
 };
 
 export const ALL_TOOLS = Object.keys(TOOLS) as Tool[];
@@ -68,18 +89,37 @@ export interface Compiled {
 }
 
 /** Turn the grid into ops, column by column (Quirk semantics for dots). */
-export function compile(cells: Cells): Compiled {
+export function compile(cells: Cells, opts: CompileOptions = {}): Compiled {
   const ops: Op[] = [];
   const errors: string[] = [];
   let usedColumns = 0;
   cells.forEach((col, c) => {
     const rows = (t: Tool) => col.flatMap((v, r) => (v === t ? [r] : []));
     const ctrls = rows('ctrl'), antis = rows('anti'), swaps = rows('swap');
-    const gates = col.flatMap((v, r) => (v && SINGLE[v] ? [{ r, ...SINGLE[v]! }] : []));
+    const gates = col.flatMap((v, r) => {
+      if (!v || !SINGLE[v]) return [];
+      const g = { r, ...SINGLE[v]! };
+      // rotation cells keep the angle they were placed with
+      const a = opts.angles?.[c]?.[r];
+      return [g.params && a != null ? { ...g, params: [a] } : g];
+    });
+    // custom gate blocks: runs of the same slot, k rows each
+    const blocks: { top: number; gate: CustomGate }[] = [];
+    for (let r = 0; r < col.length; r++) {
+      const v = col[r];
+      if (!isCustom(v)) continue;
+      const gate = opts.customs?.[CUSTOM_TOOLS.indexOf(v)];
+      if (!gate) {
+        errors.push(`Step ${c + 1}: custom slot ${v.toUpperCase()} is empty.`);
+        continue;
+      }
+      blocks.push({ top: r, gate });
+      r += gate.n - 1;
+    }
     if (col.some((v) => v)) usedColumns++;
     const controls = [...ctrls, ...antis].sort((a, b) => a - b);
     if (swaps.length && swaps.length !== 2) errors.push(`Step ${c + 1}: a swap needs exactly two marks.`);
-    if (controls.length && !gates.length && swaps.length !== 2) {
+    if (controls.length && !gates.length && !blocks.length && swaps.length !== 2) {
       errors.push(`Step ${c + 1}: a dot needs a gate in its column to control.`);
       return;
     }
@@ -93,6 +133,19 @@ export function compile(cells: Cells): Compiled {
       ops.push(op);
     }
     if (swaps.length === 2) ops.push({ kind: 'swap', a: swaps[0], b: swaps[1], ...(controls.length ? { controls } : {}) });
+    for (const { top, gate } of blocks) {
+      const m = (q: number) => top + q;
+      const ctl = (own?: number[]) => {
+        const all = [...(own ?? []).map(m), ...controls];
+        return all.length ? { controls: all } : {};
+      };
+      for (const op of gate.ops) {
+        if (op.kind === 'gate') ops.push({ ...op, target: m(op.target), ...ctl(op.controls) });
+        else if (op.kind === 'swap') ops.push({ ...op, a: m(op.a), b: m(op.b), ...ctl(op.controls) });
+        else if (op.kind === 'iswap' && !controls.length) ops.push({ ...op, a: m(op.a), b: m(op.b) });
+        else if (op.kind === 'iswap') errors.push(`Step ${c + 1}: an iSWAP inside a custom gate cannot be controlled.`);
+      }
+    }
     if (controls.length) flipAnti();
   });
   return { ops, errors, usedColumns };
@@ -294,9 +347,9 @@ export function parOf(ch: BuildChallenge): number {
 }
 
 /** Is the grid a solution to the challenge? */
-export function check(ch: BuildChallenge, cells: Cells): CheckResult {
+export function check(ch: BuildChallenge, cells: Cells, opts: CompileOptions = {}): CheckResult {
   if (!ch.target) return { status: 'free' };
-  const c = compile(cells);
+  const c = compile(cells, opts);
   if (!c.usedColumns) return { status: 'empty' };
   if (c.errors.length) return { status: 'error', message: c.errors[0] };
   const broken = ch.rule?.(cells);

@@ -3,7 +3,8 @@ import { toPennyLane, toQasm, toQiskit } from '../quantum/export';
 import { route, RoutingError, T5, type Routed } from '../quantum/routing';
 import { run } from '../quantum/circuit';
 import { exact } from '../quantum/exact';
-import { dirac, factor, gateFormula, gateName, kronLabel, localMatrix, qubitsOf, toAscii } from '../quantum/matrix';
+import { dirac, factor, gateFormula, gateName, kronLabel, localMatrix, qubitsOf, toAscii, zyz } from '../quantum/matrix';
+import { angleText } from '../quantum/exact';
 
 /** The code window's languages, in tab order. */
 export const FORMATS = ['qiskit', 'qasm', 'pennylane', 'chip', 'maths'] as const;
@@ -45,7 +46,7 @@ export function splitLine(line: string, format: Format): CodeLine {
   if (t.startsWith('#') || t.startsWith('//')) return { head: '', rest: t, comment: true };
   let m: RegExpMatchArray | null = null;
   if (format === 'maths') {
-    m = /^((?:U|\|psi>|Matrix) = )(.*)$/.exec(t);
+    m = /^((?:U|\|psi>|Matrix) = |Euler: )(.*)$/.exec(t);
   } else if (format === 'qasm' || format === 'chip') {
     m = /^(c\[\d+\] = measure)(.*)$/.exec(t) ??
       /^((?:if \([^)]*\) )?(?:(?:ctrl(?:\(\d+\))?|inv) @ )*[A-Za-z_][\w]*(?:\([^)]*\))?)(.*)$/.exec(t);
@@ -74,6 +75,13 @@ export function mathsText(n: number, ops: readonly Op[]): string {
     `Step ${ops.length}: ${toAscii(gateName(op))} on ${qubitsOf(op).map((q) => `q${q}`).join(', ')}`,
     `U = ${toAscii(kronLabel(n, op))}`,
     toAscii(gateFormula(op)),
+    ...(m.length === 2 && op.kind === 'gate'
+      ? (() => {
+          const e = zyz(m);
+          const a = (v: number) => angleText(Math.abs(v) < 1e-9 ? 0 : v).ascii;
+          return [`Euler: Rz(${a(e.phi)}) Ry(${a(e.theta)}) Rz(${a(e.lambda)}), phase ${a(e.alpha)}`];
+        })()
+      : []),
     ...(f ? [`Matrix = ${f.label.ascii} *`] : ['Matrix =']),
     ...cells.map((row) => `[ ${row.map((c) => c.padStart(w)).join('  ')} ]`),
     `|psi> = ${toAscii(dirac(state, 4))}`,

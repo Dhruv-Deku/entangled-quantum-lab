@@ -9,6 +9,7 @@ import type { Tool } from '../game/builder';
 const BUILD_KEYS: Record<string, Tool> = {
   h: 'h', x: 'x', y: 'y', z: 'z', s: 's', S: 'sdg', t: 't', T: 'tdg', v: 'sx', V: 'sxdg',
   '1': 'rx', '2': 'ry', '3': 'rz', c: 'ctrl', o: 'anti', p: 'target', w: 'swap',
+  '4': 'g1', '5': 'g2', '6': 'g3',
 };
 
 /**
@@ -31,6 +32,7 @@ const KEYS: [string, string][] = [
   ['[  ]', 'Previous / next chapter, lesson or sandbox preset'],
   ['A', 'Course: everything, in order, with quizzes'],
   ['E', 'Sandbox: noise lab (Shift+E on/off, , . T1, Shift+M mitigate)'],
+  ['F', 'Library (Shift+F save; U switch tab; Shift+Y use first row; Shift+K QR code; Shift+U import)'],
   ['1  2  3', 'Answer a quiz on the card'],
   ['J', 'Course: Show me (does the task for you)'],
   ['L', 'Learn: one lesson per gate'],
@@ -41,7 +43,7 @@ const KEYS: [string, string][] = [
   ['G  /  O', 'Code window: next tab; simplify (on the chip tab: run on chip)'],
   ['=', 'Zoom the code window and notes in or out'],
   ['Up  Down', 'Code window: previous / next page of code'],
-  ['In Build', 'arrows move; H X Y Z S T place; Shift+S/T dagger; V SX; 1 2 3 Rx Ry Rz; C dot; O open dot; P plus; W swap; Backspace erase'],
+  ['In Build', 'arrows move; H X Y Z S T place; Shift+S/T dagger; V SX; 1 2 3 Rx Ry Rz (, . angle); 4 5 6 your gates; C dot; O open dot; P plus; W swap; Backspace erase'],
   ['P', 'Play the chapters from Chapter 1'],
 ];
 
@@ -86,7 +88,7 @@ export class DebugInputSystem extends createSystem({}) {
   }
 
   private onKey(e: KeyboardEvent): void {
-    if (e.target instanceof HTMLInputElement) return;
+    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
     unlockAudio();
     const k = e.key;
     if ((e.ctrlKey || e.metaKey) && (k === 'z' || k === 'Z')) {
@@ -113,6 +115,11 @@ export class DebugInputSystem extends createSystem({}) {
     }
     switch (k.toLowerCase()) {
       case 'h': case 'x': case 'y': case 'z': case 's': case 't':
+        // Shift+Y uses the first row of the library (load a circuit or apply a gate); y is the Y gate
+        if (k === 'Y') {
+          window.dispatchEvent(new CustomEvent('entangled:library', { detail: 'use' }));
+          break;
+        }
         if (lab.gate(k.toLowerCase() as 'h')) feedback('gate');
         break;
       case 'm':
@@ -167,6 +174,13 @@ export class DebugInputSystem extends createSystem({}) {
         campaign.enterLearn();
         feedback('select');
         break;
+      case 'f':
+        // f opens the library; Shift+F saves the circuit (or makes a gate on the Gates tab)
+        window.dispatchEvent(new CustomEvent('entangled:library', { detail: k === 'F' ? 'save' : 'toggle' }));
+        break;
+      case 'u':
+        window.dispatchEvent(new CustomEvent('entangled:library', { detail: k === 'U' ? 'import' : 'tab' }));
+        break;
       case 'e':
         // e opens the noise lab; Shift+E turns the noise on or off
         window.dispatchEvent(new CustomEvent('entangled:noise', { detail: k === 'E' ? 'toggle' : 'panel' }));
@@ -194,6 +208,11 @@ export class DebugInputSystem extends createSystem({}) {
         window.dispatchEvent(new Event('entangled:notes'));
         break;
       case 'k':
+        if (k === 'K') {
+          window.dispatchEvent(new CustomEvent('entangled:library', { detail: 'qr' }));
+          break;
+        }
+      // falls through
       case 'g':
       case 'o':
       case '=':
@@ -233,6 +252,10 @@ export class DebugInputSystem extends createSystem({}) {
     if (mv) {
       e.preventDefault();
       b.moveCursor(mv[0], mv[1]);
+      return true;
+    }
+    if (e.key === ',' || e.key === '.') {
+      b.stepAngle(e.key === '.' ? 1 : -1);
       return true;
     }
     const tool = BUILD_KEYS[e.key];

@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { BUILDS, check, compile, emptyCells, parOf, sameUnitary, type Cells, type Tool } from './builder';
+import { Lab } from '../lab/lab';
+import type { Op } from '../quantum/circuit';
+import { mulberry32 } from '../quantum/measure';
+import { BuildSession } from './build-session';
 
 const cells = (n: number, cols: (Tool | null)[][]): Cells => cols.map((c) => Array.from({ length: n }, (_, r) => c[r] ?? null));
 const byChip = (chip: string) => BUILDS.find((b) => b.chip === chip)!;
@@ -71,5 +75,45 @@ describe('circuit builder: challenges', () => {
     expect(r.status).toBe('solved');
     const longer = check(byChip('Z from HX'), cells(1, [['h'], ['x'], ['h'], ['x'], ['x']]));
     expect(longer).toEqual({ status: 'solved', columns: 5, par: 3 });
+  });
+});
+
+describe('custom gates and rotation angles', () => {
+  const bellGate = { name: 'Bell', n: 2, ops: [{ kind: 'gate', gate: 'h', target: 0 }, { kind: 'gate', gate: 'x', target: 1, controls: [0] }] as Op[] };
+
+  it('a custom gate block expands onto its rows, and a dot in the column controls all of it', () => {
+    const cells = emptyCells(3, 2);
+    cells[0][1] = 'g1';
+    cells[0][2] = 'g1';
+    expect(compile(cells, { customs: [bellGate] }).ops).toEqual([
+      { kind: 'gate', gate: 'h', target: 1 },
+      { kind: 'gate', gate: 'x', target: 2, controls: [1] },
+    ]);
+    cells[0][0] = 'ctrl';
+    const ops = compile(cells, { customs: [bellGate] }).ops;
+    expect(ops[0]).toMatchObject({ gate: 'h', target: 1, controls: [0] });
+    expect(ops[1]).toMatchObject({ gate: 'x', target: 2, controls: [1, 0] });
+    expect(compile(cells, { customs: [] }).errors[0]).toMatch(/slot G1 is empty/);
+  });
+
+  it('the session places a whole block, clears it as one, and rotation cells keep their angle', () => {
+    const lab = new Lab(1, mulberry32(1));
+    const s = new BuildSession(lab);
+    s.start(0);
+    s.setCustoms([bellGate]);
+    s.selectTool('g1');
+    s.place(0, 0);
+    expect(s.cells[0].slice(0, 3)).toEqual(['g1', 'g1', null]);
+    expect(lab.state.probabilities()[3]).toBeCloseTo(0.5, 9);
+    s.place(0, 2); // does not fit below row 2 of 3
+    expect(s.cells[0][2]).toBeNull();
+    s.erase(0, 1);
+    expect(s.cells[0].slice(0, 2)).toEqual([null, null]);
+    s.selectTool('ry');
+    s.stepAngle(-1);
+    s.stepAngle(-1);
+    s.place(1, 0);
+    expect(s.angle).toBeCloseTo(Math.PI / 4, 12);
+    expect(lab.history.ops[0]).toMatchObject({ gate: 'ry', params: [Math.PI / 4] });
   });
 });

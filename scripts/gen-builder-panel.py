@@ -7,7 +7,7 @@ Run: python scripts/gen-builder-panel.py
 from pathlib import Path
 
 COLS, ROWS = 14, 4
-TOOLS = ['h', 'x', 'y', 'z', 's', 'sdg', 't', 'tdg', 'sx', 'sxdg', 'rx', 'ry', 'rz', 'ctrl', 'anti', 'target', 'swap']
+TOOLS = ['h', 'x', 'y', 'z', 's', 'sdg', 't', 'tdg', 'sx', 'sxdg', 'rx', 'ry', 'rz', 'ctrl', 'anti', 'target', 'swap', 'g1', 'g2', 'g3']
 
 style = """
 <style>
@@ -50,6 +50,7 @@ style = """
   .status { font-size: 12; font-weight: 600; color: #8a8d93; }
   .grid { flex-direction: column; padding-top: 4; padding-bottom: 4; border-radius: 14; background-color: #1d1e21; }
   .row { flex-direction: row; align-items: center; }
+  .arow { flex-direction: row; align-items: center; gap: 8; }
   .ql { width: 26; font-size: 11; font-weight: 700; color: #8a8d93; padding-left: 6; }
   .cell { width: 40; height: 40; flex-direction: row; align-items: center; cursor: pointer; border-radius: 6; }
   .wire { flex-grow: 1; height: 2; background-color: #4a4c52; }
@@ -72,6 +73,13 @@ for t in TOOLS:
     lines.append(f'    <div id="p-{t}" class="tile"><div id="p-{t}-g" class="g"><div id="p-{t}-gl" class="gl">-</div></div></div>')
 lines.append('  </div>')
 lines.append('  <div id="b-info" class="info">Tap a tool, then tap the grid.</div>')
+# angle for new Rx / Ry / Rz cells (shown only while one of them is selected)
+lines.append('  <div id="b-angle-row" class="arow">')
+lines.append('    <div class="info">Angle for new rotations:</div>')
+lines.append('    <div id="b-angle-down" class="btn"><div class="bt">-</div></div>')
+lines.append('    <div id="b-angle" class="bt">pi/2</div>')
+lines.append('    <div id="b-angle-up" class="btn"><div class="bt">+</div></div>')
+lines.append('  </div>')
 lines.append('  <div class="grid">')
 for r in range(ROWS):
     lines.append(f'    <div id="b-row-{r}" class="row">')

@@ -77,6 +77,8 @@ export class LabSystem extends createSystem({
   private pulseClock = -1;
   /** Maths tab: the board shows the current step's matrix and state instead of the circuit. */
   private mathsOn = false;
+  /** The library open: thumbnails or a QR code, drawn by the UI, kept until closed. */
+  private overlayKey = '';
   /** Phase wheels or the VQE curve on the board (algorithm chapters). */
   private wheelsOn = false;
   private vqeView: Parameters<CircuitBoard['renderVqe']>[1] | undefined = undefined;
@@ -354,7 +356,7 @@ export class LabSystem extends createSystem({
     if (this.chip.root.visible) this.chip.update(dt);
     if (this.fridge.root.visible) this.fridge.update(dt);
     // on the chip tab the board rises above the code window so the pulse schedule shows
-    const boardY = this.pulseView || this.mathsOn || this.landscapeView || this.densityOn || this.wheelsOn || this.vqeView !== undefined ? 0.5 : 0.27;
+    const boardY = this.pulseView || this.mathsOn || this.landscapeView || this.densityOn || this.wheelsOn || this.vqeView !== undefined || this.overlayKey ? 0.5 : 0.27;
     this.board.root.position.y += (boardY - this.board.root.position.y) * (1 - Math.exp(-dt * 8));
     if (this.placePending) {
       this.player.head.updateWorldMatrix(true, false);
@@ -446,7 +448,9 @@ export class LabSystem extends createSystem({
       this.boardVersion = this.stateVersion;
       this.boardTimer = 0;
       const h = lab.history.toJSON();
-      if (this.wheelsOn) {
+      if (this.overlayKey) {
+        // the library's view stays until it closes
+      } else if (this.wheelsOn) {
         this.board.renderWheels(lab.history.state);
       } else if (this.vqeView !== undefined) {
         // drawn by showVqe
@@ -488,6 +492,15 @@ export class LabSystem extends createSystem({
     } else {
       this.boardVersion = -1;
     }
+  }
+
+  /** Let the UI draw on the board (library thumbnails, a QR code); null gives it back. Same key again does nothing. */
+  showOverlay(key: string | null, draw?: (board: CircuitBoard) => void): void {
+    const k = key ?? '';
+    if (k === this.overlayKey) return;
+    this.overlayKey = k;
+    if (k && draw) draw(this.board);
+    else this.boardVersion = -1;
   }
 
   /** Phase wheels for the QFT and phase estimation chapters. */

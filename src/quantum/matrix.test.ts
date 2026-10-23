@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { run, type Op } from './circuit';
 import { angleText, exact } from './exact';
-import { dirac, factor, gateFormula, gateName, kronLabel, localMatrix, toAscii, type C } from './matrix';
+import { dirac, factor, gateFormula, gateName, kronLabel, localMatrix, toAscii, zyz, type C } from './matrix';
 import { mulberry32 } from './measure';
 
 const R = Math.SQRT1_2;
@@ -106,5 +106,26 @@ describe('formulas and notation', () => {
     expect(/^[\x20-\x7E]+$/.test(a)).toBe(true);
     expect(a).toContain('e^(-i');
     expect(toAscii('1/√2 (|00⟩ + |11⟩)')).toBe('1/sqrt2 (|00> + |11>)');
+  });
+});
+
+describe('ZYZ decomposition', () => {
+  it('rebuilds every gate exactly, global phase included', () => {
+    const rnd = mulberry32(3);
+    const ops: Op[] = (['h', 'x', 'y', 'z', 's', 'sdg', 't', 'tdg', 'sx', 'sxdg'] as const).map((g) => ({ kind: 'gate', gate: g, target: 0 }));
+    for (let k = 0; k < 40; k++) ops.push({ kind: 'gate', gate: 'u', target: 0, params: [rnd() * 6, rnd() * 6 - 3, rnd() * 6 - 3] });
+    for (const op of ops) {
+      const { m } = localMatrix(op);
+      const { alpha, theta, phi, lambda } = zyz(m);
+      for (let col = 0; col < 2; col++) {
+        const s = run(1, [...(col ? [{ kind: 'gate', gate: 'x', target: 0 } as Op] : []), { kind: 'gate', gate: 'rz', target: 0, params: [lambda] }, { kind: 'gate', gate: 'ry', target: 0, params: [theta] }, { kind: 'gate', gate: 'rz', target: 0, params: [phi] }], () => 0.5).state;
+        for (let row = 0; row < 2; row++) {
+          const re = Math.cos(alpha) * s.re[row] - Math.sin(alpha) * s.im[row];
+          const im = Math.sin(alpha) * s.re[row] + Math.cos(alpha) * s.im[row];
+          expect(re, `${JSON.stringify(op)} [${row}][${col}]`).toBeCloseTo(m[row][col][0], 9);
+          expect(im).toBeCloseTo(m[row][col][1], 9);
+        }
+      }
+    }
   });
 });

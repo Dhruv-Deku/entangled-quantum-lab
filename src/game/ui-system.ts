@@ -28,6 +28,8 @@ import { NotesPanel } from './notes-ui';
 import { BUILDS, parOf } from './builder';
 import { starsFor } from './puzzles';
 import { DEPOL_STEPS, noiseLab, T1_STEPS, T2_STEPS } from '../lab/noise-lab';
+import { library, placeGate } from '../lab/library';
+import { openImportDialog } from '../lab/import-dialog';
 import { codeLines, FORMAT_NAMES, FORMATS, linesOf, pages, program, routeOrError, type Format } from './code-view';
 import { landscape, SQUARE, toPennyLaneQaoa } from '../quantum/qaoa';
 import { H2 } from '../quantum/h2-data';
@@ -59,6 +61,7 @@ const PLACEMENT = {
 
 const SLOTS = 7;
 const CODE_LINES = 10;
+const LIB_ROWS = 5;
 /** How much bigger a zoomed window is. */
 const ZOOM = 1.3;
 const NAV_SLOTS = 18;
@@ -158,6 +161,13 @@ export class UISystem extends createSystem({
   private builder: BuilderPanel | null = null;
   private notesAsset: UIKitMLAsset | null = null;
   private noiseAsset: UIKitMLAsset | null = null;
+  private libAsset: UIKitMLAsset | null = null;
+  /** Library panel: open, which tab, which page, and whether the board shows the QR code. */
+  private libOpen = false;
+  private libTab: 'circuit' | 'gate' = 'circuit';
+  private libPage = 0;
+  private libQr = false;
+  private libNote: string | null = null;
   /** The noise lab panel is open (sandbox only). */
   private noiseOpen = false;
   private notes: NotesPanel | null = null;
@@ -226,12 +236,13 @@ export class UISystem extends createSystem({
     this.builderAsset = this.world.getSceneObject<UIKitMLAsset>('builder-panel') ?? null;
     this.notesAsset = this.world.getSceneObject<UIKitMLAsset>('notes-panel') ?? null;
     this.noiseAsset = this.world.getSceneObject<UIKitMLAsset>('noise-panel') ?? null;
-    if (!this.chapter || !this.dock || !this.code || !this.nav || !this.builderAsset || !this.notesAsset || !this.noiseAsset) return false;
+    this.libAsset = this.world.getSceneObject<UIKitMLAsset>('library-panel') ?? null;
+    if (!this.chapter || !this.dock || !this.code || !this.nav || !this.builderAsset || !this.notesAsset || !this.noiseAsset || !this.libAsset) return false;
     this.code.visible = false;
 
     // panels take poke and ray input but must never capture the grab pointer,
     // or a hand reaching for an orb just above the dock grabs the dock instead
-    for (const panel of [this.chapter, this.dock, this.code, this.nav, this.builderAsset, this.notesAsset, this.noiseAsset]) {
+    for (const panel of [this.chapter, this.dock, this.code, this.nav, this.builderAsset, this.notesAsset, this.noiseAsset, this.libAsset]) {
       panel.traverse((o) => {
         (o as unknown as { pointerEventsType: unknown }).pointerEventsType = { deny: 'grab' };
       });
@@ -254,6 +265,10 @@ export class UISystem extends createSystem({
     for (const k of ['t1', 't2', 'p']) noiseIds.push(`noise-${k}`, `noise-${k}-fill`, `noise-${k}-down`, `noise-${k}-up`);
     for (const id of noiseIds) this.els.set(id, this.noiseAsset.requireElementById(id));
     this.els.set('btn-notes-label', this.chapter.requireElementById('btn-notes-label'));
+    this.els.set('btn-lib', this.chapter.requireElementById('btn-lib'));
+    const libIds = ['lib-title', 'lib-close', 'lib-tab-circuits', 'lib-tab-circuits-l', 'lib-tab-gates', 'lib-tab-gates-l', 'lib-note', 'lib-save', 'lib-save-l', 'lib-import', 'lib-qr', 'lib-qr-l', 'lib-prev', 'lib-next'];
+    for (let i = 0; i < LIB_ROWS; i++) libIds.push(`lib-r-${i}`, `lib-n-${i}`, `lib-m-${i}`, `lib-a-${i}`, `lib-a-${i}-l`, `lib-d-${i}`);
+    for (const id of libIds) this.els.set(id, this.libAsset.requireElementById(id));
     this.codeScale = this.code.scale.x;
     this.notesScale = this.notesAsset.scale.x;
     for (const [id, el] of this.els) el.name = id;
@@ -352,6 +367,40 @@ export class UISystem extends createSystem({
     this.builder = new BuilderPanel(this.builderAsset, campaign.build, () => feedback('select'));
     this.notes = new NotesPanel(this.notesAsset, () => undefined, () => this.toggleZoom());
     on('btn-notes', () => (campaign.mode === 'sandbox' ? this.toggleNoise() : this.toggleNotes()));
+    on('btn-lib', () => this.toggleLibrary());
+    on('lib-close', () => this.toggleLibrary());
+    on('lib-tab-circuits', () => this.libShow('circuit'));
+    on('lib-tab-gates', () => this.libShow('gate'));
+    on('lib-prev', () => this.libTurn(-1));
+    on('lib-next', () => this.libTurn(1));
+    on('lib-save', () => this.libSave());
+    on('lib-import', () => this.libImport());
+    on('lib-qr', () => this.libToggleQr());
+    for (let i = 0; i < LIB_ROWS; i++) {
+      on(`lib-a-${i}`, () => this.libUse(i));
+      on(`lib-d-${i}`, () => this.libDelete(i));
+    }
+    // the builder's custom slots follow the library's newest gates
+    const syncCustoms = () => campaign.build.setCustoms(library.gates.slice(0, 3).map((g) => ({ name: g.name, n: g.n, ops: g.ops })), campaign.mode === 'build');
+    syncCustoms();
+    this.cleanupFuncs.push(
+      library.onChange(() => {
+        syncCustoms();
+        this.renderLibrary();
+      }),
+    );
+    const onLibKey = (e: Event) => {
+      const what = (e as CustomEvent<string>).detail;
+      if (what === 'toggle') this.toggleLibrary();
+      else if (!this.libOpen) return;
+      else if (what === 'save') this.libSave();
+      else if (what === 'tab') this.libShow(this.libTab === 'circuit' ? 'gate' : 'circuit');
+      else if (what === 'qr') this.libToggleQr();
+      else if (what === 'import') this.libImport();
+      else if (what === 'use') this.libUse(0);
+    };
+    window.addEventListener('entangled:library', onLibKey);
+    this.cleanupFuncs.push(() => window.removeEventListener('entangled:library', onLibKey));
     on('noise-toggle', () => {
       noiseLab.toggle();
       feedback('select');
@@ -419,6 +468,7 @@ export class UISystem extends createSystem({
     const sandbox = v.mode === 'sandbox' && !v.intro;
     this.els.get('btn-notes')?.setProperties({ display: n || sandbox ? 'flex' : 'none' });
     this.text('btn-notes-label', sandbox ? (this.noiseOpen ? 'Close noise' : 'Noise') : 'Notes');
+    this.els.get('btn-lib')?.setProperties({ display: sandbox ? 'flex' : 'none' });
     // the noise lab is a sandbox tool: leaving the sandbox turns it off
     if (!sandbox && (this.noiseOpen || noiseLab.on)) {
       this.noiseOpen = false;
@@ -547,6 +597,141 @@ export class UISystem extends createSystem({
     }
     if (!v.stepDone) this.text('goal-text', v.wrong !== null ? 'Not quite. Try another answer.' : this.immersive ? 'Tap an answer' : 'Pick an answer  (press 1, 2 or 3)');
     this.bg('goal-dot', v.stepDone ? C.done : v.wrong !== null ? '#ff8a7a' : C.current);
+  }
+
+  /** Open or close the library (any mode; loading a circuit moves to the sandbox). */
+  private toggleLibrary(): void {
+    this.libOpen = !this.libOpen;
+    this.libQr = false;
+    this.libNote = null;
+    if (this.libOpen) {
+      if (this.code) this.code.visible = false;
+      if (this.notes?.open) this.notes.close();
+      this.noiseOpen = false;
+    }
+    this.renderLibrary();
+    feedback('select');
+  }
+
+  private libItems() {
+    return this.libTab === 'circuit' ? library.circuits : library.gates;
+  }
+
+  private libShow(tab: 'circuit' | 'gate'): void {
+    this.libTab = tab;
+    this.libPage = 0;
+    this.libQr = false;
+    this.libNote = null;
+    this.renderLibrary();
+    feedback('select');
+  }
+
+  private libTurn(dir: number): void {
+    const pages = Math.max(1, Math.ceil(this.libItems().length / LIB_ROWS));
+    this.libPage = Math.max(0, Math.min(pages - 1, this.libPage + dir));
+    this.renderLibrary();
+  }
+
+  private libSave(): void {
+    const ops = lab.history.ops.slice();
+    try {
+      const it = library.add(this.libTab, lab.n, ops);
+      this.libNote = this.libTab === 'gate' ? `Saved as gate ${it.name} (${it.n} qubits). In Build it is a tile; in the sandbox, Apply drops it on the selected qubit and up.` : `Saved "${it.name}".`;
+      this.libPage = 0;
+      feedback('success');
+    } catch (err) {
+      this.libNote = (err as Error).message;
+      feedback('reject');
+    }
+    this.renderLibrary();
+  }
+
+  private libUse(row: number): void {
+    const it = this.libItems()[this.libPage * LIB_ROWS + row];
+    if (!it) return;
+    if (it.kind === 'circuit') {
+      campaign.enterSandbox(it.n, it.ops);
+      this.libNote = `Loaded "${it.name}" in the sandbox.`;
+      feedback('select');
+    } else {
+      // a gate goes onto the selected qubit and the ones above it
+      const qubits = [...Array(it.n).keys()].map((k) => lab.selected + k);
+      if (campaign.mode !== 'sandbox' || qubits[qubits.length - 1] >= lab.n) {
+        this.libNote = campaign.mode !== 'sandbox' ? 'Apply works in the sandbox (or use the gate as a tile in Build).' : `${it.name} needs ${it.n} qubits from q${lab.selected}: select a lower qubit or add one.`;
+        feedback('reject');
+      } else {
+        for (const op of placeGate(it, qubits)) lab.apply(op);
+        this.libNote = `Applied ${it.name} on ${qubits.map((q) => `q${q}`).join(', ')}.`;
+        feedback('gate');
+      }
+    }
+    this.renderLibrary();
+  }
+
+  private libDelete(row: number): void {
+    const it = this.libItems()[this.libPage * LIB_ROWS + row];
+    if (!it) return;
+    library.remove(it.id);
+    this.libNote = `Deleted "${it.name}".`;
+    feedback('select');
+  }
+
+  private libImport(): void {
+    if (this.immersive) {
+      this.libNote = 'Import uses the 2D page: exit VR, paste the code, then come back in.';
+      this.renderLibrary();
+      return feedback('reject');
+    }
+    openImportDialog((c, name) => {
+      const it = library.add('circuit', c.n, c.ops, name || undefined);
+      campaign.enterSandbox(c.n, c.ops);
+      this.libTab = 'circuit';
+      this.libPage = 0;
+      this.libNote = `Imported "${it.name}" from ${c.format === 'qasm' ? 'OpenQASM' : 'Qiskit'}: ${c.n} qubits, ${c.ops.length} steps.`;
+      this.renderLibrary();
+      feedback('success');
+    });
+  }
+
+  private libToggleQr(): void {
+    this.libQr = !this.libQr;
+    this.renderLibrary();
+    feedback('select');
+  }
+
+  private renderLibrary(): void {
+    if (!this.libAsset) return;
+    const items = this.libItems();
+    const gates = this.libTab === 'gate';
+    this.text('lib-title', gates ? 'My gates' : 'My circuits');
+    for (const [t, on] of [['circuits', !gates], ['gates', gates]] as const) {
+      this.bg(`lib-tab-${t}`, on ? C.text : '#242528');
+      this.els.get(`lib-tab-${t}-l`)?.setProperties({ color: on ? '#18191b' : C.textDim });
+    }
+    const pages = Math.max(1, Math.ceil(items.length / LIB_ROWS));
+    this.libPage = Math.min(this.libPage, pages - 1);
+    for (let i = 0; i < LIB_ROWS; i++) {
+      const it = items[this.libPage * LIB_ROWS + i];
+      this.els.get(`lib-r-${i}`)?.setProperties({ display: it ? 'flex' : 'none' });
+      if (!it) continue;
+      this.text(`lib-n-${i}`, it.name);
+      this.text(`lib-m-${i}`, `${it.n} qubit${it.n === 1 ? '' : 's'}, ${it.ops.length} steps${gates && i < 3 && this.libPage === 0 ? `, Build tile G${i + 1}` : ''}`);
+      this.text(`lib-a-${i}-l`, gates ? 'Apply' : 'Load');
+    }
+    this.text('lib-save-l', gates ? 'Make gate' : 'Save this circuit');
+    this.text('lib-qr-l', this.libQr ? 'Hide QR' : 'QR code');
+    this.els.get('lib-prev')?.setProperties({ display: pages > 1 ? 'flex' : 'none' });
+    this.els.get('lib-next')?.setProperties({ display: pages > 1 ? 'flex' : 'none' });
+    this.text(
+      'lib-note',
+      this.libNote ??
+        (gates
+          ? 'Make gate turns the circuit on the orbs into one block you can reuse: a tile in Build, or Apply in the sandbox.'
+          : items.length
+            ? 'Saved on this device. Load opens a circuit in the sandbox.'
+            : 'Nothing saved yet. Save this circuit keeps what is on the orbs; Import reads OpenQASM or Qiskit code.'),
+    );
+    this.dirty = true;
   }
 
   /** Open or close the noise lab (sandbox only). */
@@ -813,6 +998,27 @@ export class UISystem extends createSystem({
     const playing = v.mode === 'course' || v.mode === 'campaign' || v.mode === 'learn' || v.mode === 'puzzle';
     const step = playing && !v.intro ? v.step : null;
     const codeOpen = this.code!.visible;
+    // the library takes the board while it is open: thumbnails, or a QR code of the current circuit
+    if (this.libOpen) {
+      labSys.chip.root.visible = false;
+      labSys.showHardware(null);
+      labSys.showMaths(false);
+      labSys.showLandscape(null);
+      labSys.showDensity(false);
+      labSys.showWheels(false);
+      labSys.showVqe(undefined, H2);
+      const items = this.libItems().slice(this.libPage * LIB_ROWS, this.libPage * LIB_ROWS + 8);
+      if (this.libQr) {
+        const url = `${location.origin}${location.pathname}${SHARE_PREFIX}${encodeURIComponent(encodeCircuit(lab.n, lab.history.ops))}`;
+        labSys.showOverlay(`qr:${url}`, (b) => b.renderQr(url, 'Scan with a phone camera to open this circuit there.'));
+      } else {
+        labSys.showOverlay(`lib:${this.libTab}:${this.libPage}:${items.map((i) => i.id).join(',')}`, (b) =>
+          b.renderLibrary(this.libTab === 'gate' ? 'My gates' : 'My circuits', items, this.libTab === 'gate' ? 'No gates yet: Make gate saves the circuit on the orbs as one.' : 'No circuits yet: Save this circuit, or Import code.'),
+        );
+      }
+      return;
+    }
+    labSys.showOverlay(null);
     // the noise lab takes the board while it is open
     labSys.showDensity(this.noiseOpen);
     if (this.noiseOpen) {
@@ -1016,7 +1222,7 @@ export class UISystem extends createSystem({
     const want = this.pokeOn ? near > 0.14 : near > 0.2;
     if (want === this.pokeOn) return;
     this.pokeOn = want;
-    for (const id of ['chapter-panel', 'gate-dock', 'code-panel', 'nav-panel', 'builder-panel', 'notes-panel', 'noise-panel']) {
+    for (const id of ['chapter-panel', 'gate-dock', 'code-panel', 'nav-panel', 'builder-panel', 'notes-panel', 'noise-panel', 'library-panel']) {
       const e = this.world.getSceneEntity(id);
       if (!e) continue;
       if (want && !e.hasComponent(PokeInteractable)) e.addComponent(PokeInteractable);
@@ -1084,6 +1290,13 @@ export class UISystem extends createSystem({
     } else {
       this.notesAsset!.visible = false;
       this.notesAsset!.position.copy(PARKED);
+    }
+    if (this.libOpen) {
+      this.place(this.libAsset!, 'notes-panel');
+      this.libAsset!.visible = true;
+    } else {
+      this.libAsset!.visible = false;
+      this.libAsset!.position.copy(PARKED);
     }
     if (this.noiseOpen) {
       this.place(this.noiseAsset!, 'notes-panel');

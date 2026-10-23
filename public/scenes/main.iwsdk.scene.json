@@ -270,6 +270,26 @@
         "RayInteractable": {},
         "PokeInteractable": {}
       }
+    },
+    {
+      "id": "library-panel",
+      "name": "Library",
+      "content": {
+        "type": "asset",
+        "asset": "library-panel"
+      },
+      "transform": {
+        "position": [
+          0,
+          -50,
+          0
+        ],
+        "scale": 0.052
+      },
+      "components": {
+        "RayInteractable": {},
+        "PokeInteractable": {}
+      }
     }
   ],
   "authoring": {

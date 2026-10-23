@@ -1,0 +1,93 @@
+<!--
+  Library: my saved circuits and my custom gates, with save, import and a QR
+  code for sharing. UIKit units are cm.
+-->
+<style>
+  .card {
+    flex-direction: column;
+    width: 440;
+    gap: 9;
+    padding-top: 20;
+    padding-bottom: 18;
+    padding-left: 22;
+    padding-right: 22;
+    background-color: #1b1c1f;
+    border-radius: 26;
+    border-width: 1;
+    border-color: #34363b;
+  }
+  .head { flex-direction: row; justify-content: space-between; align-items: center; }
+  .titles { flex-direction: column; gap: 2; }
+  .eyebrow { font-size: 11; font-weight: 600; color: #8a8d93; }
+  .title { font-size: 20; font-weight: 700; color: #f2f3f5; }
+  .note { font-size: 12; line-height: 1.4; color: #b8bbc1; }
+  .tabs {
+    flex-direction: row;
+    gap: 4;
+    padding-top: 4;
+    padding-bottom: 4;
+    padding-left: 4;
+    padding-right: 4;
+    border-radius: 20;
+    background-color: #242528;
+  }
+  .tab { flex-grow: 1; height: 30; border-radius: 15; align-items: center; justify-content: center; background-color: #242528; cursor: pointer; }
+  .tl { font-size: 12; font-weight: 700; color: #8a8d93; }
+  .row {
+    flex-direction: row;
+    align-items: center;
+    gap: 8;
+    padding-top: 7;
+    padding-bottom: 7;
+    padding-left: 12;
+    padding-right: 8;
+    border-radius: 14;
+    background-color: #242528;
+  }
+  .names { flex-direction: column; flex-grow: 1; gap: 2; }
+  .name { font-size: 13; font-weight: 600; color: #e4e6eb; }
+  .meta { font-size: 11; color: #8a8d93; }
+  .btn {
+    height: 30;
+    padding-left: 12;
+    padding-right: 12;
+    border-radius: 15;
+    align-items: center;
+    justify-content: center;
+    background-color: #34363b;
+    cursor: pointer;
+  }
+  .bt { font-size: 12; font-weight: 700; color: #e4e6eb; }
+  .btns { flex-direction: row; gap: 6; align-items: center; }
+  .foot { flex-direction: row; justify-content: space-between; align-items: center; }
+</style>
+<div class="card">
+  <div class="head">
+    <div class="titles">
+      <div class="eyebrow">Library</div>
+      <div id="lib-title" class="title">My circuits</div>
+    </div>
+    <div id="lib-close" class="btn"><div class="bt">Close</div></div>
+  </div>
+  <div class="tabs">
+    <div id="lib-tab-circuits" class="tab"><div id="lib-tab-circuits-l" class="tl">My circuits</div></div>
+    <div id="lib-tab-gates" class="tab"><div id="lib-tab-gates-l" class="tl">My gates</div></div>
+  </div>
+  <div id="lib-note" class="note">-</div>
+  <div id="lib-r-0" class="row"><div class="names"><div id="lib-n-0" class="name">-</div><div id="lib-m-0" class="meta">-</div></div><div id="lib-a-0" class="btn"><div id="lib-a-0-l" class="bt">Load</div></div><div id="lib-d-0" class="btn"><div class="bt">Delete</div></div></div>
+  <div id="lib-r-1" class="row"><div class="names"><div id="lib-n-1" class="name">-</div><div id="lib-m-1" class="meta">-</div></div><div id="lib-a-1" class="btn"><div id="lib-a-1-l" class="bt">Load</div></div><div id="lib-d-1" class="btn"><div class="bt">Delete</div></div></div>
+  <div id="lib-r-2" class="row"><div class="names"><div id="lib-n-2" class="name">-</div><div id="lib-m-2" class="meta">-</div></div><div id="lib-a-2" class="btn"><div id="lib-a-2-l" class="bt">Load</div></div><div id="lib-d-2" class="btn"><div class="bt">Delete</div></div></div>
+  <div id="lib-r-3" class="row"><div class="names"><div id="lib-n-3" class="name">-</div><div id="lib-m-3" class="meta">-</div></div><div id="lib-a-3" class="btn"><div id="lib-a-3-l" class="bt">Load</div></div><div id="lib-d-3" class="btn"><div class="bt">Delete</div></div></div>
+  <div id="lib-r-4" class="row"><div class="names"><div id="lib-n-4" class="name">-</div><div id="lib-m-4" class="meta">-</div></div><div id="lib-a-4" class="btn"><div id="lib-a-4-l" class="bt">Load</div></div><div id="lib-d-4" class="btn"><div class="bt">Delete</div></div></div>
+  <div class="foot">
+    <div class="btns">
+      <div id="lib-save" class="btn"><div id="lib-save-l" class="bt">Save this circuit</div></div>
+      <div id="lib-import" class="btn"><div class="bt">Import</div></div>
+      <div id="lib-qr" class="btn"><div id="lib-qr-l" class="bt">QR code</div></div>
+    </div>
+    <div class="btns">
+      <div id="lib-prev" class="btn"><div class="bt">Back</div></div>
+      <div id="lib-next" class="btn"><div class="bt">More</div></div>
+    </div>
+  </div>
+</div>
