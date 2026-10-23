@@ -33,6 +33,7 @@ import { openImportDialog } from '../lab/import-dialog';
 import { codeLines, FORMAT_NAMES, FORMATS, linesOf, pages, program, routeOrError, type Format } from './code-view';
 import { describe as describeVoice, parseVoice, type VoiceCommand } from './voice';
 import { explainStep, histogram, nextStop, stepTitle } from './debugger';
+import { nextView, STATE_VIEW_NAMES, type StateView } from '../quantum/state-views';
 import { SpeechInput } from '../lab/speech';
 import { landscape, SQUARE, toPennyLaneQaoa } from '../quantum/qaoa';
 import { H2 } from '../quantum/h2-data';
@@ -174,6 +175,8 @@ export class UISystem extends createSystem({
   private dbgOpen = false;
   private breakpoints = new Set<number>();
   private dbgRun: { stop: number; timer: number } | null = null;
+  /** The big-state view on show (Q-sphere, state city, entanglement map), if any. */
+  private stateView: StateView | null = null;
   /** Library panel: open, which tab, which page, and whether the board shows the QR code. */
   private libOpen = false;
   private libTab: 'circuit' | 'gate' = 'circuit';
@@ -366,6 +369,10 @@ export class UISystem extends createSystem({
     );
     on('a-voice', () => this.speech?.toggle());
     on('a-debug', () => this.toggleDebugger());
+    on('a-view', () => this.cycleView());
+    const onViewKey = () => this.cycleView();
+    window.addEventListener('entangled:view', onViewKey);
+    this.cleanupFuncs.push(() => window.removeEventListener('entangled:view', onViewKey));
     on('dbg-close', () => this.toggleDebugger());
     on('dbg-start', () => this.dbgSeek(0));
     on('dbg-back', () => this.dbgSeek(lab.history.cursor - 1));
@@ -762,6 +769,15 @@ export class UISystem extends createSystem({
         this.renderLibrary();
         return true;
     }
+  }
+
+  /** Q-sphere, then the state city, then the entanglement map, then back to the circuit. */
+  private cycleView(): void {
+    this.stateView = nextView(this.stateView);
+    this.text('a-view-l', this.stateView ? STATE_VIEW_NAMES[this.stateView] : 'View');
+    this.bg('a-view', this.stateView ? C.primary : '#2d2f33');
+    this.flash(this.stateView ? `${STATE_VIEW_NAMES[this.stateView]}. Press View again for the next one.` : 'Back to the circuit.');
+    feedback('select');
   }
 
   /** Open or close the step debugger. */
@@ -1627,7 +1643,10 @@ export class UISystem extends createSystem({
     this.placeBlend(this.code!, 'code-panel', 'code-zoom', this.zoomT, this.codeScale, this.codeOpenT);
     this.updateBoardMode();
     const lsys = this.world.getSystem(LabSystem);
-    if (lsys) lsys.boardRaised = this.dbgOpen;
+    if (lsys) {
+      lsys.boardRaised = this.dbgOpen;
+      lsys.showStateView(this.libOpen ? null : this.stateView);
+    }
     // notes sit where the code panel does; only one of the two is open at a time
     if (this.notes!.open) {
       this.placeBlend(this.notesAsset!, 'notes-panel', 'notes-zoom', this.zoomT, this.notesScale, this.notesOpenT);

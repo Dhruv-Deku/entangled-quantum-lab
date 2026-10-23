@@ -33,6 +33,7 @@ const KEYS: [string, string][] = [
   ['A', 'Course: everything, in order, with quizzes'],
   ['E', 'Sandbox: noise lab (Shift+E on/off, , . T1, Shift+M mitigate)'],
   ['Shift+D', 'Step debugger (, . step; ; run to breakpoint; \' set breakpoint)'],
+  ['Shift+V', 'Big-state views: Q-sphere, state city, entanglement map'],
   ['V', 'Voice commands on or off ("Hadamard on qubit zero", "run a thousand shots")'],
   ['F', 'Library (Shift+F save; U switch tab; Shift+Y use first row; Shift+K QR code; Shift+U import)'],
   ['1  2  3', 'Answer a quiz on the card'],
@@ -177,7 +178,7 @@ export class DebugInputSystem extends createSystem({}) {
         feedback('select');
         break;
       case 'v':
-        window.dispatchEvent(new Event('entangled:voice'));
+        window.dispatchEvent(new Event(k === 'V' ? 'entangled:view' : 'entangled:voice'));
         break;
       case 'f':
         // f opens the library; Shift+F saves the circuit (or makes a gate on the Gates tab)

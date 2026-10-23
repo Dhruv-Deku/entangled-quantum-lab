@@ -27,6 +27,8 @@ import { FridgeVisual } from './fridge';
 import { noiseLab } from './noise-lab';
 import { runNoisy } from '../quantum/density';
 import { ChipVisual } from './chip';
+import { QSphereVisual, StateCityVisual } from './state-views-3d';
+import { pureDensity, type StateView } from '../quantum/state-views';
 import { T5 } from '../quantum/routing';
 import { feedback } from './feedback';
 import { GOLD, GroupVisual, ORB_RADIUS, OrbVisual, StrikeVisual, ThreadVisual } from './visuals';
@@ -70,6 +72,10 @@ export class LabSystem extends createSystem({
   chip!: ChipVisual;
   /** The dilution refrigerator the chip lives in, shown with it. */
   fridge!: FridgeVisual;
+  /** Big-state views: the Q-sphere and the state city float where the board was; the board shows their legend. */
+  private qsphere!: QSphereVisual;
+  private city!: StateCityVisual;
+  private stateView: StateView | null = null;
   /** Chip tab: the board shows the pulse schedule instead of the circuit. */
   private pulseView: PulseView | null = null;
   private pulseKey = '';
@@ -140,6 +146,15 @@ export class LabSystem extends createSystem({
     this.fridge.root.rotation.y = 0.5;
     this.fridge.root.visible = false;
     ws.add(this.fridge.root);
+    this.qsphere = new QSphereVisual();
+    this.qsphere.root.position.set(0, 0.25, -0.27);
+    this.qsphere.root.visible = false;
+    ws.add(this.qsphere.root);
+    this.city = new StateCityVisual();
+    this.city.root.position.set(0, 0.17, -0.3);
+    this.city.root.rotation.x = 0.18;
+    this.city.root.visible = false;
+    ws.add(this.city.root);
 
     this.syncOrbs(true);
     this.cleanupFuncs.push(lab.on((e) => this.onLabEvent(e)));
@@ -355,8 +370,10 @@ export class LabSystem extends createSystem({
     const dt = Math.min(delta, 0.05);
     if (this.chip.root.visible) this.chip.update(dt);
     if (this.fridge.root.visible) this.fridge.update(dt);
+    if (this.qsphere.root.visible) this.qsphere.update(dt);
+    if (this.city.root.visible) this.city.update(dt);
     // on the chip tab the board rises above the code window so the pulse schedule shows
-    const boardY = this.boardRaised || this.pulseView || this.mathsOn || this.landscapeView || this.densityOn || this.wheelsOn || this.vqeView !== undefined || this.overlayKey ? 0.5 : 0.27;
+    const boardY = this.boardRaised || (this.stateView && this.stateView !== 'heatmap') || this.pulseView || this.mathsOn || this.landscapeView || this.densityOn || this.wheelsOn || this.vqeView !== undefined || this.overlayKey ? 0.5 : 0.27;
     this.board.root.position.y += (boardY - this.board.root.position.y) * (1 - Math.exp(-dt * 8));
     if (this.placePending) {
       this.player.head.updateWorldMatrix(true, false);
@@ -450,6 +467,11 @@ export class LabSystem extends createSystem({
       const h = lab.history.toJSON();
       if (this.overlayKey) {
         // the library's view stays until it closes
+      } else if (this.stateView) {
+        const rho = noiseLab.on ? noiseLab.rho(lab.n, lab.history.ops) : pureDensity(lab.history.state);
+        this.board.renderStateView(this.stateView, lab.history.state, rho, noiseLab.on);
+        if (this.stateView === 'qsphere') this.qsphere.set(lab.history.state);
+        if (this.stateView === 'city') this.city.set(rho);
       } else if (this.wheelsOn) {
         this.board.renderWheels(lab.history.state);
       } else if (this.vqeView !== undefined) {
@@ -504,6 +526,15 @@ export class LabSystem extends createSystem({
     this.overlayKey = k;
     if (k && draw) draw(this.board);
     else this.boardVersion = -1;
+  }
+
+  /** A big-state view (null puts the circuit back). */
+  showStateView(view: StateView | null): void {
+    if (view === this.stateView) return;
+    this.stateView = view;
+    this.qsphere.root.visible = view === 'qsphere';
+    this.city.root.visible = view === 'city';
+    this.boardVersion = -1;
   }
 
   /** Phase wheels for the QFT and phase estimation chapters. */

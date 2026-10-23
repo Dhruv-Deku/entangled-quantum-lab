@@ -10,6 +10,7 @@ import { angleText } from '../quantum/exact';
 import type { QState } from '../quantum/state';
 import { blochVector as blochVectorOf } from '../quantum/bloch';
 import { qubitColor } from './visuals';
+import { cityHighlights, entanglementMap, entanglementSummary, phaseColor, qsphere, STATE_VIEW_NAMES, type DensityLike, type StateView } from '../quantum/state-views';
 
 const W = 1600;
 const H = 640;
@@ -541,6 +542,106 @@ export class CircuitBoard {
     this.tex.needsUpdate = true;
   }
 
+  /**
+   * The big-state views' board: the entanglement map itself, or the legend
+   * and the leading numbers beside the 3D Q-sphere or state city.
+   */
+  renderStateView(view: StateView, state: QState, rho: DensityLike, noisy: boolean): void {
+    const g = this.g;
+    g.clearRect(0, 0, W, H);
+    roundRect(g, 4, 4, W - 8, H - 8, 40);
+    g.fillStyle = 'rgba(29,30,33,0.94)';
+    g.fill();
+    g.lineWidth = 2;
+    g.strokeStyle = '#34363b';
+    g.stroke();
+    const n = state.n;
+    text(g, `${STATE_VIEW_NAMES[view]}  /  ${n} qubit${n > 1 ? 's' : ''}, ${1 << n} basis states`, 44, 62, DIM, '600 28px');
+    text(g, 'View: next', W - 44, 62, '#6b6e75', '600 24px', 'right');
+    if (view === 'heatmap') {
+      const m = entanglementMap(state);
+      const size = Math.min(84, 380 / n);
+      const x0 = 120, y0 = 130;
+      for (let q = 0; q < n; q++) {
+        text(g, `q${q}`, x0 + q * size + size / 2, y0 - 16, qubitColor(q), '700 24px', 'center');
+        text(g, `q${q}`, x0 - 16, y0 + q * size + size / 2 + 8, qubitColor(q), '700 24px', 'right');
+      }
+      for (let a = 0; a < n; a++)
+        for (let c = 0; c < n; c++) {
+          const x = x0 + c * size, y = y0 + a * size;
+          g.fillStyle = '#26272b';
+          g.fillRect(x + 2, y + 2, size - 4, size - 4);
+          if (a === c) continue;
+          const v = m.pair[a][c];
+          if (v < 0.01) continue;
+          g.fillStyle = hexAlpha(GOLD, 0.15 + 0.85 * v);
+          g.fillRect(x + 2, y + 2, size - 4, size - 4);
+          if (size > 56) text(g, v.toFixed(2), x + size / 2, y + size / 2 + 8, '#1d1e21', '700 20px', 'center');
+        }
+      text(g, 'each pair on its own', x0, y0 + n * size + 38, DIM, '500 20px');
+      // with all the rest
+      const bx = 640;
+      text(g, 'each qubit with all the rest', bx, 128, DIM, '600 22px');
+      for (let q = 0; q < n; q++) {
+        const yy = 160 + q * 54;
+        text(g, `q${q}`, bx, yy + 26, qubitColor(q), '700 24px');
+        g.fillStyle = '#26272b';
+        g.fillRect(bx + 60, yy + 8, 360, 22);
+        g.fillStyle = hexAlpha(GOLD, 0.25 + 0.75 * m.rest[q]);
+        g.fillRect(bx + 60, yy + 8, 360 * m.rest[q], 22);
+        text(g, m.rest[q].toFixed(2), bx + 440, yy + 27, INK, '600 22px');
+      }
+      let yy = 196 + n * 54;
+      for (const para of entanglementSummary(m))
+        for (const line of wrap(g, para, '500 24px', W - 640 - 60)) {
+          text(g, line, 640, yy, INK, '500 24px');
+          yy += 34;
+        }
+      text(g, 'Pairs use the negativity; "with the rest" is 1 - |Bloch arrow|^2.', 44, H - 40, '#6b6e75', '500 20px');
+    } else if (view === 'qsphere') {
+      text(g, 'One dot per basis state. Top: all 0s. Bottom: all 1s. Same number of 1s, same latitude.', 44, 120, INK, '500 26px');
+      text(g, 'Dot size: probability.   Dot colour: phase (relative to the biggest dot).', 44, 160, INK, '500 26px');
+      // the colour wheel
+      const cx = 1400, cy = 360, r = 110;
+      for (let i = 0; i < 72; i++) {
+        const a0 = (i / 72) * Math.PI * 2, a1 = ((i + 1.2) / 72) * Math.PI * 2;
+        g.beginPath();
+        g.moveTo(cx, cy);
+        g.arc(cx, cy, r, -a1, -a0);
+        g.closePath();
+        g.fillStyle = phaseColor(a0);
+        g.fill();
+      }
+      circle(g, cx, cy, r * 0.55);
+      g.fillStyle = '#1d1e21';
+      g.fill();
+      text(g, '0', cx + r + 14, cy + 8, DIM, '600 22px');
+      text(g, 'pi/2', cx, cy - r - 14, DIM, '600 22px', 'center');
+      text(g, 'pi', cx - r - 14, cy + 8, DIM, '600 22px', 'right');
+      text(g, '3pi/2', cx, cy + r + 32, DIM, '600 22px', 'center');
+      const top = qsphere(state).filter((p) => p.p > 1e-4).sort((a, b) => b.p - a.p);
+      top.slice(0, 8).forEach((p, i) => {
+        const y = 230 + i * 44;
+        circle(g, 64, y - 8, 12);
+        g.fillStyle = phaseColor(p.phase);
+        g.fill();
+        text(g, `|${p.label}>`, 92, y, INK, '600 26px');
+        text(g, `P ${p.p.toFixed(3)}`, 92 + 26 * (n + 3), y, INK, '500 24px');
+        text(g, `phase ${angleText(p.phase).text}`, 92 + 26 * (n + 3) + 160, y, DIM, '500 24px');
+      });
+      if (top.length > 8) text(g, `and ${top.length - 8} more`, 92, 230 + 8 * 44, DIM, '500 22px');
+    } else {
+      text(g, `The density matrix as towers${noisy ? ' (with the noise lab on)' : ''}: row = ket, column = bra.`, 44, 120, INK, '500 26px');
+      text(g, 'Grey: probabilities (diagonal).  Blue: coherences.  Coral: negative.  Noise wears the blue down.', 44, 160, INK, '500 24px');
+      cityHighlights(rho, n, 8).forEach((t, i) => {
+        const y = 230 + i * 44;
+        text(g, t.label, 64, y, t.i === t.j ? INK : '#8fb7ff', '600 26px');
+        text(g, Math.abs(t.re) < 5e-4 ? `${t.im.toFixed(3)}i` : `${t.re.toFixed(3)}${Math.abs(t.im) > 5e-4 ? ` ${t.im >= 0 ? '+' : '-'} ${Math.abs(t.im).toFixed(3)}i` : ''}`, 64 + 26 * (2 * n + 5), y, INK, '500 24px');
+      });
+    }
+    this.tex.needsUpdate = true;
+  }
+
   /** VQE for H2: energy against bond length (Hartree-Fock dashed, exact solid, VQE points), and where the dial stands now. */
   renderVqe(points: { r: number; fci: number; hf: number }[], vqe: { r: number; energy: number; hf: number; fci: number; curve: [number, number][] | null; path: [number, number][] } | null): void {
     const g = this.g;
@@ -905,6 +1006,22 @@ function bracket(g: CanvasRenderingContext2D, x: number, top: number, h: number,
 }
 
 /** '#rrggbb' plus an alpha, as rgba(). */
+/** Split a sentence into lines no wider than maxW at the given font. */
+function wrap(g: CanvasRenderingContext2D, s: string, font: string, maxW: number): string[] {
+  g.font = `${font} Inter, system-ui, sans-serif`;
+  const lines: string[] = [];
+  let cur = '';
+  for (const word of s.split(' ')) {
+    const next = cur ? `${cur} ${word}` : word;
+    if (cur && g.measureText(next).width > maxW) {
+      lines.push(cur);
+      cur = word;
+    } else cur = next;
+  }
+  if (cur) lines.push(cur);
+  return lines;
+}
+
 function hexAlpha(hex: string, a: number): string {
   const n = parseInt(hex.slice(1), 16);
   return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
