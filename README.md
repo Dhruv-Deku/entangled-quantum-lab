@@ -16,7 +16,7 @@ your circuit exports to Qiskit and OpenQASM 3.
 ```sh
 npm install
 npm run dev        # managed browser with the Quest 3 emulator (IWER)
-npm test           # 180 unit tests: physics, gestures, ghost-hand demos, the full course, 12 chapters, 15 lessons, notes, puzzles, builder, share links, simplifier, OpenQASM, code window, chip routing, noise, pulse schedules, gate matrices, exact maths and QAOA
+npm test           # 221 unit tests: physics, gestures, the course, 18 chapters, 15 lessons, puzzles, builder, noise, chemistry, import, IBM compiling and more
 npm run typecheck
 npm run build
 ```
@@ -64,6 +64,9 @@ depends on a single input path.
 | – | Page through long code | Back / More | Up / Down |
 | – | Route onto the 5-qubit chip and run with hardware errors | Qiskit, On chip, Run on chip | K, G to On chip, O |
 | – | The maths of each step: matrix, formula, state vectors | Qiskit, Maths | K, G to Maths, then Ctrl+Z / Ctrl+Y |
+| – | Run on a real IBM quantum computer | Qiskit, On chip, Run on IBM | Shift+O on the On chip tab |
+| – | Noise lab: T1, T2, gate error, zero-noise extrapolation | sandbox card: Noise | E (Shift+E on/off, Shift+M mitigate) |
+| – | Library: save, load, import, QR code, custom gates | sandbox card: Library | F (Shift+F save, U tab, Shift+Y use, Shift+K QR, Shift+U import) |
 | – | Simplify the circuit (Undo brings it back) | Qiskit, then Simplify | O |
 
 Gesture thresholds live in `src/gestures/config.ts` (with hysteresis, hold times
@@ -119,6 +122,12 @@ the way a learner would, and check that a wrong answer waits.
 10. **Hidden Number** – Bernstein-Vazirani on 4 qubits: a random 3-bit number read in one question instead of three.
 11. **The Mystery Qubit** – state tomography: a sealed box hides a random state; look at 100 copies along Z, X and Y, rebuild the arrow with your wrist and T, then reveal how close you came.
 12. **Max Cut** – QAOA: optimise a variational circuit's two dials on the cost landscape, then two layers, and watch the best cuts dominate the shots.
+13. **Phase Wheel** – the quantum Fourier transform turns the number 5 into angles you can see on phase wheels, and back.
+14. **Phase Estimation** – phase kickback and an inverse QFT read a gate's secret angle in binary.
+15. **Factoring 15** – Shor's algorithm (compiled): the period of 7^x mod 15 is 4, so 15 = 3 x 5.
+16. **The H2 Molecule** – VQE on a real chemistry Hamiltonian: Hartree-Fock, then the exact ground energy, then the whole bond curve.
+17. **Search 8 Boxes** – Grover on three qubits: two rounds, 94.5%.
+18. **Simon's Secret** – the first exponential quantum speedup: the readings name a hidden bit string.
 
 | Chapter 3: measure one qubit and the other always agrees | Chapter 8: two bits sent on one qubit, 100 of 100 shots |
 | --- | --- |
@@ -257,6 +266,86 @@ The **PennyLane** tab exports the run as a program in the usual exercise shape
 parameters found. Run with PennyLane 0.42 it prints exactly the same <H_C> and
 ratio as the app: -3.000 / 0.750 for one layer on the ring, -3.4573 / 0.8643
 for two layers on a kite.
+
+## Run on a real quantum computer
+
+The code window's **On chip** tab has **Run on IBM**: your circuit runs on an
+actual IBM Quantum computer through your own IBM Quantum Platform account (the
+free Open Plan works). Add your API key and instance CRN once on the 2D page
+(the **IBM Quantum** button at the bottom right; they stay in this browser).
+The app then does what Qiskit's transpiler does at its simplest:
+
+- picks the least busy operational backend with CZ gates (IBM Heron), reads its
+  wiring and calibration, and chooses a connected group of good qubits;
+- routes the circuit onto them, adding SWAPs where qubits are not wired;
+- rewrites every gate in the chip's native set: one-qubit gates become
+  RZ SX RZ SX RZ from their Euler angles, controlled gates become CNOTs and
+  one-qubit gates, and each CNOT is a CZ between Hadamards;
+- submits a 1000-shot Sampler job as OpenQASM 3 on the physical qubits, polls it
+  (it survives a reload), and rains the real counts on the desk next to how
+  close they are to the ideal circuit and to the noise model's prediction.
+
+Tests check the native translation (same unitary for every gate), compiling 40
+random circuits onto a heavy-hex fragment (native gates only, wired pairs only,
+same result through the layouts), Qiskit parsing the output as RZ/SX/CZ only,
+and the client's requests against a scripted stand-in for IBM's API (paths,
+`Service-CRN`, `IBM-API-Version: 2026-04-15`, the Sampler body). Through the dev
+server's proxy, IBM's live login and API both answer a fake key with the
+right rejection. A real hardware run needs your key, so it is the one step
+not run here; queues on the free plan can take minutes.
+
+Browsers cannot call IBM's servers directly (CORS), so `vite.config.ts`
+forwards `/ibm-iam`, `/ibm-api` and `/ibm-api-eu`; a hosted build needs the
+same three forwards.
+
+## Noise lab
+
+![The noise lab: density matrix, Bloch lengths, purity and zero-noise extrapolation](docs/screenshots/noise-lab.png)
+
+In the sandbox, **Noise** (or E) opens the noise lab. Turn it on and every gate
+runs as on a real chip: depolarizing error (ten times more for two-qubit gates),
+**T1** energy loss and **T2** dephasing during each gate's duration (36 ns, 280
+ns, 1.2 us readout). The orbs show the mixed state, so arrows shrink inside the
+spheres; shots sample it; and the board shows the **density matrix** (square
+size = |rho_ij|, probabilities on the diagonal, coherences off it), each qubit's
+Bloch length and the purity. **Mitigate** runs **zero-noise extrapolation**: the
+fidelity with the ideal state at 1x, 2x and 3x the noise, fitted back to zero.
+
+The density-matrix simulator matches the statevector exactly without noise,
+gives e^(-t/T1) decay and T2 dephasing, and matches Qiskit's `quantum_info`
+density matrices with the same channels to 3e-16.
+
+## Library, import and custom gates
+
+- **Library** (sandbox card, or F): My circuits and My gates, saved on this
+  device. The board shows them as thumbnails; Load opens a circuit.
+- **Import** reads OpenQASM 2 or 3 and Qiskit code, pasted on the 2D page.
+  Every exported program reads back as the same circuit (120 random round trips
+  each), and QASM written by Qiskit itself imports exactly.
+- **QR code** draws the current circuit's share link on the board; a phone
+  camera opens it (checked by decoding the rendered code). Where the browser
+  has a barcode detector and a camera, the import dialog can scan one too.
+- **Make gate** turns the circuit on the orbs into one reusable block: tiles
+  G1-G3 in Build (a dot in the column controls the whole block), or Apply in the
+  sandbox onto the selected qubit and up.
+- Builder rotations take any angle in steps of pi/8 (, and . on a keyboard),
+  and the Maths tab shows every one-qubit gate's Euler angles,
+  U = e^{i a} Rz(phi) Ry(theta) Rz(lambda), checked to rebuild 50 gates exactly.
+
+## Algorithm chapters
+
+| QFT phase wheels | VQE for H2 |
+| --- | --- |
+| ![The phase wheels after the QFT of 5: 5/8, 2/8 and 4/8 of a turn](docs/screenshots/phase-wheels.png) | ![The H2 energy curve: Hartree-Fock dashed, exact solid, VQE points on it](docs/screenshots/vqe-h2.png) |
+
+Chapters 13-18 add the QFT (phase wheels on the board), phase estimation, Shor
+factoring 15 (a compiled modular exponent, said so on the card), VQE for the H2
+molecule, Grover on eight boxes and Simon's algorithm. The H2 Hamiltonians are
+real: generated with PennyLane's quantum chemistry (STO-3G, Jordan-Wigner, 4
+qubits) by `scripts/gen-h2.py`; VQE reaches the exact ground energy at all 24
+bond lengths, and the minimum sits at 0.74 Angstrom. Tests check the QFT
+against the discrete Fourier transform, phase estimation for every k/8, Shor's
+period and factors, Grover's 94.5%, and Simon's secret.
 
 ## The maths of every step
 

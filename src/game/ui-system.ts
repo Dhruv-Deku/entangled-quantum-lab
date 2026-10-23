@@ -35,6 +35,9 @@ import { landscape, SQUARE, toPennyLaneQaoa } from '../quantum/qaoa';
 import { H2 } from '../quantum/h2-data';
 import { agreement, NO_NOISE, runOnChip, TYPICAL_NOISE } from '../quantum/hardware';
 import { T5, type Routed } from '../quantum/routing';
+import { compileForIbm, samplesToCounts } from '../quantum/ibm-compile';
+import { IbmClient, loadPending, loadSettings, savePending, type PendingJob } from '../lab/ibm';
+import { addIbmButton, openIbmDialog } from '../lab/ibm-dialog';
 import { schedule } from '../quantum/pulses';
 
 type El = ReturnType<UIKitMLAsset['requireElementById']>;
@@ -62,6 +65,7 @@ const PLACEMENT = {
 const SLOTS = 7;
 const CODE_LINES = 10;
 const LIB_ROWS = 5;
+const IBM_SHOTS = 1000;
 /** How much bigger a zoomed window is. */
 const ZOOM = 1.3;
 const NAV_SLOTS = 18;
@@ -257,7 +261,7 @@ export class UISystem extends createSystem({
     const dockIds = ['g-h', 'g-x', 'g-y', 'g-z', 'g-s', 'g-t', 'g-rl', 'g-rr', 'a-cnot', 'a-swap', 'a-measure', 'a-shots', 'a-export', 't-prev', 't-next', 'dock-status'];
     for (let i = 0; i < SLOTS; i++) dockIds.push(`t-${i}`, `t-${i}-l`);
     for (const id of dockIds) this.els.set(id, this.dock.requireElementById(id));
-    const codeIds = ['code-close', 'code-note', 'code-link', 'code-eyebrow', 'code-title', 'code-zoom', 'code-zoom-label', 'code-simplify', 'code-simplify-label', 'code-run', 'code-up', 'code-down'];
+    const codeIds = ['code-close', 'code-note', 'code-link', 'code-eyebrow', 'code-title', 'code-zoom', 'code-zoom-label', 'code-simplify', 'code-simplify-label', 'code-run', 'code-ibm', 'code-ibm-l', 'code-up', 'code-down'];
     for (const f of FORMATS) codeIds.push(`code-tab-${f}`, `code-tab-${f}-l`);
     for (let i = 0; i < CODE_LINES; i++) codeIds.push(`code-r-${i}`, `code-n-${i}`, `code-h-${i}`, `code-t-${i}`);
     for (const id of codeIds) this.els.set(id, this.code.requireElementById(id));
@@ -343,6 +347,12 @@ export class UISystem extends createSystem({
     for (const f of FORMATS) on(`code-tab-${f}`, () => this.setFormat(f));
     on('code-simplify', () => this.simplifyCircuit());
     on('code-run', () => this.runChip());
+    on('code-ibm', () => void this.runIbm());
+    this.cleanupFuncs.push(addIbmButton());
+    // a job submitted before a reload: keep waiting for it
+    const pending = loadPending();
+    const settings = loadSettings();
+    if (pending && settings) this.ibmJob = { ...pending, client: new IbmClient(settings), ideal: null, sim: null, polling: false };
     on('code-zoom', () => this.toggleZoom());
     on('code-up', () => this.pageCode(-1));
     on('code-down', () => this.pageCode(1));
@@ -354,6 +364,7 @@ export class UISystem extends createSystem({
         else this.showCode();
       } else if (what === 'format') this.setFormat(FORMATS[(FORMATS.indexOf(this.codeFormat) + 1) % FORMATS.length]);
       else if (what === 'simplify') (this.codeFormat === 'chip' ? this.runChip() : this.simplifyCircuit());
+      else if (what === 'ibm') void this.runIbm();
       else if (what === 'zoom') this.toggleZoom();
       else if ((what === 'up' || what === 'down') && this.code?.visible) this.pageCode(what === 'up' ? -1 : 1);
     };
@@ -1055,6 +1066,95 @@ export class UISystem extends createSystem({
     } else labSys.showLandscape(null);
   }
 
+  /** An IBM Quantum job in flight (submitted from the chip tab), and what to compare it with. */
+  private ibmJob: (PendingJob & { client: IbmClient; ideal: number[] | null; sim: number | null; polling: boolean }) | null = null;
+  private ibmNote: string | null = null;
+  private ibmTimer = 0;
+
+  /**
+   * Run on IBM: compile for the backend (route onto its wiring, translate to
+   * RZ, SX, CZ), submit a 1000-shot Sampler job, then poll until it finishes.
+   */
+  private async runIbm(): Promise<void> {
+    if (this.ibmJob) {
+      this.ibmNote = `Still waiting for job ${this.ibmJob.id.slice(0, 8)} on ${this.ibmJob.backend}.`;
+      return this.showCode(false);
+    }
+    const settings = loadSettings();
+    if (!settings) {
+      this.ibmNote = this.immersive ? 'Add your IBM Quantum API key first: exit VR and tap IBM Quantum (bottom right of the page).' : 'Add your IBM Quantum API key and instance CRN, then tap Run on IBM again.';
+      if (!this.immersive) openIbmDialog(() => void this.runIbm());
+      this.showCode(false);
+      return feedback('reject');
+    }
+    const ops = lab.history.ops.slice();
+    const n = lab.n;
+    const client = new IbmClient(settings);
+    try {
+      this.ibmNote = 'Contacting IBM Quantum: choosing a backend...';
+      this.showCode(false);
+      const backend = await client.pickBackend();
+      const cal = await client.calibration(backend.name, backend.nQubits);
+      const compiled = compileForIbm(n, ops, backend, cal.score, cal.usable);
+      this.ibmNote = `Compiled for ${backend.name}: qubits ${compiled.region.join(', ')}, ${compiled.twoQubit} CZ gates, ${compiled.swaps} SWAPs. Submitting...`;
+      this.showCode(false);
+      const id = await client.submit(compiled.qasm, backend.name, IBM_SHOTS);
+      const job: PendingJob = { id, backend: backend.name, n, submittedAt: Date.now() };
+      savePending(job);
+      // what to compare the hardware with: the ideal circuit, and the noise model on the same compiled circuit
+      const ideal = Array.from(lab.history.state.probabilities());
+      const simRun = runOnChip({ ops: compiled.native, initial: compiled.initial, final: compiled.final, swaps: compiled.swaps, twoQubitBefore: 0, twoQubitAfter: 0 }, n, compiled.region.length, 2000, Math.random, TYPICAL_NOISE);
+      this.ibmJob = { ...job, client, ideal, sim: agreement(simRun.counts, ideal), polling: false };
+      this.ibmTimer = 0;
+      this.ibmNote = `Submitted to ${backend.name} (job ${id.slice(0, 8)}). Queued: results can take minutes; keep working.`;
+      feedback('select');
+    } catch (err) {
+      this.ibmNote = (err as Error).message;
+      feedback('reject');
+    }
+    this.showCode(false);
+  }
+
+  /** Every few seconds while a job is out: check it, and show the result when it lands. */
+  private pollIbm(dt: number): void {
+    const job = this.ibmJob;
+    if (!job || job.polling) return;
+    this.ibmTimer += dt;
+    if (this.ibmTimer < 8) return;
+    this.ibmTimer = 0;
+    job.polling = true;
+    void (async () => {
+      try {
+        const st = await job.client.job(job.id);
+        if (st.status === 'Completed') {
+          const counts = samplesToCounts(await job.client.samples(job.id), job.n);
+          const shots = counts.reduce((a, b) => a + b, 0);
+          if (lab.n === job.n) lab.showShots(counts);
+          const real = job.ideal ? agreement(counts, job.ideal) : null;
+          this.ibmNote =
+            real === null
+              ? `${job.backend}: ${shots} real shots are in (on the rain if the lab still has ${job.n} qubits).`
+              : `${job.backend}, ${shots} real shots: ${(real * 100).toFixed(1)}% agree with the ideal circuit; the noise model predicted ${((job.sim ?? 0) * 100).toFixed(1)}%.`;
+          this.ibmJob = null;
+          savePending(null);
+          feedback('success');
+        } else if (st.status === 'Failed' || st.status === 'Cancelled') {
+          this.ibmNote = `IBM job ${st.status.toLowerCase()}${st.reason ? `: ${st.reason}` : '.'}`;
+          this.ibmJob = null;
+          savePending(null);
+          feedback('reject');
+        } else {
+          const mins = Math.round((Date.now() - job.submittedAt) / 60000);
+          this.ibmNote = `${job.backend}: ${st.status.toLowerCase()} (${mins} min so far, job ${job.id.slice(0, 8)}).`;
+        }
+      } catch (err) {
+        this.ibmNote = `Checking the IBM job: ${(err as Error).message}`;
+      }
+      job.polling = false;
+      if (this.code?.visible) this.showCode(false);
+    })();
+  }
+
   /** The board's pulse view for a routed circuit. */
   private pulseView(routed: Routed) {
     const holders = new Array<number>(T5.qubits).fill(-1);
@@ -1181,6 +1281,8 @@ export class UISystem extends createSystem({
     this.text('code-title', onChip ? 'Your circuit on the T5 chip' : onMaths ? 'The maths of this step' : `Your circuit in ${lang}`);
     this.els.get('code-simplify')?.setProperties({ display: onChip ? 'none' : 'flex' });
     this.els.get('code-run')?.setProperties({ display: onChip ? 'flex' : 'none' });
+    this.els.get('code-ibm')?.setProperties({ display: onChip ? 'flex' : 'none' });
+    this.text('code-ibm-l', this.ibmJob ? 'IBM job...' : 'Run on IBM');
     this.bg('code-run', typeof routed === 'string' ? '#26272b' : C.primary);
     this.text('code-simplify-label', this.unsimplified ? 'Undo' : this.preview !== null ? 'Original' : 'Simplify');
     this.bg('code-simplify', this.unsimplified || this.preview !== null ? C.primary : '#34363b');
@@ -1190,7 +1292,7 @@ export class UISystem extends createSystem({
       : typeof routed === 'string'
         ? routed
         : `Five qubits in a T, wired only to neighbours. ${routed.swaps ? `${routed.swaps} SWAP${routed.swaps === 1 ? '' : 's'} added: ${routed.twoQubitBefore} two-qubit gates became ${routed.twoQubitAfter}.` : `No SWAPs needed: all ${routed.twoQubitBefore} two-qubit gates land on wired pairs.`}`;
-    this.text('code-note', this.codeNote?.text ?? (onChip ? chipNote : `${where}${this.immersive ? '.' : '; copied to your clipboard.'}`));
+    this.text('code-note', (onChip && this.ibmNote) || (this.codeNote?.text ?? (onChip ? chipNote : `${where}${this.immersive ? '.' : '; copied to your clipboard.'}`)));
     this.code.visible = true;
     if (sound) {
       feedback('select');
@@ -1307,6 +1409,7 @@ export class UISystem extends createSystem({
     }
     this.place(this.nav!, 'nav-panel');
     campaign.update(Math.min(delta, 0.05));
+    this.pollIbm(Math.min(delta, 0.05));
 
     this.updatePokeGate();
 

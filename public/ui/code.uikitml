@@ -109,6 +109,7 @@
     <div class="btns">
       <div id="code-simplify" class="btn"><div id="code-simplify-label" class="bt">Simplify</div></div>
       <div id="code-run" class="btn"><div class="bt">Run on chip</div></div>
+      <div id="code-ibm" class="btn"><div id="code-ibm-l" class="bt">Run on IBM</div></div>
       <div id="code-link" class="btn"><div class="bt">Copy link</div></div>
     </div>
   </div>

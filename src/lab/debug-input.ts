@@ -40,7 +40,7 @@ const KEYS: [string, string][] = [
   ['B', 'Build: circuit builder (cross-dot grid)'],
   ['I', 'Notes: read about this chapter or lesson (again: next page)'],
   ['K', 'Code panel: your circuit as Qiskit or OpenQASM'],
-  ['G  /  O', 'Code window: next tab; simplify (on the chip tab: run on chip)'],
+  ['G  /  O', 'Code window: next tab; simplify (on the chip tab: run on chip; Shift+O: run on IBM)'],
   ['=', 'Zoom the code window and notes in or out'],
   ['Up  Down', 'Code window: previous / next page of code'],
   ['In Build', 'arrows move; H X Y Z S T place; Shift+S/T dagger; V SX; 1 2 3 Rx Ry Rz (, . angle); 4 5 6 your gates; C dot; O open dot; P plus; W swap; Backspace erase'],
@@ -220,7 +220,7 @@ export class DebugInputSystem extends createSystem({}) {
       case 'arrowup':
       case 'arrowdown': {
         // the code window, through a window event like notes: open or close, next tab, simplify, zoom, page
-        const detail = ({ k: 'toggle', g: 'format', o: 'simplify', '=': 'zoom', '+': 'zoom', arrowup: 'up', arrowdown: 'down' } as Record<string, string>)[k.toLowerCase()];
+        const detail = k === 'O' ? 'ibm' : ({ k: 'toggle', g: 'format', o: 'simplify', '=': 'zoom', '+': 'zoom', arrowup: 'up', arrowdown: 'down' } as Record<string, string>)[k.toLowerCase()];
         if (k.startsWith('Arrow')) e.preventDefault();
         window.dispatchEvent(new CustomEvent('entangled:code', { detail }));
         break;
