@@ -9,6 +9,8 @@ Every number on screen comes from a real statevector simulator: Bloch arrows
 shrink honestly when qubits entangle, measurement follows the Born rule, and
 your circuit exports to Qiskit.
 
+![Chapter 10, Hidden Number: four qubits, the circuit board above them and 100 shots that all read 1101](docs/screenshots/ch10-hidden-number.png)
+
 ## Run it
 
 ```sh
@@ -23,9 +25,11 @@ On a Quest on the same Wi-Fi: run `npx @iwsdk/cli dev status`, open one of the
 `runtimeUrls.network` addresses in the Quest browser, accept the local
 certificate warning, and tap Enter XR.
 
-![Chapter 4: the ghost hand shows how to touch two orbs together](docs/screenshots/ch4-ghost-hands.png)
+![In mixed reality: the panels and orbs sit on your real desk, with hand tracking](docs/screenshots/ar-passthrough-hands.png)
 
 ## Gestures
+
+![Chapter 4: the ghost hand shows how to touch two orbs together](docs/screenshots/ch4-ghost-hands.png)
 
 A translucent **ghost hand** plays each move on the orb it applies to when a step
 starts, then steps aside, and comes back if you stall. Its poses are run through
@@ -68,9 +72,11 @@ src/gestures/  hand-joint features and the gesture state machine (tested with a
                synthetic hand, including tracking noise)
 src/lab/       the lab model, 3D orbs, threads, GHZ ring, probability rain,
                gesture and desktop input systems, sound, autosave
-src/game/      seven chapters, twelve lessons, sandbox presets, the campaign
-               state machine, hands-only panels, the ghost-hand tutor
-public/ui/     UIKitML panels (chapter card, gate dock, code panel)
+src/game/      ten chapters, fifteen lessons, twelve puzzles, the circuit builder,
+               notes, sandbox presets, the campaign state machine, hands-only
+               panels, the ghost-hand tutor
+public/ui/     UIKitML panels (chapter card, gate dock, code, navigator, builder,
+               notes)
 ```
 
 ## Chapters
@@ -86,9 +92,15 @@ public/ui/     UIKitML panels (chapter card, gate dock, code panel)
 9. **One Question** – Deutsch: a sealed box is constant or balanced; one question through phase kickback tells which, for all four boxes.
 10. **Hidden Number** – Bernstein-Vazirani on 4 qubits: a random 3-bit number read in one question instead of three.
 
+| Chapter 3: measure one qubit and the other always agrees | Chapter 8: two bits sent on one qubit, 100 of 100 shots |
+| --- | --- |
+| ![Entanglement: 100 shots land only on 00 and 11](docs/screenshots/ch3-entangled-rain.png) | ![Superdense coding: every shot reads 10](docs/screenshots/ch8-superdense.png) |
+
 ## Learn
 
-![Learn: the Z gate lesson, target reached](docs/screenshots/learn-z-gate.png)
+| Z gate: the target ring turns mint | Kickback: the control flips, the target stays put |
+| --- | --- |
+| ![Learn: the Z gate lesson, target reached](docs/screenshots/learn-z-gate.png) | ![Learn: the phase kickback lesson, both targets reached](docs/screenshots/learn-kickback.png) |
 
 Fifteen short lessons, one per gate or idea: H, X, Y, Z, S, T, rotation,
 measurement, CNOT, SWAP, phase, kickback, no cloning, Bell states and GHZ states. Each lesson explains the
@@ -133,7 +145,9 @@ to be plain ASCII (the panel font has no special symbols) and to fit the panel.
 
 ## Build: circuit builder
 
-![The builder: a Fredkin gate from a Toffoli and two CNOTs, in cross-dot notation](docs/screenshots/build-fredkin.png)
+| Challenge 10: a Fredkin from a Toffoli and two CNOTs | Free build: every tool, the orbs run it live |
+| --- | --- |
+| ![The builder: a Fredkin gate in cross-dot notation](docs/screenshots/build-fredkin.png) | ![Free build: a GHZ state followed by single-qubit gates](docs/screenshots/build-free.png) |
 
 A fifth tab turns the gate dock into a grid editor written in standard circuit
 notation: filled dots (controls), open dots (anti-controls), circled-plus targets
@@ -161,17 +175,25 @@ A board at the back of the desk shows the circuit so far as a standard diagram
 a rewind, a blue cursor) and the full state as circles: the filled area is a
 basis state's probability, the hand is its phase.
 
+![One round of Grover's search on the board: the full circuit, and all 100 shots on 11](docs/screenshots/sandbox-grover.png)
+
 ## Share links
 
 The Qiskit panel has **Copy link**: a short, readable link such as
 `#c=3_h0/x1c0/x2c1/M0=1` that opens the circuit, recorded measurement outcomes
 included, in anyone's sandbox. Links are validated before anything is loaded.
 
+![A shared link opened: a GHZ circuit with the recorded measurement M0 = 1](docs/screenshots/shared-circuit.png)
+
 ## Sandbox
 
 Up to 5 qubits, every gate unlocked, plus ready-made circuits: Bell pair, GHZ
 (3 and 5 qubits), an even superposition of 16 outcomes, a finished
 teleportation to scrub through, and one round of Grover's search.
+
+| Bell pair: 100 shots, only 00 and 11 | GHZ x5: five qubits, one shared coin |
+| --- | --- |
+| ![Sandbox: a Bell pair with probability rain](docs/screenshots/sandbox-bell-rain.png) | ![Sandbox: a five-qubit GHZ state with the gold ring](docs/screenshots/sandbox-ghz5.png) |
 
 Each qubit keeps one colour everywhere (arrow, trail, desk label, timeline step,
 outcome digit). Gold is reserved for entanglement: threads, cores, the GHZ ring
