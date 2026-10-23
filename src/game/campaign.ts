@@ -233,6 +233,11 @@ export class Campaign {
     return true;
   }
 
+  /** A value the current chapter remembered (read-only, for the board). */
+  memoryValue(key: string): unknown {
+    return this.memory[key];
+  }
+
   /** What the last QAOA optimisation found (MaxCut chapter and the course), for the board and the code window. */
   get qaoa(): { graph: string; p: number; gammas: number[]; betas: number[]; path: [number, number, number][]; ratio: number; energy: number } | null {
     return (this.memory.qaoa as never) ?? null;

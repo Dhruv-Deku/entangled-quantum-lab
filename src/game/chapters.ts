@@ -6,6 +6,7 @@ import type { Vec3 } from '../quantum/gates';
 import { pairStrength } from '../quantum/entanglement';
 import type { QState } from '../quantum/state';
 import { maxcutSteps } from './qaoa-steps';
+import { ALGORITHM_CHAPTERS } from './algorithm-chapters';
 
 /** What a goal can look at. */
 export interface GoalContext {
@@ -56,7 +57,7 @@ export interface Step {
   /** Unique key a page or quiz marks in memory when it is done. */
   id?: string;
   /** What the circuit board shows during this step (default: the circuit). */
-  board?: 'maths' | 'landscape';
+  board?: 'maths' | 'landscape' | 'wheel' | 'vqe';
   /** Show the chip, the fridge and the pulse schedule during this step. */
   hardware?: boolean;
   /** Show me: do the task for the player, with the same actions the gestures make. */
@@ -722,6 +723,7 @@ export const CHAPTERS: Chapter[] = [
     steps: maxcutSteps(),
     outro: 'That was QAOA, a variational algorithm: a quantum circuit with dials, tuned by a classical optimizer. The PennyLane tab in the code window has the same program.',
   },
+  ...ALGORITHM_CHAPTERS,
 ];
 
 /**

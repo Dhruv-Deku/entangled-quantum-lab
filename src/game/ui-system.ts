@@ -30,6 +30,7 @@ import { starsFor } from './puzzles';
 import { DEPOL_STEPS, noiseLab, T1_STEPS, T2_STEPS } from '../lab/noise-lab';
 import { codeLines, FORMAT_NAMES, FORMATS, linesOf, pages, program, routeOrError, type Format } from './code-view';
 import { landscape, SQUARE, toPennyLaneQaoa } from '../quantum/qaoa';
+import { H2 } from '../quantum/h2-data';
 import { agreement, NO_NOISE, runOnChip, TYPICAL_NOISE } from '../quantum/hardware';
 import { T5, type Routed } from '../quantum/routing';
 import { schedule } from '../quantum/pulses';
@@ -60,7 +61,7 @@ const SLOTS = 7;
 const CODE_LINES = 10;
 /** How much bigger a zoomed window is. */
 const ZOOM = 1.3;
-const NAV_SLOTS = 15;
+const NAV_SLOTS = 18;
 const TABS = ['course', 'campaign', 'learn', 'puzzle', 'build', 'sandbox'] as const;
 /** Where hidden panels park, out of reach of every pointer. */
 const PARKED = new Vector3(0, -50, 0);
@@ -432,7 +433,7 @@ export class UISystem extends createSystem({
     if (v.intro) {
       this.text('chapter-eyebrow', 'Welcome');
       this.text('chapter-title', 'Entangled');
-      this.text('chapter-body', 'Hold a qubit in your hand. Eleven short chapters, about fifteen minutes. A ghost hand shows every move, and every move has a button too.');
+      this.text('chapter-body', 'Hold a qubit in your hand. Eighteen chapters, from one qubit to Shor and VQE. A ghost hand shows every move, and every move has a button too.');
       this.text('goal-text', this.immersive ? 'Tap Start, or pinch the orb and turn it' : 'Press Enter, or hold an arrow key');
       this.bg('goal-dot', C.current);
       for (let i = 0; i < 5; i++) this.els.get(`pip-${i}`)?.setProperties({ display: 'none' });
@@ -824,6 +825,8 @@ export class UISystem extends createSystem({
     const codeChip = codeOpen && this.codeFormat === 'chip';
     const wantHardware = codeChip || !!step?.hardware;
     const wantMaths = !wantHardware && ((codeOpen && this.codeFormat === 'maths') || step?.board === 'maths');
+    labSys.showWheels(!wantHardware && !wantMaths && step?.board === 'wheel');
+    labSys.showVqe(!wantHardware && !wantMaths && step?.board === 'vqe' ? ((campaign.memoryValue('vqe') as never) ?? null) : undefined, H2);
     const wantLandscape = !wantHardware && !wantMaths && step?.board === 'landscape';
     labSys.chip.root.visible = wantHardware;
     if (!wantHardware) labSys.showHardware(null);

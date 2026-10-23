@@ -79,6 +79,42 @@ export const NOTES: Record<string, string[]> = {
     'The approximation ratio <H_C> / min(H_C) scores the average shot: one layer on a ring of four reaches 0.75, two layers do better. The PennyLane tab exports the same circuit with qml.qaoa.',
     'Key idea: a variational algorithm is a loop. The quantum circuit estimates a cost, a classical computer turns the dials, and the two together find good answers.',
   ],
+  'Phase Wheel': [
+    'The quantum Fourier transform maps a number x to angles: |x> becomes 1/sqrt(N) times the sum over y of e^(2 pi i x y / N) |y>. Every output qubit ends up on the equator, turned by an angle that encodes x.',
+    'For 3 qubits, qubit k turns by x times 2^k / 8 of a full turn: q0 by x/8, q1 by twice that, q2 by four times. The circuit is Hadamards and controlled phase gates, then swaps; it needs about n^2 gates for n qubits, against n 2^n for the classical fast Fourier transform.',
+    'The angles cannot be read by one measurement, which is why the QFT is used in reverse: the inverse QFT turns angles back into a number you can measure. In Qiskit: from qiskit.circuit.library import QFTGate.',
+    'Key idea: the QFT writes numbers as phases and the inverse reads phases as numbers. Phase estimation and Shor are built on it.',
+  ],
+  'Phase Estimation': [
+    'If |u> is an eigenstate of a gate U, then U|u> = e^(2 pi i phi)|u> for some phase phi. Phase estimation measures phi.',
+    'Counting qubit j controls U applied 2^j times. Because |u> is an eigenstate, the target is unchanged and the phase kicks back onto the control: qubit j picks up 2 pi phi 2^j. That is exactly the pattern a QFT makes, so an inverse QFT reads phi in binary.',
+    'With m counting qubits phi is read to m bits; here 3 bits read any multiple of 1/8 exactly. Finer phases need more qubits, and the error falls by half with each one.',
+    'Key idea: phase kickback plus the inverse QFT reads an eigenvalue. It powers Shor\'s algorithm and quantum chemistry.',
+  ],
+  'Factoring 15': [
+    'To factor N, pick a number a and find the period r of a^x mod N. For N = 15 and a = 7 the powers go 1, 7, 4, 13, then repeat, so r = 4. Then a^(r/2) = 49 = 4 (mod 15), and gcd(4 - 1, 15) = 3 and gcd(4 + 1, 15) = 5 are the factors.',
+    'The quantum part finds r: a superposition of every x, the function a^x mod N computed into a work register, and an inverse QFT that turns the period into peaks at multiples of 2^m / r.',
+    'Here the modular exponent is compiled: knowing the period is 4, two CNOTs copy the right bits. A full circuit computes a^x mod N with reversible arithmetic and needs many more qubits; factoring a 2048-bit RSA number would take millions of physical qubits with error correction.',
+    'Key idea: factoring becomes period finding, and the QFT finds periods exponentially faster than any known classical method.',
+  ],
+  'The H2 Molecule': [
+    'A molecule\'s electronic energy is the lowest eigenvalue of its Hamiltonian. Mapped to qubits (Jordan-Wigner, STO-3G basis), H2 needs 4 qubits and 15 Pauli terms like Z0 Z1 and X0 X1 Y2 Y3, with coefficients that change with the bond length.',
+    'VQE prepares a trial state with a circuit that has dials, measures the energy term by term, and lets a classical optimizer turn the dials down. Here one dial mixes the Hartree-Fock state |1100> with the doubly excited |0011>, which is all H2 needs.',
+    'Hartree-Fock misses electron correlation: 0.0205 hartree at 0.74 Angstrom, and much more when the bond is stretched. VQE recovers it. The Hamiltonians were computed with PennyLane qchem (qml.qchem.molecular_hamiltonian).',
+    'Key idea: VQE is a quantum-classical loop for finding ground-state energies, one of the most promising early uses of quantum computers.',
+  ],
+  'Search 8 Boxes': [
+    'Grover\'s search finds one marked item among N in about (pi/4) sqrt(N) steps, where checking one by one takes N/2 on average.',
+    'Each round has two parts. The oracle flips the sign of the marked item\'s amplitude. The diffuser reflects every amplitude about the average, which grows the marked one and shrinks the rest.',
+    'For 8 items: 1/8 at the start, 78% after one round, 94.5% after two. A third round would overshoot and lower it again, so knowing when to stop matters.',
+    'Key idea: amplitude amplification gives a square-root speedup for unstructured search, and it is used inside many other quantum algorithms.',
+  ],
+  "Simon's Secret": [
+    'A box computes f(x) with a hidden rule: f(x) = f(x xor s) for a secret bit string s. Classically you need about 2^(n/2) questions to find s; Simon\'s algorithm needs about n.',
+    'Query the box on a superposition of every input, then apply Hadamards to the inputs. Interference cancels every outcome y with an odd overlap with s, so each shot gives a y with y . s = 0 (mod 2).',
+    'A few such readings form linear equations whose only non-zero solution is s. With 2 bits, one or two readings already pin it down.',
+    'Key idea: Simon\'s algorithm was the first exponential quantum speedup over classical computers, and it inspired Shor\'s factoring.',
+  ],
   'The Mystery Qubit': [
     'One copy of a qubit tells you almost nothing: a measurement gives a single bit and destroys the rest, and an unknown qubit cannot be copied. But if a machine can make the same state again and again, many measurements can rebuild it.',
     'Measuring along Z gives P(0) = (1 + z)/2, so z = P(0) - P(1). To measure along X, first apply H, which swings the X axis onto Z. For Y, apply S dagger and then H. Three axes give the three numbers of the arrow: x, y and z.',

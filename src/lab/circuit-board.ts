@@ -6,6 +6,7 @@ import type { Density, DeviceNoise } from '../quantum/density';
 import { bestCut, BETA_MAX, GAMMA_MAX, type Graph } from '../quantum/qaoa';
 import { dirac, factor, gateFormula, gateName, ket, kronLabel, localMatrix, qubitsOf } from '../quantum/matrix';
 import type { QState } from '../quantum/state';
+import { blochVector as blochVectorOf } from '../quantum/bloch';
 import { qubitColor } from './visuals';
 
 const W = 1600;
@@ -479,6 +480,111 @@ export class CircuitBoard {
       g.stroke();
       text(g, '0', sx(0), top + h + 28, DIM, '500 18px', 'center');
       text(g, `fidelity: raw ${zneRes.values[0].toFixed(3)}  ->  mitigated ${zneRes.mitigated.toFixed(3)}   (ideal 1)`, px, top + h + 66, INK, '600 20px');
+    }
+    this.tex.needsUpdate = true;
+  }
+
+  /**
+   * Phase wheels: each qubit's arrow seen from above. The hand points along the
+   * arrow's angle around the equator (its phase); its length is how far the
+   * arrow leans out from the poles.
+   */
+  renderWheels(state: QState): void {
+    const g = this.g;
+    g.clearRect(0, 0, W, H);
+    roundRect(g, 4, 4, W - 8, H - 8, 40);
+    g.fillStyle = 'rgba(29,30,33,0.94)';
+    g.fill();
+    g.lineWidth = 2;
+    g.strokeStyle = '#34363b';
+    g.stroke();
+    text(g, 'Phase wheels: each qubit seen from above, its angle around the equator', 44, 62, DIM, '600 28px');
+    const n = state.n;
+    const r = Math.min(150, (W - 120) / n / 2 - 24);
+    for (let q = 0; q < n; q++) {
+      const cx = 60 + r + 24 + q * ((W - 120) / n), cy = 330;
+      circle(g, cx, cy, r);
+      g.lineWidth = 3;
+      g.strokeStyle = '#4a4c52';
+      g.stroke();
+      for (let k = 0; k < 8; k++) {
+        const a = (k / 8) * Math.PI * 2;
+        g.fillStyle = '#4a4c52';
+        g.fillRect(cx + Math.cos(a) * (r - 14) - 2, cy - Math.sin(a) * (r - 14) - 2, 4, 4);
+      }
+      const [bx, by, bz] = blochVectorOf(state, q);
+      const lean = Math.hypot(bx, by);
+      const ang = Math.atan2(by, bx);
+      g.strokeStyle = qubitColor(q);
+      g.lineWidth = 7;
+      g.beginPath();
+      g.moveTo(cx, cy);
+      g.lineTo(cx + Math.cos(ang) * r * lean, cy - Math.sin(ang) * r * lean);
+      g.stroke();
+      circle(g, cx, cy, 8);
+      g.fillStyle = qubitColor(q);
+      g.fill();
+      text(g, `q${q}`, cx, cy + r + 46, qubitColor(q), '700 28px', 'center');
+      const turn = (((ang / (2 * Math.PI)) % 1) + 1) % 1;
+      const eighths = Math.round(turn * 8);
+      const label = lean < 0.05 ? (bz > 0 ? 'at |0>' : bz < 0 ? 'at |1>' : 'mixed') : Math.abs(turn * 8 - eighths) < 0.02 ? `${eighths % 8}/8 turn` : `${turn.toFixed(3)} turn`;
+      text(g, label, cx, cy + r + 82, INK, '600 24px', 'center');
+    }
+    this.tex.needsUpdate = true;
+  }
+
+  /** VQE for H2: energy against bond length (Hartree-Fock dashed, exact solid, VQE points), and where the dial stands now. */
+  renderVqe(points: { r: number; fci: number; hf: number }[], vqe: { r: number; energy: number; hf: number; fci: number; curve: [number, number][] | null; path: [number, number][] } | null): void {
+    const g = this.g;
+    g.clearRect(0, 0, W, H);
+    roundRect(g, 4, 4, W - 8, H - 8, 40);
+    g.fillStyle = 'rgba(29,30,33,0.94)';
+    g.fill();
+    g.lineWidth = 2;
+    g.strokeStyle = '#34363b';
+    g.stroke();
+    text(g, 'VQE for H2: energy against bond length', 44, 62, DIM, '600 28px');
+    if (vqe) text(g, `E = ${vqe.energy.toFixed(4)} Ha   exact ${vqe.fci.toFixed(4)}   Hartree-Fock ${vqe.hf.toFixed(4)}`, W - 44, 62, INK, '700 26px', 'right');
+    const x0 = 140, y0 = 110, w = W - 220, h = 400;
+    const rmin = 0.3, rmax = 2.5;
+    const emin = Math.min(...points.map((p) => p.fci)) - 0.05, emax = Math.max(...points.map((p) => p.hf)) + 0.05;
+    const sx = (r: number) => x0 + ((r - rmin) / (rmax - rmin)) * w;
+    const sy = (e: number) => y0 + h - ((e - emin) / (emax - emin)) * h;
+    g.strokeStyle = '#34363b';
+    g.strokeRect(x0, y0, w, h);
+    for (const r of [0.5, 1, 1.5, 2, 2.5]) text(g, `${r}`, sx(r), y0 + h + 30, DIM, '500 20px', 'center');
+    text(g, 'bond length (Angstrom)', x0 + w / 2, y0 + h + 62, INK, '600 22px', 'center');
+    for (const e of [-1.1, -1.0, -0.9, -0.8, -0.7]) if (e > emin && e < emax) text(g, e.toFixed(1), x0 - 12, sy(e) + 7, DIM, '500 20px', 'right');
+    text(g, 'Ha', x0 - 70, y0 + 20, DIM, '600 20px');
+    const line = (vals: [number, number][], color: string, dash: number[]) => {
+      g.setLineDash(dash);
+      g.strokeStyle = color;
+      g.lineWidth = 4;
+      g.beginPath();
+      vals.forEach(([r, e], i) => (i ? g.lineTo(sx(r), sy(e)) : g.moveTo(sx(r), sy(e))));
+      g.stroke();
+      g.setLineDash([]);
+    };
+    line(points.map((p) => [p.r, p.hf]), '#8a8d93', [10, 10]);
+    line(points.map((p) => [p.r, p.fci]), INK, []);
+    text(g, 'Hartree-Fock', sx(2.0), sy(points[points.length - 1].hf) - 16, DIM, '600 22px', 'center');
+    text(g, 'exact', sx(2.1), sy(points[points.length - 1].fci) + 34, INK, '600 22px', 'center');
+    if (vqe?.curve) for (const [r, e] of vqe.curve) {
+      circle(g, sx(r), sy(e), 7);
+      g.fillStyle = MINT;
+      g.fill();
+    }
+    if (vqe) {
+      g.strokeStyle = BLUE;
+      g.lineWidth = 2;
+      g.beginPath();
+      g.moveTo(sx(vqe.r), y0);
+      g.lineTo(sx(vqe.r), y0 + h);
+      g.stroke();
+      circle(g, sx(vqe.r), sy(vqe.energy), 11);
+      g.lineWidth = 5;
+      g.strokeStyle = MINT;
+      g.stroke();
     }
     this.tex.needsUpdate = true;
   }

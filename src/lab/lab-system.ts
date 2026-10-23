@@ -77,6 +77,10 @@ export class LabSystem extends createSystem({
   private pulseClock = -1;
   /** Maths tab: the board shows the current step's matrix and state instead of the circuit. */
   private mathsOn = false;
+  /** Phase wheels or the VQE curve on the board (algorithm chapters). */
+  private wheelsOn = false;
+  private vqeView: Parameters<CircuitBoard['renderVqe']>[1] | undefined = undefined;
+  private vqeKey = '';
   /** Noise lab open: the board shows the density matrix. */
   private densityOn = false;
   private noiseVersion = -1;
@@ -350,7 +354,7 @@ export class LabSystem extends createSystem({
     if (this.chip.root.visible) this.chip.update(dt);
     if (this.fridge.root.visible) this.fridge.update(dt);
     // on the chip tab the board rises above the code window so the pulse schedule shows
-    const boardY = this.pulseView || this.mathsOn || this.landscapeView || this.densityOn ? 0.5 : 0.27;
+    const boardY = this.pulseView || this.mathsOn || this.landscapeView || this.densityOn || this.wheelsOn || this.vqeView !== undefined ? 0.5 : 0.27;
     this.board.root.position.y += (boardY - this.board.root.position.y) * (1 - Math.exp(-dt * 8));
     if (this.placePending) {
       this.player.head.updateWorldMatrix(true, false);
@@ -442,14 +446,18 @@ export class LabSystem extends createSystem({
       this.boardVersion = this.stateVersion;
       this.boardTimer = 0;
       const h = lab.history.toJSON();
-      if (this.densityOn) {
+      if (this.wheelsOn) {
+        this.board.renderWheels(lab.history.state);
+      } else if (this.vqeView !== undefined) {
+        // drawn by showVqe
+      } else if (this.densityOn) {
         const rho = noiseLab.on ? noiseLab.rho(lab.n, lab.history.ops) : runNoisy(lab.n, lab.history.ops, { t1: Infinity, t2: Infinity, depol: 0 });
         this.board.renderDensity(rho, noiseLab.noise, noiseLab.on, noiseLab.zne);
       } else if (this.mathsOn) {
         const k = lab.history.cursor;
         const ops = lab.history.ops;
         this.board.renderMaths(lab.n, k > 0 ? ops[k - 1] : null, k, h.ops.length, lab.history.stateAt(Math.max(0, k - 1)), lab.history.state);
-      } else if (!this.pulseView && !this.landscapeView) this.board.render(lab.n, h.ops, lab.history.cursor, lab.state, this.boardTarget);
+      } else if (!this.pulseView && !this.landscapeView && this.vqeView === undefined) this.board.render(lab.n, h.ops, lab.history.cursor, lab.state, this.boardTarget);
     }
     if (this.pulseView && this.pulseClock >= 0) {
       this.pulseClock += dt;
@@ -480,6 +488,23 @@ export class LabSystem extends createSystem({
     } else {
       this.boardVersion = -1;
     }
+  }
+
+  /** Phase wheels for the QFT and phase estimation chapters. */
+  showWheels(on: boolean): void {
+    if (on === this.wheelsOn) return;
+    this.wheelsOn = on;
+    this.boardVersion = -1;
+  }
+
+  /** The VQE chemistry curve (undefined puts the circuit back). */
+  showVqe(view: Parameters<CircuitBoard['renderVqe']>[1] | undefined, points: Parameters<CircuitBoard['renderVqe']>[0]): void {
+    const key = view === undefined ? '' : JSON.stringify(view ? [view.energy, view.r, view.curve?.length ?? 0] : 'none');
+    if (key === this.vqeKey) return;
+    this.vqeKey = key;
+    this.vqeView = view;
+    if (view !== undefined) this.board.renderVqe(points, view);
+    else this.boardVersion = -1;
   }
 
   /** The noise lab's board: the density matrix, Bloch lengths and the ZNE plot. */
