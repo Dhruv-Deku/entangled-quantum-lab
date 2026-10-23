@@ -16,7 +16,7 @@ your circuit exports to Qiskit and OpenQASM 3.
 ```sh
 npm install
 npm run dev        # managed browser with the Quest 3 emulator (IWER)
-npm test           # 143 unit tests: physics, gestures, ghost-hand demos, 11 chapters, 15 lessons, notes, puzzles, builder, share links, simplifier, OpenQASM, code window
+npm test           # 154 unit tests: physics, gestures, ghost-hand demos, 11 chapters, 15 lessons, notes, puzzles, builder, share links, simplifier, OpenQASM, code window, chip routing and noise
 npm run typecheck
 npm run build
 ```
@@ -61,6 +61,7 @@ depends on a single input path.
 | – | Code window: Qiskit, OpenQASM 3 or PennyLane tabs | Qiskit, then a tab | K, then G |
 | – | Zoom the code window and notes (bigger, at eye level) | Zoom | = |
 | – | Page through long code | Back / More | Up / Down |
+| – | Route onto the 5-qubit chip and run with hardware errors | Qiskit, On chip, Run on chip | K, G to On chip, O |
 | – | Simplify the circuit (Undo brings it back) | Qiskit, then Simplify | O |
 
 Gesture thresholds live in `src/gestures/config.ts` (with hysteresis, hold times
@@ -212,6 +213,39 @@ loaded with `qiskit.qasm3.loads`, every circuit compared as a full unitary) on
 60 random circuits with every gate, one and two controls, swaps and iSWAP. The
 unit tests check the simplifier on 300 random circuits, and that every pair of
 gates it calls commuting really does.
+
+## On a real chip
+
+![Run on chip: the routed circuit, the T5 chip at the upper right, and 1000 noisy shots that agree 87% with the ideal circuit](docs/screenshots/chip-run.png)
+
+Real quantum chips only wire each qubit to its neighbours. The code window's
+**On chip** tab maps your circuit onto **T5**, five superconducting qubits in a
+T (the layout of many early cloud quantum computers), the way a compiler does:
+gates with two controls are broken into one- and two-qubit gates (the textbook
+Toffoli circuit, with Fredkin and CCZ built from it), every placement of your
+qubits on the chip is tried, and SWAPs are added wherever a two-qubit gate's
+qubits are not neighbours. A SWAP in your own circuit costs nothing: the
+compiler just relabels which physical qubit holds which logical one. The tab
+shows the routed OpenQASM on physical qubits Q0 to Q4 and what routing cost
+("1 SWAP added: 3 two-qubit gates became 6").
+
+**Run on chip** runs 1000 shots with typical hardware errors (1% per CNOT, 0.1%
+per single-qubit gate, 2% readout), rains the counts on the desk and says how
+far they are from the ideal circuit. A lit 3D model of the chip floats beside
+the board: a silicon die with aluminium cross-shaped qubits, couplers, readout
+resonators and wire bonds. Each qubit is tinted with the colour of the logical
+qubit it holds, the run plays back on it, couplers flash gold for entangling
+gates, and routing SWAPs visibly move the colours from qubit to qubit.
+
+The tests check routing on 120 random circuits (every two-qubit gate lands on a
+coupler, and the routed circuit is the same unitary through the start and end
+layouts), the decompositions, and that the noise model behaves: no noise
+matches the ideal, readout flips about 2%, and SWAPs cost fidelity.
+
+![The T5 chip from the headset, beside the code window](docs/screenshots/chip-headset.png)
+
+Windows now settle into place when they open, and Zoom glides between sizes
+instead of jumping.
 
 ## Circuit board
 

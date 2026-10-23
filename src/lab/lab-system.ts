@@ -23,6 +23,8 @@ import { lab } from './instance';
 import { partialState, type LabEvent } from './lab';
 import { RainVisual } from './rain';
 import { CircuitBoard } from './circuit-board';
+import { ChipVisual } from './chip';
+import { T5 } from '../quantum/routing';
 import { feedback } from './feedback';
 import { GOLD, GroupVisual, ORB_RADIUS, OrbVisual, StrikeVisual, ThreadVisual } from './visuals';
 
@@ -61,6 +63,8 @@ export class LabSystem extends createSystem({
   private group!: GroupVisual;
   private bolt!: StrikeVisual;
   private board!: CircuitBoard;
+  /** The 5-qubit chip on the desk, shown while the code window's Chip tab is open. */
+  chip!: ChipVisual;
   private boardTarget: QState | null = null;
   private boardVersion = -1;
   private boardTimer = 0;
@@ -97,6 +101,14 @@ export class LabSystem extends createSystem({
     this.board.root.position.set(0, 0.27, -0.42);
     this.board.root.rotation.x = -0.12;
     ws.add(this.board.root);
+    // the chip floats at the upper right, between the circuit board and the navigator
+    this.chip = new ChipVisual(T5);
+    this.chip.root.position.set(0.3, 0.2, -0.27);
+    // standing up, turned to face the seated player, like a part in a display case
+    this.chip.root.rotation.set(1.31, -0.34, 0, 'YXZ');
+    this.chip.root.scale.setScalar(1.05);
+    this.chip.root.visible = false;
+    ws.add(this.chip.root);
 
     this.syncOrbs(true);
     this.cleanupFuncs.push(lab.on((e) => this.onLabEvent(e)));
@@ -310,6 +322,7 @@ export class LabSystem extends createSystem({
 
   update(delta: number): void {
     const dt = Math.min(delta, 0.05);
+    if (this.chip.root.visible) this.chip.update(dt);
     if (this.placePending) {
       this.player.head.updateWorldMatrix(true, false);
       // wait for tracking: a seated head is well above the floor

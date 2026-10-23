@@ -27,7 +27,9 @@ import { notesFor } from './notes';
 import { NotesPanel } from './notes-ui';
 import { BUILDS, parOf } from './builder';
 import { starsFor } from './puzzles';
-import { codeLines, FORMAT_NAMES, FORMATS, pages, program, type Format } from './code-view';
+import { codeLines, FORMAT_NAMES, FORMATS, pages, program, routeOrError, type Format } from './code-view';
+import { agreement, NO_NOISE, runOnChip, TYPICAL_NOISE } from '../quantum/hardware';
+import { T5 } from '../quantum/routing';
 
 type El = ReturnType<UIKitMLAsset['requireElementById']>;
 
@@ -117,6 +119,15 @@ export class UISystem extends createSystem({
   /** Scene scales of the code window and notes, before any zoom. */
   private codeScale = 0;
   private notesScale = 0;
+  /** Eased 0..1: how far the windows are into their zoomed placement. */
+  private zoomT = 0;
+  /** Eased 0..1 open animation per window (a window settles in instead of popping up). */
+  private codeOpenT = 1;
+  private notesOpenT = 1;
+  private codeWasOpen = false;
+  private notesWasOpen = false;
+  private readonly p2 = new Vector3();
+  private readonly q2 = new Quaternion();
   /** Sandbox circuit before Simplify, kept until the circuit changes, so Undo can bring it back. */
   private unsimplified: { n: number; ops: Op[]; after: string } | null = null;
   /** Outside the sandbox Simplify only previews: the panel shows the shorter circuit, the lab keeps yours. */
@@ -213,7 +224,7 @@ export class UISystem extends createSystem({
     const dockIds = ['g-h', 'g-x', 'g-y', 'g-z', 'g-s', 'g-t', 'g-rl', 'g-rr', 'a-cnot', 'a-swap', 'a-measure', 'a-shots', 'a-export', 't-prev', 't-next', 'dock-status'];
     for (let i = 0; i < SLOTS; i++) dockIds.push(`t-${i}`, `t-${i}-l`);
     for (const id of dockIds) this.els.set(id, this.dock.requireElementById(id));
-    const codeIds = ['code-close', 'code-note', 'code-link', 'code-eyebrow', 'code-title', 'code-zoom', 'code-zoom-label', 'code-simplify', 'code-simplify-label', 'code-up', 'code-down', 'code-lines'];
+    const codeIds = ['code-close', 'code-note', 'code-link', 'code-eyebrow', 'code-title', 'code-zoom', 'code-zoom-label', 'code-simplify', 'code-simplify-label', 'code-run', 'code-up', 'code-down'];
     for (const f of FORMATS) codeIds.push(`code-tab-${f}`, `code-tab-${f}-l`);
     for (let i = 0; i < CODE_LINES; i++) codeIds.push(`code-r-${i}`, `code-n-${i}`, `code-h-${i}`, `code-t-${i}`);
     for (const id of codeIds) this.els.set(id, this.code.requireElementById(id));
@@ -286,6 +297,7 @@ export class UISystem extends createSystem({
     on('code-link', () => this.copyLink());
     for (const f of FORMATS) on(`code-tab-${f}`, () => this.setFormat(f));
     on('code-simplify', () => this.simplifyCircuit());
+    on('code-run', () => this.runChip());
     on('code-zoom', () => this.toggleZoom());
     on('code-up', () => this.pageCode(-1));
     on('code-down', () => this.pageCode(1));
@@ -296,7 +308,7 @@ export class UISystem extends createSystem({
         if (this.code?.visible) this.code.visible = false;
         else this.showCode();
       } else if (what === 'format') this.setFormat(FORMATS[(FORMATS.indexOf(this.codeFormat) + 1) % FORMATS.length]);
-      else if (what === 'simplify') this.simplifyCircuit();
+      else if (what === 'simplify') (this.codeFormat === 'chip' ? this.runChip() : this.simplifyCircuit());
       else if (what === 'zoom') this.toggleZoom();
       else if ((what === 'up' || what === 'down') && this.code?.visible) this.pageCode(what === 'up' ? -1 : 1);
     };
@@ -610,6 +622,36 @@ export class UISystem extends createSystem({
     feedback('select');
   }
 
+  /**
+   * Run on chip: route the circuit onto T5, run 1000 shots with typical
+   * hardware errors, play the run on the 3D chip, rain the counts, and say how
+   * close they came to the ideal circuit.
+   */
+  private runChip(): void {
+    const ops = lab.history.ops.slice();
+    const routed = routeOrError(lab.n, ops);
+    if (typeof routed === 'string') {
+      feedback('reject');
+      return;
+    }
+    const shots = 1000;
+    const noisy = runOnChip(routed, lab.n, T5.qubits, shots, Math.random, TYPICAL_NOISE);
+    // the ideal answer: exact when nothing is measured mid-circuit, otherwise a noiseless run
+    const midMeasure = ops.some((op) => op.kind === 'measure' || op.kind === 'reset');
+    const ideal = midMeasure
+      ? Array.from(runOnChip(routed, lab.n, T5.qubits, 4000, Math.random, NO_NOISE).counts, (c) => c / 4000)
+      : Array.from(lab.history.state.probabilities());
+    const score = agreement(noisy.counts, ideal);
+    this.world.getSystem(LabSystem)?.chip.play(routed);
+    lab.showShots(noisy.counts);
+    this.codeNote = {
+      key: JSON.stringify(ops),
+      text: `${shots} shots with typical chip errors (CNOT 1%, readout 2%): ${(score * 100).toFixed(1)}% agree with the ideal circuit. ${routed.swaps ? `The ${routed.swaps} routing SWAP${routed.swaps === 1 ? '' : 's'} cost some of that.` : 'No SWAPs were needed.'}`,
+    };
+    this.showCode(false);
+    feedback('shots');
+  }
+
   private pageCode(dir: number): void {
     this.codePage += dir;
     this.showCode(false);
@@ -680,6 +722,10 @@ export class UISystem extends createSystem({
     if (this.codeNote && this.codeNote.key !== key) this.codeNote = null;
     const shownOps = this.preview !== null ? simplify(ops).ops : ops;
     const lang = FORMAT_NAMES[this.codeFormat];
+    const onChip = this.codeFormat === 'chip';
+    const routed = onChip ? routeOrError(lab.n, shownOps) : null;
+    const chipVisual = this.world.getSystem(LabSystem)?.chip;
+    if (routed && typeof routed !== 'string' && chipVisual && !chipVisual.playing) chipVisual.showLayout(routed.initial);
     const code = program(this.codeFormat, lab.n, shownOps);
     // a page at a time
     const all = codeLines(this.codeFormat, lab.n, shownOps);
@@ -701,7 +747,6 @@ export class UISystem extends createSystem({
         color: line.comment ? '#6b6e75' : C.text,
       });
     }
-    this.text('code-lines', count > 1 ? `Lines ${first + 1}-${Math.min(all.length, first + CODE_LINES)} of ${all.length}` : `${all.length} lines`);
     this.els.get('code-up')?.setProperties({ display: count > 1 ? 'flex' : 'none' });
     this.els.get('code-down')?.setProperties({ display: count > 1 ? 'flex' : 'none' });
     this.bg('code-up', this.codePage > 0 ? '#34363b' : '#26272b');
@@ -711,12 +756,21 @@ export class UISystem extends createSystem({
       this.bg(`code-tab-${f}`, on ? C.text : '#242528');
       this.els.get(`code-tab-${f}-l`)?.setProperties({ color: on ? '#18191b' : C.textDim });
     }
-    this.text('code-eyebrow', `Code  /  ${ops.length} steps on ${lab.n} qubit${lab.n === 1 ? '' : 's'}`);
-    this.text('code-title', `Your circuit in ${lang}`);
+    const range = count > 1 ? `lines ${first + 1}-${Math.min(all.length, first + CODE_LINES)} of ${all.length}` : `${all.length} lines`;
+    this.text('code-eyebrow', `Code  /  ${ops.length} steps on ${lab.n} qubit${lab.n === 1 ? '' : 's'}  /  ${range}`);
+    this.text('code-title', onChip ? 'Your circuit on the T5 chip' : `Your circuit in ${lang}`);
+    this.els.get('code-simplify')?.setProperties({ display: onChip ? 'none' : 'flex' });
+    this.els.get('code-run')?.setProperties({ display: onChip ? 'flex' : 'none' });
+    this.bg('code-run', typeof routed === 'string' ? '#26272b' : C.primary);
     this.text('code-simplify-label', this.unsimplified ? 'Undo' : this.preview !== null ? 'Original' : 'Simplify');
     this.bg('code-simplify', this.unsimplified || this.preview !== null ? C.primary : '#34363b');
-    const where = { qiskit: 'Runs as-is in Qiskit', qasm: 'Opens in IBM Quantum, Qiskit, Braket and most other tools', pennylane: 'Runs as-is in PennyLane' }[this.codeFormat];
-    this.text('code-note', this.codeNote?.text ?? `${where}${this.immersive ? '.' : '; copied to your clipboard.'}`);
+    const where = { qiskit: 'Runs as-is in Qiskit', qasm: 'Opens in IBM Quantum, Qiskit, Braket and most other tools', pennylane: 'Runs as-is in PennyLane', chip: '' }[this.codeFormat];
+    const chipNote = !routed
+      ? ''
+      : typeof routed === 'string'
+        ? routed
+        : `Five qubits in a T, wired only to neighbours. ${routed.swaps ? `${routed.swaps} SWAP${routed.swaps === 1 ? '' : 's'} added: ${routed.twoQubitBefore} two-qubit gates became ${routed.twoQubitAfter}.` : `No SWAPs needed: all ${routed.twoQubitBefore} two-qubit gates land on wired pairs.`}`;
+    this.text('code-note', this.codeNote?.text ?? (onChip ? chipNote : `${where}${this.immersive ? '.' : '; copied to your clipboard.'}`));
     this.code.visible = true;
     if (sound) {
       feedback('select');
@@ -767,8 +821,34 @@ export class UISystem extends createSystem({
     obj.quaternion.copy(this.q).multiply(this.tilt.setFromEuler(rot));
   }
 
+  /**
+   * Place a window part way between its normal and zoomed spots (t = 0..1),
+   * at `appear` of its open animation: it grows from 94% and drops 1 cm into place.
+   */
+  private placeBlend(obj: { position: Vector3; quaternion: Quaternion; scale: Vector3 }, from: keyof typeof PLACEMENT, to: keyof typeof PLACEMENT, t: number, base: number, appear: number): void {
+    this.place(obj, to);
+    this.p2.copy(obj.position);
+    this.q2.copy(obj.quaternion);
+    this.place(obj, from);
+    obj.position.lerp(this.p2, t);
+    obj.quaternion.slerp(this.q2, t);
+    obj.position.y += (1 - appear) * 0.01;
+    obj.scale.setScalar(base * (1 + (ZOOM - 1) * t) * (0.94 + 0.06 * appear));
+  }
+
   update(delta: number): void {
     if (!this.bind()) return;
+    // ease toward the zoom state and through the open animations (critically damped, about 0.25 s)
+    const dt = Math.min(delta, 0.05);
+    const ease = 1 - Math.exp(-dt * 14);
+    this.zoomT += ((this.zoom ? 1 : 0) - this.zoomT) * ease;
+    if (Math.abs(this.zoomT - (this.zoom ? 1 : 0)) < 1e-3) this.zoomT = this.zoom ? 1 : 0;
+    if (this.code!.visible && !this.codeWasOpen) this.codeOpenT = 0;
+    if (this.notes!.open && !this.notesWasOpen) this.notesOpenT = 0;
+    this.codeWasOpen = this.code!.visible;
+    this.notesWasOpen = this.notes!.open;
+    this.codeOpenT += (1 - this.codeOpenT) * ease;
+    this.notesOpenT += (1 - this.notesOpenT) * ease;
     this.place(this.chapter!, 'chapter-panel');
     // the builder replaces the dock while the Build tab is open
     const building = campaign.mode === 'build';
@@ -781,12 +861,12 @@ export class UISystem extends createSystem({
       this.place(this.dock!, 'gate-dock');
       this.builderAsset!.position.copy(PARKED);
     }
-    this.place(this.code!, this.zoom ? 'code-zoom' : 'code-panel');
-    this.code!.scale.setScalar(this.codeScale * (this.zoom ? ZOOM : 1));
+    this.placeBlend(this.code!, 'code-panel', 'code-zoom', this.zoomT, this.codeScale, this.codeOpenT);
+    const chip = this.world.getSystem(LabSystem)?.chip;
+    if (chip) chip.root.visible = this.code!.visible && this.codeFormat === 'chip';
     // notes sit where the code panel does; only one of the two is open at a time
     if (this.notes!.open) {
-      this.place(this.notesAsset!, this.zoom ? 'notes-zoom' : 'notes-panel');
-      this.notesAsset!.scale.setScalar(this.notesScale * (this.zoom ? ZOOM : 1));
+      this.placeBlend(this.notesAsset!, 'notes-panel', 'notes-zoom', this.zoomT, this.notesScale, this.notesOpenT);
       this.notesAsset!.visible = true;
     } else {
       this.notesAsset!.visible = false;

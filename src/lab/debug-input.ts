@@ -34,7 +34,7 @@ const KEYS: [string, string][] = [
   ['B', 'Build: circuit builder (cross-dot grid)'],
   ['I', 'Notes: read about this chapter or lesson (again: next page)'],
   ['K', 'Code panel: your circuit as Qiskit or OpenQASM'],
-  ['G  /  O', 'Code window: next language tab, simplify the circuit'],
+  ['G  /  O', 'Code window: next tab; simplify (on the chip tab: run on chip)'],
   ['=', 'Zoom the code window and notes in or out'],
   ['Up  Down', 'Code window: previous / next page of code'],
   ['In Build', 'arrows move; H X Y Z S T place; Shift+S/T dagger; V SX; 1 2 3 Rx Ry Rz; C dot; O open dot; P plus; W swap; Backspace erase'],

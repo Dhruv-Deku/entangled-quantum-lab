@@ -1,6 +1,6 @@
 """Generate public/ui/code.uikitml: the code window.
 
-Format tabs (Qiskit, OpenQASM 3, PennyLane), Zoom, a page of numbered code lines
+Format tabs (Qiskit, OpenQASM 3, PennyLane, the routed circuit on the chip), Zoom, a page of numbered code lines
 (each split into a coloured gate name and the rest, since UIKit text has one
 colour per element and ignores line breaks), and Back / More, Simplify, Copy link.
 Run: python scripts/gen-code-panel.py
@@ -8,7 +8,7 @@ Run: python scripts/gen-code-panel.py
 from pathlib import Path
 
 LINES = 10
-TABS = [('qiskit', 'Qiskit'), ('qasm', 'OpenQASM 3'), ('pennylane', 'PennyLane')]
+TABS = [('qiskit', 'Qiskit'), ('qasm', 'OpenQASM 3'), ('pennylane', 'PennyLane'), ('chip', 'On chip')]
 
 style = """
 <style>
@@ -118,10 +118,10 @@ lines += [
     '    <div class="btns">',
     '      <div id="code-up" class="btn"><div class="bt">Back</div></div>',
     '      <div id="code-down" class="btn"><div class="bt">More</div></div>',
-    '      <div id="code-lines" class="note">-</div>',
     '    </div>',
     '    <div class="btns">',
     '      <div id="code-simplify" class="btn"><div id="code-simplify-label" class="bt">Simplify</div></div>',
+    '      <div id="code-run" class="btn"><div class="bt">Run on chip</div></div>',
     '      <div id="code-link" class="btn"><div class="bt">Copy link</div></div>',
     '    </div>',
     '  </div>',
