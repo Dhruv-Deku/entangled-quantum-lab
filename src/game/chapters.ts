@@ -5,6 +5,7 @@ import type { Op } from '../quantum/circuit';
 import type { Vec3 } from '../quantum/gates';
 import { pairStrength } from '../quantum/entanglement';
 import type { QState } from '../quantum/state';
+import { maxcutSteps } from './qaoa-steps';
 
 /** What a goal can look at. */
 export interface GoalContext {
@@ -49,6 +50,19 @@ export interface Step {
   action?: { label: string; run: (lab: Lab, memory: Record<string, unknown>) => void };
   /** What the ghost hand shows; a function when the step has several moves. */
   hint?: Hint | ((ctx: GoalContext) => Hint | null);
+  /** Course quizzes: the answers shown on the card, and which one is right. */
+  choices?: string[];
+  answer?: number;
+  /** Unique key a page or quiz marks in memory when it is done. */
+  id?: string;
+  /** What the circuit board shows during this step (default: the circuit). */
+  board?: 'maths' | 'landscape';
+  /** Show the chip, the fridge and the pulse schedule during this step. */
+  hardware?: boolean;
+  /** Show me: do the task for the player, with the same actions the gestures make. */
+  solve?: (lab: Lab) => void;
+  /** Keep the payoff up until Continue instead of moving on by itself (long explanations). */
+  hold?: boolean;
   /** Target Bloch vector per qubit, drawn as a ghost arrow inside the orb (null: none); a function when it depends on earlier steps. */
   target?: (Vec3 | null)[] | ((memory: Record<string, unknown>) => (Vec3 | null)[]);
 }
@@ -700,6 +714,13 @@ export const CHAPTERS: Chapter[] = [
       },
     ],
     outro: 'That was quantum state tomography: rebuilding an unknown state from many measurements. Labs use it to check every new qubit they make.',
+  },
+  {
+    title: 'Max Cut',
+    chip: 'MaxCut',
+    qubits: 4,
+    steps: maxcutSteps(),
+    outro: 'That was QAOA, a variational algorithm: a quantum circuit with dials, tuned by a classical optimizer. The PennyLane tab in the code window has the same program.',
   },
 ];
 

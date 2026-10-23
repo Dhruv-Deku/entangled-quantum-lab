@@ -93,7 +93,12 @@ export function routeOrError(n: number, ops: readonly Op[]): Routed | string {
 
 /** Every non-blank line of the program, split for colouring. */
 export function codeLines(format: Format, n: number, ops: readonly Op[]): CodeLine[] {
-  return program(format, n, ops)
+  return linesOf(program(format, n, ops), format);
+}
+
+/** Any program text as code-window lines. */
+export function linesOf(text: string, format: Format): CodeLine[] {
+  return text
     .split('\n')
     .filter((l) => l.trim())
     .map((l) => splitLine(l, format));

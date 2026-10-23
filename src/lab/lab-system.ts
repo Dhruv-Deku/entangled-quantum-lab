@@ -22,7 +22,7 @@ import { Qubit, VirtualRoom } from './components';
 import { lab } from './instance';
 import { partialState, type LabEvent } from './lab';
 import { RainVisual } from './rain';
-import { CircuitBoard, type PulseView } from './circuit-board';
+import { CircuitBoard, type LandscapeView, type PulseView } from './circuit-board';
 import { FridgeVisual } from './fridge';
 import { ChipVisual } from './chip';
 import { T5 } from '../quantum/routing';
@@ -75,6 +75,9 @@ export class LabSystem extends createSystem({
   private pulseClock = -1;
   /** Maths tab: the board shows the current step's matrix and state instead of the circuit. */
   private mathsOn = false;
+  /** QAOA steps: the board shows the graph and the cost landscape. */
+  private landscapeView: LandscapeView | null = null;
+  private landscapeKey = '';
   private pulseSeconds = 0;
   private boardTarget: QState | null = null;
   private boardVersion = -1;
@@ -342,7 +345,7 @@ export class LabSystem extends createSystem({
     if (this.chip.root.visible) this.chip.update(dt);
     if (this.fridge.root.visible) this.fridge.update(dt);
     // on the chip tab the board rises above the code window so the pulse schedule shows
-    const boardY = this.pulseView || this.mathsOn ? 0.5 : 0.27;
+    const boardY = this.pulseView || this.mathsOn || this.landscapeView ? 0.5 : 0.27;
     this.board.root.position.y += (boardY - this.board.root.position.y) * (1 - Math.exp(-dt * 8));
     if (this.placePending) {
       this.player.head.updateWorldMatrix(true, false);
@@ -435,7 +438,7 @@ export class LabSystem extends createSystem({
         const k = lab.history.cursor;
         const ops = lab.history.ops;
         this.board.renderMaths(lab.n, k > 0 ? ops[k - 1] : null, k, h.ops.length, lab.history.stateAt(Math.max(0, k - 1)), lab.history.state);
-      } else if (!this.pulseView) this.board.render(lab.n, h.ops, lab.history.cursor, lab.state, this.boardTarget);
+      } else if (!this.pulseView && !this.landscapeView) this.board.render(lab.n, h.ops, lab.history.cursor, lab.state, this.boardTarget);
     }
     if (this.pulseView && this.pulseClock >= 0) {
       this.pulseClock += dt;
@@ -466,6 +469,16 @@ export class LabSystem extends createSystem({
     } else {
       this.boardVersion = -1;
     }
+  }
+
+  /** QAOA steps: the graph and the landscape (null puts the circuit back). Same view again does nothing. */
+  showLandscape(view: LandscapeView | null): void {
+    const key = view ? `${view.graph.name}-${view.qaoa ? `${view.qaoa.p}-${view.qaoa.path.length}-${view.qaoa.energy}` : 'none'}` : '';
+    if (key === this.landscapeKey) return;
+    this.landscapeKey = key;
+    this.landscapeView = view;
+    if (view) this.board.renderLandscape(view);
+    else this.boardVersion = -1;
   }
 
   /** The maths tab: the board follows the timeline cursor and shows that step's maths. */

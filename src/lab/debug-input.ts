@@ -29,6 +29,9 @@ const KEYS: [string, string][] = [
   ['R', 'Reset to |0…0⟩'],
   ['Enter', 'Continue, or the card button (Oracle, Storm…)'],
   ['[  ]', 'Previous / next chapter, lesson or sandbox preset'],
+  ['A', 'Course: everything, in order, with quizzes'],
+  ['1  2  3', 'Answer a quiz on the card'],
+  ['J', 'Course: Show me (does the task for you)'],
   ['L', 'Learn: one lesson per gate'],
   ['Q', 'Puzzles: match the target, beat par'],
   ['B', 'Build: circuit builder (cross-dot grid)'],
@@ -97,6 +100,11 @@ export class DebugInputSystem extends createSystem({}) {
     }
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     if (campaign.mode === 'build' && this.buildKey(e)) return;
+    // a quiz on the card: 1, 2, 3 answer it
+    if (k >= '1' && k <= '3' && campaign.view.step?.choices && !campaign.view.stepDone && !campaign.view.chapterDone) {
+      feedback(campaign.answer(Number(k) - 1) ? 'success' : 'reject');
+      return;
+    }
     if (k >= '1' && k <= '5') {
       lab.select(Number(k) - 1);
       feedback('select');
@@ -153,6 +161,13 @@ export class DebugInputSystem extends createSystem({}) {
       case 'l':
         campaign.enterLearn();
         feedback('select');
+        break;
+      case 'a':
+        campaign.enterCourse();
+        feedback('select');
+        break;
+      case 'j':
+        if (campaign.showMe()) feedback('select');
         break;
       case 'q':
         campaign.startPuzzle(campaign.puzzleIndex);

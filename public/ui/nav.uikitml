@@ -36,7 +36,7 @@
     background-color: #1b1c1f;
     cursor: pointer;
   }
-  .tl { font-size: 12; font-weight: 700; color: #8a8d93; }
+  .tl { font-size: 11; font-weight: 700; color: #8a8d93; }
   .grid { flex-direction: row; flex-wrap: wrap; gap: 6; }
   .item {
     width: 106;
@@ -57,6 +57,7 @@
 </style>
 <div class="nav">
   <div class="tabs">
+    <div id="tab-course" class="tab"><div id="tab-course-l" class="tl">Course</div></div>
     <div id="tab-campaign" class="tab"><div id="tab-campaign-l" class="tl">Chapters</div></div>
     <div id="tab-learn" class="tab"><div id="tab-learn-l" class="tl">Learn</div></div>
     <div id="tab-puzzle" class="tab"><div id="tab-puzzle-l" class="tl">Puzzles</div></div>

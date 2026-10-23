@@ -72,6 +72,13 @@ export const NOTES: Record<string, string[]> = {
     'Hadamards on the inputs turn those signs straight into the bits of s. One question reads the whole string: 3 bits here, but it works the same for a million.',
     'Key idea: n questions become one. The same pattern of superposition, phase kickback and interference sits inside bigger algorithms, including Simon\'s and Shor\'s.',
   ],
+  'Max Cut': [
+    'MaxCut: split the nodes of a graph into two groups so that as many edges as possible run between them. It stands in for many scheduling and layout problems, and for big graphs no fast exact method is known.',
+    'As a cost Hamiltonian, H_C = sum over edges of 1/2 (Z_i Z_j - 1). Each split is a basis state whose energy is minus the number of edges it cuts, so the ground state is the best cut.',
+    'QAOA starts in |+> on every qubit, then alternates exp(-i gamma H_C) (CNOT, Rz, CNOT per edge) with exp(-i beta X) on each qubit (Rx). A classical optimizer tunes gamma and beta to lower <H_C>.',
+    'The approximation ratio <H_C> / min(H_C) scores the average shot: one layer on a ring of four reaches 0.75, two layers do better. The PennyLane tab exports the same circuit with qml.qaoa.',
+    'Key idea: a variational algorithm is a loop. The quantum circuit estimates a cost, a classical computer turns the dials, and the two together find good answers.',
+  ],
   'The Mystery Qubit': [
     'One copy of a qubit tells you almost nothing: a measurement gives a single bit and destroys the rest, and an unknown qubit cannot be copied. But if a machine can make the same state again and again, many measurements can rebuild it.',
     'Measuring along Z gives P(0) = (1 + z)/2, so z = P(0) - P(1). To measure along X, first apply H, which swings the X axis onto Z. For Y, apply S dagger and then H. Three axes give the three numbers of the arrow: x, y and z.',

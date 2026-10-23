@@ -48,6 +48,21 @@
   .btn-text-primary { font-size: 15; font-weight: 600; color: #ffffff; }
   .progress { flex-direction: row; gap: 5; margin-top: 16; }
   .pip { width: 32; height: 5; border-radius: 3; background-color: #3a3c41; }
+  .choices { flex-direction: column; gap: 6; margin-top: 12; }
+  .choice {
+    flex-direction: row;
+    align-items: center;
+    gap: 10;
+    padding-top: 10;
+    padding-bottom: 10;
+    padding-left: 12;
+    padding-right: 12;
+    border-radius: 14;
+    background-color: #2d2f33;
+    cursor: pointer;
+  }
+  .ck { width: 14; font-size: 12; font-weight: 700; color: #8a8d93; }
+  .cl { font-size: 14; color: #e4e6eb; }
 </style>
 <div class="card">
   <div id="chapter-eyebrow" class="eyebrow">Chapter 1 of 7</div>
@@ -56,6 +71,11 @@
   <div class="goal">
     <div id="goal-dot" class="dot"></div>
     <div id="goal-text" class="goal-text">Turn the arrow away from 0</div>
+  </div>
+  <div id="choices" class="choices">
+    <div id="choice-0" class="choice"><div id="choice-0-k" class="ck">1</div><div id="choice-0-l" class="cl">-</div></div>
+    <div id="choice-1" class="choice"><div id="choice-1-k" class="ck">2</div><div id="choice-1-l" class="cl">-</div></div>
+    <div id="choice-2" class="choice"><div id="choice-2-k" class="ck">3</div><div id="choice-2-l" class="cl">-</div></div>
   </div>
   <div class="progress">
     <div id="pip-0" class="pip"></div>

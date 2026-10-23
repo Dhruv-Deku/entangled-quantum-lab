@@ -27,7 +27,8 @@ import { notesFor } from './notes';
 import { NotesPanel } from './notes-ui';
 import { BUILDS, parOf } from './builder';
 import { starsFor } from './puzzles';
-import { codeLines, FORMAT_NAMES, FORMATS, pages, program, routeOrError, type Format } from './code-view';
+import { codeLines, FORMAT_NAMES, FORMATS, linesOf, pages, program, routeOrError, type Format } from './code-view';
+import { landscape, SQUARE, toPennyLaneQaoa } from '../quantum/qaoa';
 import { agreement, NO_NOISE, runOnChip, TYPICAL_NOISE } from '../quantum/hardware';
 import { T5, type Routed } from '../quantum/routing';
 import { schedule } from '../quantum/pulses';
@@ -59,7 +60,7 @@ const CODE_LINES = 10;
 /** How much bigger a zoomed window is. */
 const ZOOM = 1.3;
 const NAV_SLOTS = 15;
-const TABS = ['campaign', 'learn', 'puzzle', 'build', 'sandbox'] as const;
+const TABS = ['course', 'campaign', 'learn', 'puzzle', 'build', 'sandbox'] as const;
 /** Where hidden panels park, out of reach of every pointer. */
 const PARKED = new Vector3(0, -50, 0);
 
@@ -217,9 +218,10 @@ export class UISystem extends createSystem({
       });
     }
 
-    const ids = ['chapter-eyebrow', 'chapter-title', 'chapter-body', 'goal-dot', 'goal-text', 'btn-next', 'btn-next-label', 'btn-replay', 'btn-replay-label', 'btn-notes', 'pip-0', 'pip-1', 'pip-2', 'pip-3', 'pip-4'];
+    const ids = ['chapter-eyebrow', 'chapter-title', 'chapter-body', 'goal-dot', 'goal-text', 'btn-next', 'btn-next-label', 'btn-replay', 'btn-replay-label', 'btn-notes', 'pip-0', 'pip-1', 'pip-2', 'pip-3', 'pip-4', 'choices'];
+    for (let i = 0; i < 3; i++) ids.push(`choice-${i}`, `choice-${i}-k`, `choice-${i}-l`);
     for (const id of ids) this.els.set(id, this.chapter.requireElementById(id));
-    const navIds = ['tab-campaign', 'tab-campaign-l', 'tab-learn', 'tab-learn-l', 'tab-puzzle', 'tab-puzzle-l', 'tab-build', 'tab-build-l', 'tab-sandbox', 'tab-sandbox-l', 'nav-progress', 'nav-progress-2'];
+    const navIds = ['tab-course', 'tab-course-l', 'tab-campaign', 'tab-campaign-l', 'tab-learn', 'tab-learn-l', 'tab-puzzle', 'tab-puzzle-l', 'tab-build', 'tab-build-l', 'tab-sandbox', 'tab-sandbox-l', 'nav-progress', 'nav-progress-2'];
     for (let i = 0; i < NAV_SLOTS; i++) navIds.push(`n-${i}`, `n-${i}-n`, `n-${i}-l`);
     for (const id of navIds) this.els.set(id, this.nav.requireElementById(id));
     const dockIds = ['g-h', 'g-x', 'g-y', 'g-z', 'g-s', 'g-t', 'g-rl', 'g-rr', 'a-cnot', 'a-swap', 'a-measure', 'a-shots', 'a-export', 't-prev', 't-next', 'dock-status'];
@@ -245,7 +247,10 @@ export class UISystem extends createSystem({
       } else campaign.next();
       feedback('select');
     });
+    for (let i = 0; i < 3; i++) on(`choice-${i}`, () => feedback(campaign.answer(i) ? 'success' : 'reject'));
     on('btn-replay', () => {
+      // in the course the second button is Show me while a task is open
+      if (campaign.mode === 'course' && campaign.showMe()) return feedback('select');
       campaign.replay();
       feedback('select');
     });
@@ -258,7 +263,8 @@ export class UISystem extends createSystem({
     }
     for (let i = 0; i < NAV_SLOTS; i++) {
       on(`n-${i}`, () => {
-        if (this.tab === 'campaign' && i < campaign.chapters.length) campaign.startChapter(i);
+        if (this.tab === 'course' && i < campaign.course.length) campaign.startCourse(i);
+        else if (this.tab === 'campaign' && i < campaign.chapters.length) campaign.startChapter(i);
         else if (this.tab === 'learn' && i < campaign.lessons.length) campaign.startLesson(i);
         else if (this.tab === 'puzzle' && i < campaign.puzzles.length) campaign.startPuzzle(i);
         else if (this.tab === 'build' && i < BUILDS.length) campaign.enterBuild(i);
@@ -358,6 +364,7 @@ export class UISystem extends createSystem({
       else if (n.title !== this.notes.title) this.notes.show(n.eyebrow, n.title, n.paras);
     }
     if (v.mode !== 'sandbox' || v.preset >= 0) this.sharedOpen = false;
+    if (v.intro || v.mode === 'sandbox') this.els.get('choices')?.setProperties({ display: 'none' });
     if (v.intro) {
       this.text('chapter-eyebrow', 'Welcome');
       this.text('chapter-title', 'Entangled');
@@ -392,6 +399,7 @@ export class UISystem extends createSystem({
       this.renderNav(v);
       return;
     }
+    if (v.mode !== 'course' && v.mode !== 'campaign' && v.mode !== 'learn' && v.mode !== 'puzzle') this.els.get('choices')?.setProperties({ display: 'none' });
     if (v.mode === 'build') {
       this.renderBuildCard(v);
       return;
@@ -399,12 +407,15 @@ export class UISystem extends createSystem({
     const ch = v.chapter!;
     const learn = v.mode === 'learn';
     const puzzle = v.mode === 'puzzle';
-    // lessons and puzzles step through a list; chapters tell a story
-    const listed = learn || puzzle;
+    const course = v.mode === 'course';
+    // lessons, puzzles and the course step through a list; chapters tell a story
+    const listed = learn || puzzle || course;
     const best = puzzle ? v.stars[v.puzzleIndex] : 0;
     this.text(
       'chapter-eyebrow',
-      learn
+      course
+        ? `Course  /  module ${v.courseIndex + 1} of ${v.courseCount}  /  step ${Math.min(v.stepIndex + 1, ch.steps.length)} of ${ch.steps.length}`
+        : learn
         ? `Lesson ${v.lessonIndex + 1} of ${v.lessonCount}  /  ${ch.group}`
         : puzzle
           ? `Puzzle ${v.puzzleIndex + 1} of ${v.puzzleCount}  /  par ${ch.par}${best ? `  /  best ${best} of 3 stars` : ''}`
@@ -417,7 +428,7 @@ export class UISystem extends createSystem({
       this.text('chapter-body', v.payoff ? `${v.payoff} ${ch.outro}` : ch.outro);
       this.text(
         'goal-text',
-        listed ? `${learn ? 'Lesson' : 'Puzzle'} complete. Tap Next.` : v.chapterIndex + 1 < v.chapterCount ? 'Chapter complete. Tap Continue.' : 'All chapters complete. Tap Continue for the sandbox.',
+        listed ? `${course ? 'Module' : learn ? 'Lesson' : 'Puzzle'} complete. Tap Next.` : v.chapterIndex + 1 < v.chapterCount ? 'Chapter complete. Tap Continue.' : 'All chapters complete. Tap Continue for the sandbox.',
       );
       this.bg('goal-dot', C.done);
     } else if (step) {
@@ -426,10 +437,12 @@ export class UISystem extends createSystem({
       this.text('goal-text', v.stepDone ? 'Done' : (v.goal ?? '') + hint);
       this.bg('goal-dot', v.stepDone ? C.done : C.current);
     }
+    this.renderChoices(v);
+    // the course has more steps than pips: the eyebrow counts them instead
     for (let i = 0; i < 5; i++) {
       const pip = this.els.get(`pip-${i}`);
       if (!pip) continue;
-      if (i >= ch.steps.length) {
+      if (i >= ch.steps.length || course) {
         pip.setProperties({ display: 'none' });
         continue;
       }
@@ -438,13 +451,37 @@ export class UISystem extends createSystem({
     }
     // a step that needs a card button (Oracle, Storm ...) turns Continue into that button
     this.text('btn-next-label', v.action ?? (listed ? 'Next' : 'Continue'));
-    this.text('btn-replay-label', listed ? 'Retry' : 'Replay');
+    this.text('btn-replay-label', course && step?.solve && !v.stepDone && !v.chapterDone ? 'Show me' : listed ? 'Retry' : 'Replay');
     this.bg('btn-next', v.action || v.chapterDone || v.stepDone ? C.primary : C.primaryIdle);
     if (v.action) this.text('goal-text', (v.goal ?? '') + (this.immersive ? `: tap ${v.action}` : '  (press Enter)'));
+    if (step?.hold && v.stepDone && !v.chapterDone) this.text('goal-text', this.immersive ? 'Tap Continue when ready' : 'Press Enter to continue');
     this.renderNav(v);
     const cue = `${v.mode}-${v.chapterIndex}-${v.lessonIndex}-${v.stepIndex}-${v.stepDone}-${v.chapterDone}`;
     if ((v.stepDone || v.chapterDone) && cue !== this.lastCue) feedback('success');
     this.lastCue = cue;
+  }
+
+  /**
+   * Quiz answers on the card: hidden unless the step is a quiz; a wrong pick
+   * turns red, the right one turns mint once answered.
+   */
+  private renderChoices(v: CampaignView): void {
+    const choices = !v.intro && !v.chapterDone ? v.step?.choices : undefined;
+    this.els.get('choices')?.setProperties({ display: choices ? 'flex' : 'none' });
+    if (!choices) return;
+    for (let i = 0; i < 3; i++) {
+      const c = choices[i];
+      this.els.get(`choice-${i}`)?.setProperties({ display: c ? 'flex' : 'none' });
+      if (!c) continue;
+      const right = v.stepDone && i === v.step!.answer;
+      const wrong = v.wrong === i;
+      this.text(`choice-${i}-l`, c);
+      this.bg(`choice-${i}`, right ? '#1f3a30' : wrong ? '#3a2523' : '#2d2f33');
+      this.els.get(`choice-${i}-l`)?.setProperties({ color: right ? C.done : wrong ? '#ff8a7a' : C.text });
+      this.els.get(`choice-${i}-k`)?.setProperties({ color: right ? C.done : wrong ? '#ff8a7a' : C.textDim });
+    }
+    if (!v.stepDone) this.text('goal-text', v.wrong !== null ? 'Not quite. Try another answer.' : this.immersive ? 'Tap an answer' : 'Pick an answer  (press 1, 2 or 3)');
+    this.bg('goal-dot', v.stepDone ? C.done : v.wrong !== null ? '#ff8a7a' : C.current);
   }
 
   /** What the Notes button would open right now, if anything. */
@@ -453,9 +490,9 @@ export class UISystem extends createSystem({
       const paras = notesFor('Circuit diagrams');
       return paras && { eyebrow: 'Builder notes', title: 'Circuit diagrams', paras };
     }
-    if ((v.mode === 'campaign' || v.mode === 'learn') && v.chapter && !v.intro) {
+    if ((v.mode === 'campaign' || v.mode === 'learn' || v.mode === 'course') && v.chapter && !v.intro) {
       const paras = notesFor(v.chapter.title);
-      const eyebrow = v.mode === 'learn' ? `Lesson ${v.lessonIndex + 1} notes` : `Chapter ${v.chapterIndex + 1} notes`;
+      const eyebrow = v.mode === 'learn' ? `Lesson ${v.lessonIndex + 1} notes` : v.mode === 'course' ? 'Course notes' : `Chapter ${v.chapterIndex + 1} notes`;
       return paras && { eyebrow, title: v.chapter.title, paras };
     }
     return null;
@@ -516,7 +553,9 @@ export class UISystem extends createSystem({
       this.els.get(`tab-${tab}-l`)?.setProperties({ color: on ? '#18191b' : C.textDim });
     }
     const items =
-      this.tab === 'campaign'
+      this.tab === 'course'
+        ? campaign.course.map((c, i) => ({ label: c.chip ?? c.title, done: v.coursed.includes(i), current: v.mode === 'course' && i === v.courseIndex }))
+        : this.tab === 'campaign'
         ? campaign.chapters.map((c, i) => ({ label: c.chip ?? c.title, done: v.completed.includes(i), current: v.mode === 'campaign' && !v.intro && i === v.chapterIndex }))
         : this.tab === 'learn'
           ? campaign.lessons.map((c, i) => ({ label: c.title, done: v.learned.includes(i), current: v.mode === 'learn' && i === v.lessonIndex }))
@@ -539,7 +578,7 @@ export class UISystem extends createSystem({
       this.els.get(`n-${i}-n`)?.setProperties({ color: it.current ? '#18191b' : it.done ? C.done : stars ? '#c9ccd1' : '#6b6e75' });
     }
     const starTotal = v.stars.reduce((a, b) => a + b, 0);
-    this.text('nav-progress', `${v.completed.length}/${v.chapterCount} chapters   ${v.learned.length}/${v.lessonCount} lessons`);
+    this.text('nav-progress', `${v.coursed.length}/${v.courseCount} course   ${v.completed.length}/${v.chapterCount} chapters   ${v.learned.length}/${v.lessonCount} lessons`);
     this.text('nav-progress-2', `${starTotal} of ${v.puzzleCount * 3} stars`);
   }
 
@@ -655,6 +694,46 @@ export class UISystem extends createSystem({
     feedback('shots');
   }
 
+  /** Routed circuit for a course step that shows the hardware, cached until the circuit changes. */
+  private stepRouted: { key: string; routed: Routed | null } = { key: '', routed: null };
+  private landscapeGrid: Float32Array | null = null;
+
+  /**
+   * What the board, chip and fridge show: the code window's Chip or Maths tab
+   * when it is open, otherwise whatever the current chapter or course step asks for.
+   */
+  private updateBoardMode(): void {
+    const labSys = this.world.getSystem(LabSystem);
+    if (!labSys) return;
+    const v = campaign.view;
+    const playing = v.mode === 'course' || v.mode === 'campaign' || v.mode === 'learn' || v.mode === 'puzzle';
+    const step = playing && !v.intro ? v.step : null;
+    const codeOpen = this.code!.visible;
+    const codeChip = codeOpen && this.codeFormat === 'chip';
+    const wantHardware = codeChip || !!step?.hardware;
+    const wantMaths = !wantHardware && ((codeOpen && this.codeFormat === 'maths') || step?.board === 'maths');
+    const wantLandscape = !wantHardware && !wantMaths && step?.board === 'landscape';
+    labSys.chip.root.visible = wantHardware;
+    if (!wantHardware) labSys.showHardware(null);
+    else if (!codeChip) {
+      const key = JSON.stringify(lab.history.ops);
+      if (key !== this.stepRouted.key) {
+        const r = routeOrError(lab.n, lab.history.ops);
+        this.stepRouted = { key, routed: typeof r === 'string' ? null : r };
+      }
+      const r = this.stepRouted.routed;
+      if (r) {
+        if (!labSys.chip.playing) labSys.chip.showLayout(r.initial);
+        labSys.showHardware(this.pulseView(r));
+      }
+    }
+    labSys.showMaths(wantMaths);
+    if (wantLandscape) {
+      this.landscapeGrid ??= landscape(SQUARE, 40);
+      labSys.showLandscape({ graph: SQUARE, grid: this.landscapeGrid, res: 40, qaoa: campaign.qaoa });
+    } else labSys.showLandscape(null);
+  }
+
   /** The board's pulse view for a routed circuit. */
   private pulseView(routed: Routed) {
     const holders = new Array<number>(T5.qubits).fill(-1);
@@ -742,10 +821,12 @@ export class UISystem extends createSystem({
     const labSys = this.world.getSystem(LabSystem);
     const chipVisual = labSys?.chip;
     if (routed && typeof routed !== 'string' && chipVisual && !chipVisual.playing) chipVisual.showLayout(routed.initial);
-    labSys?.showHardware(routed && typeof routed !== 'string' ? this.pulseView(routed) : null);
-    const code = program(this.codeFormat, lab.n, shownOps);
+    if (onChip) labSys?.showHardware(routed && typeof routed !== 'string' ? this.pulseView(routed) : null);
+    // in the MaxCut chapter and the course's QAOA module the PennyLane tab is the QAOA program itself
+    const qaoa = this.codeFormat === 'pennylane' ? campaign.qaoa : null;
+    const code = qaoa ? toPennyLaneQaoa(SQUARE, qaoa.gammas, qaoa.betas) : program(this.codeFormat, lab.n, shownOps);
     // a page at a time
-    const all = codeLines(this.codeFormat, lab.n, shownOps);
+    const all = qaoa ? linesOf(code, 'pennylane') : codeLines(this.codeFormat, lab.n, shownOps);
     const count = pages(all.length, CODE_LINES);
     if (!sound && this.codePage === this.codePages - 1) this.codePage = count - 1;
     this.codePages = count;
@@ -776,7 +857,6 @@ export class UISystem extends createSystem({
     const range = count > 1 ? `lines ${first + 1}-${Math.min(all.length, first + CODE_LINES)} of ${all.length}` : `${all.length} lines`;
     this.text('code-eyebrow', `Code  /  ${ops.length} steps on ${lab.n} qubit${lab.n === 1 ? '' : 's'}  /  ${range}`);
     const onMaths = this.codeFormat === 'maths';
-    labSys?.showMaths(onMaths && this.code.visible);
     this.text('code-title', onChip ? 'Your circuit on the T5 chip' : onMaths ? 'The maths of this step' : `Your circuit in ${lang}`);
     this.els.get('code-simplify')?.setProperties({ display: onChip ? 'none' : 'flex' });
     this.els.get('code-run')?.setProperties({ display: onChip ? 'flex' : 'none' });
@@ -881,11 +961,7 @@ export class UISystem extends createSystem({
       this.builderAsset!.position.copy(PARKED);
     }
     this.placeBlend(this.code!, 'code-panel', 'code-zoom', this.zoomT, this.codeScale, this.codeOpenT);
-    const chip = this.world.getSystem(LabSystem)?.chip;
-    const hardware = this.code!.visible && this.codeFormat === 'chip';
-    if (chip) chip.root.visible = hardware;
-    if (!hardware) this.world.getSystem(LabSystem)?.showHardware(null);
-    if (!this.code!.visible || this.codeFormat !== 'maths') this.world.getSystem(LabSystem)?.showMaths(false);
+    this.updateBoardMode();
     // notes sit where the code panel does; only one of the two is open at a time
     if (this.notes!.open) {
       this.placeBlend(this.notesAsset!, 'notes-panel', 'notes-zoom', this.zoomT, this.notesScale, this.notesOpenT);

@@ -2,6 +2,7 @@ import { CanvasTexture, Mesh, MeshBasicMaterial, PlaneGeometry, SRGBColorSpace }
 import type { Op } from '../quantum/circuit';
 import type { Schedule } from '../quantum/pulses';
 import { exact } from '../quantum/exact';
+import { bestCut, BETA_MAX, GAMMA_MAX, type Graph } from '../quantum/qaoa';
 import { dirac, factor, gateFormula, gateName, ket, kronLabel, localMatrix, qubitsOf } from '../quantum/matrix';
 import type { QState } from '../quantum/state';
 import { qubitColor } from './visuals';
@@ -19,6 +20,15 @@ const GOLD = '#e2b04a';
 const MINT = '#3ddc97';
 const COLS = 13;
 const BLUE = '#2d7ff9';
+
+/** QAOA on the board: the graph with its best cut, and the cost landscape the optimiser walks. */
+export interface LandscapeView {
+  graph: Graph;
+  /** <H_C> over res x res (gamma, beta): row = beta, column = gamma. */
+  grid: Float32Array;
+  res: number;
+  qaoa: { p: number; path: [number, number, number][]; ratio: number; energy: number } | null;
+}
 
 /** What the board shows on the chip tab: the routed circuit as timed pulses on the chip's lines. */
 export interface PulseView {
@@ -260,6 +270,113 @@ export class CircuitBoard {
       if (p > 1e-6) probs.push(`P(${i.toString(2).padStart(n, '0')}) = ${exact(p, 0).text}`);
     }
     rich(g, probs.join('    '), 44, H - 24, 24, DIM, 500);
+    this.tex.needsUpdate = true;
+  }
+
+  /**
+   * QAOA: left, the graph (filled and hollow nodes are the two teams of the
+   * best cut, cut edges in mint) and its cost Hamiltonian; right, <H_C> over
+   * the two dials (lighter is lower), with the optimiser's path and where it stopped.
+   */
+  renderLandscape(view: LandscapeView): void {
+    const g = this.g;
+    g.clearRect(0, 0, W, H);
+    roundRect(g, 4, 4, W - 8, H - 8, 40);
+    g.fillStyle = 'rgba(29,30,33,0.94)';
+    g.fill();
+    g.lineWidth = 2;
+    g.strokeStyle = '#34363b';
+    g.stroke();
+    const { graph, grid, res, qaoa } = view;
+    text(g, `QAOA for MaxCut on a ${graph.name} of ${graph.n}`, 44, 62, DIM, '600 30px');
+    const status = qaoa ? `p = ${qaoa.p}    <H_C> = ${qaoa.energy.toFixed(2)}    ratio ${qaoa.ratio.toFixed(2)}` : 'Tap Optimize to tune the dials';
+    text(g, status, W - 44, 62, qaoa ? INK : DIM, '700 30px', 'right');
+
+    // the graph and its best cut
+    const best = bestCut(graph);
+    const split = best.states[0];
+    const cx = 290, cy = 330, r = 135;
+    const at = (i: number): [number, number] => [cx + r * Math.cos((i / graph.n) * Math.PI * 2 - Math.PI * 0.75), cy + r * Math.sin((i / graph.n) * Math.PI * 2 - Math.PI * 0.75)];
+    for (const [i, j] of graph.edges) {
+      const cut = ((split >> i) & 1) !== ((split >> j) & 1);
+      const [x1, y1] = at(i), [x2, y2] = at(j);
+      g.strokeStyle = cut ? MINT : '#4a4c52';
+      g.lineWidth = cut ? 6 : 4;
+      g.beginPath();
+      g.moveTo(x1, y1);
+      g.lineTo(x2, y2);
+      g.stroke();
+    }
+    for (let i = 0; i < graph.n; i++) {
+      const [x, y] = at(i);
+      const team = (split >> i) & 1;
+      circle(g, x, y, 34);
+      g.fillStyle = team ? qubitColor(i) : '#1d1e21';
+      g.fill();
+      g.lineWidth = 5;
+      g.strokeStyle = qubitColor(i);
+      g.stroke();
+      text(g, `q${i}`, x, y + 10, team ? '#18191b' : qubitColor(i), '700 28px', 'center');
+    }
+    rich(g, `Best cut: ${-best.energy} of ${graph.edges.length} edges`, 44, 528, 26, INK, 600);
+    rich(g, 'H_{C} = Σ ½ (Z_{i} Z_{j} − 1) over the edges', 44, 572, 24, '#c9ccd1', 500);
+
+    // the landscape
+    const x0 = 680, y0 = 112, w = 860, h = 430;
+    let lo = Infinity, hi = -Infinity;
+    for (const e of grid) {
+      lo = Math.min(lo, e);
+      hi = Math.max(hi, e);
+    }
+    const cw = w / res, ch = h / res;
+    for (let row = 0; row < res; row++)
+      for (let col = 0; col < res; col++) {
+        const t = hi > lo ? (hi - grid[row * res + col]) / (hi - lo) : 0;
+        // dark to a cool light: lighter is a lower (better) cost
+        const c = (a: number, z: number) => Math.round(a + (z - a) * t ** 1.4);
+        g.fillStyle = `rgb(${c(32, 214)},${c(33, 226)},${c(37, 246)})`;
+        g.fillRect(x0 + col * cw, y0 + h - (row + 1) * ch, cw + 0.6, ch + 0.6);
+      }
+    g.strokeStyle = '#34363b';
+    g.lineWidth = 2;
+    g.strokeRect(x0, y0, w, h);
+    const gx = (gm: number) => x0 + (Math.min(Math.max(gm, 0), GAMMA_MAX) / GAMMA_MAX) * w;
+    const by = (bt: number) => y0 + h - (Math.min(Math.max(bt, 0), BETA_MAX) / BETA_MAX) * h;
+    // the landscape repeats: E(-g, -b) = E(g, b), period pi/2 in beta, 2 pi in gamma; fold any point into the window
+    const fold = (gm: number, bt: number): [number, number] => {
+      let a = ((gm % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI), b = bt;
+      if (a > Math.PI) {
+        a = 2 * Math.PI - a;
+        b = -b;
+      }
+      b = ((b % BETA_MAX) + BETA_MAX) % BETA_MAX;
+      return [a, b];
+    };
+    for (const [v, label] of [[0, '0'], [GAMMA_MAX / 2, 'π/2'], [GAMMA_MAX, 'π']] as const) text(g, label, gx(v), y0 + h + 30, DIM, '500 20px', 'center');
+    for (const [v, label] of [[0, '0'], [BETA_MAX / 2, 'π/4'], [BETA_MAX, 'π/2']] as const) text(g, label, x0 - 14, by(v) + 7, DIM, '500 20px', 'right');
+    rich(g, 'γ  (cost dial)', x0 + w / 2, y0 + h + 58, 22, INK, 600, 'center');
+    rich(g, 'β', x0 - 46, y0 + h / 2 + 8, 26, INK, 700, 'center');
+    if (qaoa && qaoa.path.length) {
+      g.strokeStyle = '#ffffff';
+      g.lineWidth = 3;
+      g.beginPath();
+      qaoa.path.forEach(([gm0, bt0], i) => {
+        const [gm, bt] = fold(gm0, bt0);
+        if (i) g.lineTo(gx(gm), by(bt));
+        else g.moveTo(gx(gm), by(bt));
+      });
+      g.stroke();
+      const [sg, sb] = fold(qaoa.path[0][0], qaoa.path[0][1]);
+      circle(g, gx(sg), by(sb), 7);
+      g.fillStyle = '#8a8d93';
+      g.fill();
+      const [eg, eb] = fold(qaoa.path[qaoa.path.length - 1][0], qaoa.path[qaoa.path.length - 1][1]);
+      circle(g, gx(eg), by(eb), 13);
+      g.lineWidth = 5;
+      g.strokeStyle = MINT;
+      g.stroke();
+      if (qaoa.p > 1) text(g, 'showing the first layer\'s dials', x0 + w, y0 - 14, DIM, '500 18px', 'right');
+    }
     this.tex.needsUpdate = true;
   }
 

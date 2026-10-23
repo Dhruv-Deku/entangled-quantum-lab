@@ -6,9 +6,10 @@ import { LESSONS } from './lessons';
 import { PRESETS } from './presets';
 import { BuildSession } from './build-session';
 import { PUZZLES } from './puzzles';
+import { COURSE } from './course';
 
-/** Chapters (the story), Learn (one lesson per gate or idea), or the free sandbox. */
-export type Mode = 'campaign' | 'learn' | 'puzzle' | 'build' | 'sandbox';
+/** Course (everything, in order), Chapters (the story), Learn (one lesson per gate or idea), Puzzles, Build, or the free sandbox. */
+export type Mode = 'course' | 'campaign' | 'learn' | 'puzzle' | 'build' | 'sandbox';
 
 export interface CampaignView {
   mode: Mode;
@@ -43,6 +44,12 @@ export interface CampaignView {
   goal: string | null;
   /** Target arrows for the current step, worked out for this run. */
   targets: (Vec3 | null)[] | null;
+  courseIndex: number;
+  courseCount: number;
+  /** Course modules finished at least once. */
+  coursed: readonly number[];
+  /** A quiz answer that was wrong (index), until the next try. */
+  wrong: number | null;
 }
 
 type Listener = (v: CampaignView) => void;
@@ -75,6 +82,11 @@ export class Campaign {
   readonly build: BuildSession;
   /** Lessons finished at least once, kept across sessions. */
   learned = new Set<number>();
+  courseIndex = 0;
+  /** Course modules finished at least once, kept across sessions. */
+  coursed = new Set<number>();
+  /** The last wrong quiz answer, shown in red until the next try. */
+  wrong: number | null = null;
   private stepStart = 0;
   private shots: Uint32Array | null = null;
   private memory: Record<string, unknown> = {};
@@ -87,6 +99,7 @@ export class Campaign {
     readonly chapters: Chapter[] = CHAPTERS,
     readonly lessons: Chapter[] = LESSONS,
     readonly puzzles: Chapter[] = PUZZLES,
+    readonly course: Chapter[] = COURSE,
   ) {
     this.build = new BuildSession(lab);
     this.off = lab.on((e) => this.onLab(e));
@@ -107,12 +120,13 @@ export class Campaign {
     if (this.mode === 'campaign') return this.chapters[this.chapterIndex] ?? null;
     if (this.mode === 'learn') return this.lessons[this.lessonIndex] ?? null;
     if (this.mode === 'puzzle') return this.puzzles[this.puzzleIndex] ?? null;
+    if (this.mode === 'course') return this.course[this.courseIndex] ?? null;
     return null;
   }
 
   /** A chapter, lesson or puzzle is running (the builder and sandbox have no steps). */
   private get playing(): boolean {
-    return this.mode === 'campaign' || this.mode === 'learn' || this.mode === 'puzzle';
+    return this.mode === 'campaign' || this.mode === 'learn' || this.mode === 'puzzle' || this.mode === 'course';
   }
 
   get view(): CampaignView {
@@ -141,6 +155,10 @@ export class Campaign {
       text: step ? (typeof step.text === 'function' ? step.text(this.memory) : step.text) : null,
       goal: step ? (typeof step.goal === 'function' ? step.goal(this.memory) : step.goal) : null,
       targets: step?.target ? (typeof step.target === 'function' ? step.target(this.memory) : step.target) : null,
+      courseIndex: this.courseIndex,
+      courseCount: this.course.length,
+      coursed: [...this.coursed].sort((a, b) => a - b),
+      wrong: this.wrong,
     };
   }
 
@@ -177,6 +195,49 @@ export class Campaign {
     this.begin();
   }
 
+  startCourse(i: number): void {
+    this.mode = 'course';
+    this.courseIndex = ((i % this.course.length) + this.course.length) % this.course.length;
+    this.begin();
+  }
+
+  /** The course, at the module the player was last on. */
+  enterCourse(): void {
+    this.startCourse(this.courseIndex);
+  }
+
+  /** Show me: do the current task (or press its card button). Returns false if there is nothing to do. */
+  showMe(): boolean {
+    const step = this.view.step;
+    if (!this.playing || this.stepDone || this.chapterDone || !step) return false;
+    if (step.solve) {
+      step.solve(this.lab);
+      this.update(0);
+      return true;
+    }
+    return this.act();
+  }
+
+  /** Answer the current quiz. Returns true if it was right. */
+  answer(i: number): boolean {
+    const step = this.view.step;
+    if (!this.playing || this.stepDone || this.chapterDone || !step?.choices || step.answer === undefined || !step.id) return false;
+    if (i !== step.answer) {
+      this.wrong = i;
+      this.emit();
+      return false;
+    }
+    this.wrong = null;
+    this.memory[step.id] = true;
+    this.update(0);
+    return true;
+  }
+
+  /** What the last QAOA optimisation found (MaxCut chapter and the course), for the board and the code window. */
+  get qaoa(): { graph: string; p: number; gammas: number[]; betas: number[]; path: [number, number, number][]; ratio: number; energy: number } | null {
+    return (this.memory.qaoa as never) ?? null;
+  }
+
   /** The circuit builder, at challenge i (or where the player left off). */
   enterBuild(i = this.build.index): void {
     this.mode = 'build';
@@ -210,6 +271,7 @@ export class Campaign {
     this.payoff = null;
     this.shots = null;
     this.timer = 0;
+    this.wrong = null;
     const step = this.view.step;
     step?.enter?.(this.lab, this.memory);
     this.lab.preferredControl = step?.control ?? null;
@@ -254,12 +316,15 @@ export class Campaign {
       return;
     }
     this.timer += dt;
+    // a held payoff (a quiz's explanation) waits for Continue
+    if (step.hold && this.payoff && this.timer !== Infinity) return;
     if (this.timer >= (this.payoff ? ADVANCE_DELAY : 0.6)) {
       const ch = this.current!;
       if (this.stepIndex + 1 < ch.steps.length) this.enterStep(this.stepIndex + 1);
       else {
         this.chapterDone = true;
         if (this.mode === 'learn') this.learned.add(this.lessonIndex);
+        else if (this.mode === 'course') this.coursed.add(this.courseIndex);
         else if (this.mode === 'puzzle') {
           const got = (this.memory.stars as number | undefined) ?? 1;
           this.stars.set(this.puzzleIndex, Math.max(got, this.stars.get(this.puzzleIndex) ?? 0));
@@ -299,6 +364,7 @@ export class Campaign {
         return;
       }
       if (this.mode === 'learn') this.startLesson(this.lessonIndex + 1);
+      else if (this.mode === 'course') this.startCourse(this.courseIndex + 1);
       else if (this.mode === 'puzzle') this.startPuzzle(this.puzzleIndex + 1);
       else if (this.chapterIndex + 1 < this.chapters.length) this.startChapter(this.chapterIndex + 1);
       else this.enterSandbox();
@@ -314,6 +380,7 @@ export class Campaign {
   /** Previous or next chapter / lesson (the [ and ] keys). */
   step(dir: 1 | -1): void {
     if (this.mode === 'learn') this.startLesson(this.lessonIndex + dir);
+    else if (this.mode === 'course') this.startCourse(this.courseIndex + dir);
     else if (this.mode === 'puzzle') this.startPuzzle(this.puzzleIndex + dir);
     else if (this.mode === 'build') this.enterBuild(this.build.index + dir);
     else if (this.mode === 'sandbox') this.loadPreset(this.preset + dir);
@@ -355,6 +422,8 @@ export class Campaign {
       puzzle: this.puzzleIndex,
       stars: [...this.stars],
       build: this.build.toJSON(),
+      course: this.courseIndex,
+      coursed: [...this.coursed],
     };
   }
 
@@ -367,6 +436,8 @@ export class Campaign {
     this.lessonIndex = Math.max(0, Math.min(this.lessons.length - 1, data.lesson ?? 0));
     this.learned = new Set((data.learned ?? []).filter((i) => i >= 0 && i < this.lessons.length));
     this.puzzleIndex = Math.max(0, Math.min(this.puzzles.length - 1, data.puzzle ?? 0));
+    this.courseIndex = Math.max(0, Math.min(this.course.length - 1, data.course ?? 0));
+    this.coursed = new Set((data.coursed ?? []).filter((i) => i >= 0 && i < this.course.length));
     this.build.restore(data.build);
     if (this.mode === 'build') this.build.start(this.build.index, this.build.savedCells(data.build));
     this.stars = new Map((data.stars ?? []).filter(([i, n]) => i >= 0 && i < this.puzzles.length && n >= 1 && n <= 3));

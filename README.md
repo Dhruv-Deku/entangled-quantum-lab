@@ -16,7 +16,7 @@ your circuit exports to Qiskit and OpenQASM 3.
 ```sh
 npm install
 npm run dev        # managed browser with the Quest 3 emulator (IWER)
-npm test           # 170 unit tests: physics, gestures, ghost-hand demos, 11 chapters, 15 lessons, notes, puzzles, builder, share links, simplifier, OpenQASM, code window, chip routing, noise, pulse schedules, gate matrices and exact maths
+npm test           # 180 unit tests: physics, gestures, ghost-hand demos, the full course, 12 chapters, 15 lessons, notes, puzzles, builder, share links, simplifier, OpenQASM, code window, chip routing, noise, pulse schedules, gate matrices, exact maths and QAOA
 npm run typecheck
 npm run build
 ```
@@ -52,6 +52,7 @@ depends on a single input path.
 | – | Show the circuit as Qiskit code | Qiskit | – |
 | – | The chapter card's own button (Oracle, Storm …) | blue card button | Enter |
 | – | Previous / next chapter, lesson or sandbox circuit | navigator panel | [ ] |
+| – | Course: everything, in order, with quizzes | navigator: Course | A (1 2 3 answer, J = Show me) |
 | – | Learn mode | navigator: Learn | L |
 | – | SWAP the selected qubit with the next | SWAP | W |
 | – | Puzzles | navigator: Puzzles | Q |
@@ -85,7 +86,26 @@ public/ui/     UIKitML panels (chapter card, gate dock, code, navigator, builder
                notes)
 ```
 
-## Chapters
+## Course
+
+![A course quiz answered: the right answer in mint, with its explanation held until Continue](docs/screenshots/course-quiz.png)
+
+The **Course** tab teaches everything, in order, in 14 modules: bits and
+qubits, superposition, measurement, gates as matrices, phase and interference,
+many qubits, entanglement, algorithms, teleportation, noise and errors, quantum
+hardware, compiling, variational algorithms (QAOA), and what next. Each module
+mixes three kinds of step:
+
+- **pages**: a short explanation, often with a live demo on the orbs while the
+  board shows the matrices, or (in the hardware module) the chip, the fridge and
+  the pulse schedule;
+- **tasks**: do it yourself with the gestures, or tap **Show me** and watch it done;
+- **quizzes**: three answers on the card; a wrong one turns red and you try
+  again, the right one turns mint and explains why.
+
+Progress is saved per module. The tests play the whole course start to finish
+the way a learner would, and check that a wrong answer waits.
+
 
 1. **Superposition** – turn a qubit with your wrist, split it with an open hand, collapse it with a fist.
 2. **Interference** – split twice and it comes back to 0, 100 times out of 100.
@@ -98,6 +118,7 @@ public/ui/     UIKitML panels (chapter card, gate dock, code, navigator, builder
 9. **One Question** – Deutsch: a sealed box is constant or balanced; one question through phase kickback tells which, for all four boxes.
 10. **Hidden Number** – Bernstein-Vazirani on 4 qubits: a random 3-bit number read in one question instead of three.
 11. **The Mystery Qubit** – state tomography: a sealed box hides a random state; look at 100 copies along Z, X and Y, rebuild the arrow with your wrist and T, then reveal how close you came.
+12. **Max Cut** – QAOA: optimise a variational circuit's two dials on the cost landscape, then two layers, and watch the best cuts dominate the shots.
 
 | Chapter 3: measure one qubit and the other always agrees | Chapter 8: two bits sent on one qubit, 100 of 100 shots |
 | --- | --- |
@@ -214,6 +235,28 @@ loaded with `qiskit.qasm3.loads`, every circuit compared as a full unitary) on
 60 random circuits with every gate, one and two controls, swaps and iSWAP. The
 unit tests check the simplifier on 300 random circuits, and that every pair of
 gates it calls commuting really does.
+
+## QAOA: a variational algorithm
+
+![QAOA on the board: the ring of four with its best cut, the cost landscape over gamma and beta, and the optimiser's path into the minimum](docs/screenshots/qaoa-landscape.png)
+
+Chapter 12 and the course's QAOA module solve **MaxCut** on a ring of four
+qubits: split the nodes into two teams so every edge crosses. The cost
+Hamiltonian is H_C = sum of 1/2 (Z_i Z_j - 1) over the edges (PennyLane's
+convention), so each split's energy is minus the edges it cuts. The QAOA
+circuit (Hadamards, then per layer CNOT, Rz(gamma), CNOT on every edge and
+Rx(2 beta) on every qubit) runs on the orbs; **Optimize** walks gradient
+descent across the landscape, which the board draws over both dials with the
+optimiser's path; the card reports <H_C> and the approximation ratio
+<H_C> / min(H_C). One layer reaches the known 0.75 on a ring; **Deeper** adds a
+second layer for more. The shots then favour 0101 and 1010, the best cuts.
+
+The **PennyLane** tab exports the run as a program in the usual exercise shape
+(`cost_hamiltonian`, `qaoa_circuit` with `qml.qaoa.cost_layer` and
+`mixer_layer`, `qaoa_expval`, `qaoa_probs`, `approximation_ratio`) with the
+parameters found. Run with PennyLane 0.42 it prints exactly the same <H_C> and
+ratio as the app: -3.000 / 0.750 for one layer on the ring, -3.4573 / 0.8643
+for two layers on a kite.
 
 ## The maths of every step
 
