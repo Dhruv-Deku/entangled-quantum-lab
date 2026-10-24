@@ -214,6 +214,58 @@ export const NOTES: Record<string, string[]> = {
     'Key idea: entanglement can belong to a group, not just to pairs.',
   ],
 
+  // ---------- advanced chapters ----------
+  'Bell Test': [
+    'In the CHSH game a referee sends Alice and Bob a random bit each. They answer with one bit each, without talking, and win when their answers differ exactly when both questions were 1.',
+    'Any plan made in advance, even with shared random numbers, wins at most 75% of rounds. In terms of the score S = E1 + E2 + E3 - E4, built from how often their answers agree, that is S <= 2: Bell\'s inequality.',
+    'With a Bell pair, Alice measures at 0 or 90 degrees and Bob at 45 or -45, depending on their questions. Their answers agree with probability cos^2 of half the angle between them, and they win cos^2(22.5 degrees), about 85%: S = 2 sqrt(2), the most quantum mechanics allows (Tsirelson\'s bound).',
+    'Measure one qubit first and the pair becomes ordinary correlated bits: the score falls back under 2.',
+    'Key idea: no hidden list of answers can explain entanglement. Experiments that closed every loophole won the 2022 Nobel Prize in Physics.',
+  ],
+  'Error Correction': [
+    'Noise flips qubits. Classical computers copy bits and take a vote, but a qubit cannot be copied, and reading it destroys it.',
+    'The bit-flip code spreads a|0> + b|1> into a|000> + b|111> with two CNOTs. That is entanglement, not copying: there are still only two numbers, a and b.',
+    'Two extra qubits measure parities: is q0 the same as q1, and q1 the same as q2? The answers (the syndrome) say which qubit flipped, and say nothing about a or b, so the message survives the measurement.',
+    'If each qubit flips with chance p, the code fails only when two or three flip: 3p^2 - 2p^3. That beats p whenever p < 1/2, the break-even point of this code.',
+    'Key idea: measure the errors, never the data. Codes like the surface code catch phase flips too and reach much better thresholds by using many qubits.',
+  ],
+  'Entanglement Swapping': [
+    'Start with two Bell pairs: q0-q1 and q2-q3. Alice holds q1 and q2; q0 and q3 are far apart and have never met.',
+    'Alice measures her two qubits in the Bell basis: a CNOT, an H, and two measurements. This is the same move as in teleportation.',
+    'Afterwards q0 and q3 are entangled with each other. Depending on Alice\'s two bits, the person holding q3 applies X, Z, both or nothing to get exactly (|00> + |11>)/sqrt(2).',
+    'Only two classical bits travel. Without them, q0 and q3 look like coin tosses that happen to be correlated in one of four unknown ways.',
+    'Key idea: entanglement can be passed along a chain, which is how quantum repeaters will build long-distance quantum links.',
+  ],
+  'Quantum Walk': [
+    'A classical random walker flips a coin each step and moves left or right. After t steps it is typically about sqrt(t) sites from the start.',
+    'A quantum walker uses a qubit as its coin. A Hadamard tosses it, and a controlled shift moves the walker left and right at the same time.',
+    'The paths interfere. Paths back toward the start cancel, so the walker spreads in proportion to t, with peaks far from the middle.',
+    'Here q0 to q3 hold the position (16 sites) and q4 is the coin. The coin starts in (|0> + i|1>)/sqrt(2) so the walk is symmetric.',
+    'Key idea: quantum walks spread quadratically faster than random walks, and several quantum search algorithms are built on them.',
+  ],
+  'Time Evolution': [
+    'A Hamiltonian H says how a system changes: the state after time t is e^(-iHt) applied to the start. Here H describes three magnetic spins in a line.',
+    'The ZZ terms pull neighbours into line; the X terms are a sideways field that tips them. Starting all up, the average magnetisation swings down and back.',
+    'A quantum computer cannot apply e^(-iHt) in one go, so it splits time into small steps and applies each part of H in turn: the Trotter method. Each ZZ coupling is CX, RZ, CX; each field term is an RX.',
+    'Smaller steps follow the exact curve more closely but need more gates. On real hardware every gate adds noise, so choosing the step size is a balance.',
+    'Key idea: simulating quantum systems is the use Feynman had in mind for quantum computers, and it is still among the most promising.',
+  ],
+
+  'Quantum Zeno': [
+    'Turn a qubit from |0> toward |1> in N small slices. Unwatched, the slices add up and it arrives at |1>.',
+    'Look after each slice instead. A slice of angle theta only gives a sin^2(theta/2) chance of finding |1>, and a look that finds |0> puts the qubit back at the start.',
+    'With N looks the chance it never moves is cos^2(90 degrees / N)^N, which goes to 1 as N grows: 25% for 2 looks, 78% for 10, 95% for 50.',
+    'This is the quantum Zeno effect, named after the paradox of the arrow that never moves because at every instant it is at rest.',
+    'Key idea: measurement is not passive. Looking often enough can freeze a quantum system in place.',
+  ],
+  Benchmarking: [
+    'Gate errors are tiny, around 0.1% or less, so one gate is too small to measure directly. Randomized benchmarking runs long random sequences instead.',
+    'Each sequence is m random Clifford gates (combinations of H and S) followed by the single Clifford that undoes them all. With perfect gates the qubit always returns to |0>.',
+    'With noisy gates the chance of returning falls as A p^m + 1/2. The decay p gives the average error per Clifford, (1 - p)/2, and dividing by the gates per Clifford gives the error per gate.',
+    'Errors in preparing and reading the qubit only change A, not p, so the result measures the gates alone.',
+    'Key idea: averaging over random sequences turns a tiny, hard-to-see error into a clear curve. It is the standard way chips report gate quality.',
+  ],
+
   // ---------- builder ----------
   'Circuit diagrams': [
     'A circuit diagram reads left to right like music: one horizontal wire per qubit, and time flowing to the right. Each box on a wire is a single-qubit gate.',

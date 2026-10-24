@@ -16,7 +16,7 @@ your circuit exports to Qiskit and OpenQASM 3.
 ```sh
 npm install
 npm run dev        # managed browser with the Quest 3 emulator (IWER)
-npm test           # 242 unit tests: physics, gestures, the course, 18 chapters, 15 lessons, puzzles, builder, noise, chemistry, import, IBM compiling, voice, shared rooms and more
+npm test           # 274 unit tests: physics, gestures, the course, 25 chapters, 15 lessons, puzzles, builder, noise, chemistry, import, IBM compiling, Bell tests, error correction, benchmarking, voice, shared rooms and more
 npm run typecheck
 npm run build
 ```
@@ -69,7 +69,7 @@ depends on a single input path.
 | – | Library: save, load, import, QR code, custom gates | sandbox card: Library | F (Shift+F save, U tab, Shift+Y use, Shift+K QR, Shift+U import) |
 | – | Simplify the circuit (Undo brings it back) | Qiskit, then Simplify | O |
 | – | Step debugger: step, run to a breakpoint, see why each step changed the state | Debug | Shift+D (, . step, ; run, ' breakpoint) |
-| – | Big-state views: Q-sphere, state city, entanglement map | View | Shift+V |
+| – | Big-state views: Q-sphere, state city, entanglement map, circuit unitary | View | Shift+V |
 | – | Voice commands | Voice | V |
 | – | Shared lab or classroom: start, join, claim a qubit | Share | \ (and \| for the class panel) |
 
@@ -81,12 +81,15 @@ and a shared cooldown, so fist, spread and pinch never trigger each other).
 ```
 src/quantum/   statevector simulator, gates, measurement, Bloch vectors,
                entanglement measures, noise, history, Qiskit/PennyLane export,
-               teleportation / Grover / BB84 (pure TypeScript, fully tested)
+               teleportation / Grover / BB84, the CHSH game, the bit-flip code,
+               quantum walks, Trotter evolution, randomized benchmarking
+               (pure TypeScript, fully tested)
 src/gestures/  hand-joint features and the gesture state machine (tested with a
                synthetic hand, including tracking noise)
 src/lab/       the lab model, 3D orbs, threads, GHZ ring, probability rain,
-               gesture and desktop input systems, sound, autosave
-src/game/      eleven chapters, fifteen lessons, twelve puzzles, the circuit builder,
+               gesture and desktop input systems, sound, autosave, the board's
+               figures (Bell score, syndrome table, walk, Trotter, unitary ...)
+src/game/      25 chapters, fifteen lessons, twelve puzzles, the circuit builder,
                notes, sandbox presets, the campaign state machine, hands-only
                panels, the ghost-hand tutor, voice commands, the step debugger
 src/net/       shared rooms: one circuit for everyone, qubit ownership, the
@@ -356,6 +359,62 @@ bond lengths, and the minimum sits at 0.74 Angstrom. Tests check the QFT
 against the discrete Fourier transform, phase estimation for every k/8, Shor's
 period and factors, Grover's 94.5%, and Simon's secret.
 
+## Advanced chapters
+
+Chapters 19 to 25 go past textbook algorithms into the physics that real
+quantum computers are built and judged on. Each one draws its own figure on the
+board while you play, and each is played through end to end in the unit tests
+with the numbers checked.
+
+| Bell Test (CHSH) | Error Correction |
+| --- | --- |
+| ![The Bell test board: measured agreement at four angle settings on the cos curve, and the score S = 2.93 +- 0.09 for the entangled pair against S = 1.45 after measuring, with the classical limit 2 and the quantum limit 2.83 marked](docs/screenshots/ch19-bell-test.png) | ![The bit-flip code board: the syndrome table with 01 lit (q2 flipped), and the chance of losing the message against the flip rate, with the code (3p^2 - 2p^3) under the bare qubit below p = 0.5](docs/screenshots/ch20-error-correction.png) |
+
+- **Bell Test**: Alice and Bob play the CHSH game. With a Bell pair they win
+  about 85% of 1000 rounds (S near 2 sqrt 2, shown with its sampling error);
+  after you measure one qubit they fall back under the 75% any advance plan can
+  reach. Tests check S = 2 sqrt 2 exactly, that no product state passes 2, and
+  that the quoted error matches the real spread over 400 games.
+- **Error Correction**: tilt a message onto q0, spread it into
+  a|000> + b|111>, let a storm flip one qubit, read two parity checks on the
+  ancillas, correct, and decode: q0 points where you left it. Stress test runs
+  the code 300 times at seven noise levels against 3p^2 - 2p^3.
+
+| Entanglement Swapping | Quantum Walk |
+| --- | --- |
+| ![Who is entangled with whom: a gold arc joins q0 and q3 after the Bell measurement on q1 and q2 read 10](docs/screenshots/ch21-swapping.png) | ![The quantum walk after six steps: peaks four sites out on both sides against the classical walker's bell curve, and the spread growing like t instead of sqrt t](docs/screenshots/ch22-quantum-walk.png) |
+
+- **Entanglement Swapping**: two Bell pairs, a Bell measurement on the middle
+  two, two classical bits sent, and q0 and q3 are entangled without ever
+  touching. Every 100-shot run agrees on q0 and q3.
+- **Quantum Walk**: a walker on 16 sites with a qubit coin (5 qubits, multi-
+  controlled increments). After six steps it is most likely far from the start:
+  a spread of 3.35 sites against 2.45 for a coin-flipping walker. Tests compare
+  the circuit with an independent textbook walk to 12 decimals.
+
+| Time Evolution (Trotter) | Quantum Zeno |
+| --- | --- |
+| ![The Ising chain's magnetisation from t = 0 to 6: the exact curve, the circuit's small Trotter steps on it, and three-times-bigger steps going badly wrong near t = 4](docs/screenshots/ch23-time-evolution.png) | ![The Zeno board: ten slices without looking end at 1; with a look after each, every look found 0; and the chance of staying at 0 rising with the number of looks along cos^2(90 deg / N)^N](docs/screenshots/ch24-quantum-zeno.png) |
+
+- **Time Evolution**: three spins with ZZ couplings and a transverse field,
+  simulated in Trotter steps (CX, RZ, CX per bond, RX per qubit) right on the
+  orbs. The exact curve comes from diagonalising the Hamiltonian; small steps
+  follow its swing down to -0.8 and back, three-times-bigger steps miss it.
+- **Quantum Zeno**: a half turn in ten slices reaches |1>; the same slices with
+  a look after each one usually never leave |0>. Trying 1 to 50 looks traces
+  cos^2(90 deg / N)^N.
+
+| Benchmarking |
+| --- |
+| ![Randomized benchmarking: survival against sequence length from 1 to 256 Cliffords, decaying from 0.99 to 0.6, the fitted A p^m + 0.5, and 0.09% error per gate](docs/screenshots/ch25-benchmarking.png) |
+
+- **Benchmarking**: randomized benchmarking on the noisy chip model (T1, T2,
+  gate error). Random Clifford sequences that undo themselves return to |0>
+  exactly with perfect gates; on the noisy model, survival decays and the fit
+  gives the error per gate. Tests check the 24-element Clifford group, an exact
+  formula under depolarizing noise, and that the fit recovers the error it was
+  given.
+
 ## The maths of every step
 
 ![The Maths tab: CX as a 4x4 matrix with kets on the rows, its formula, U = CX, the state before and after as column vectors, and the new state in Dirac notation](docs/screenshots/maths-board.png)
@@ -471,8 +530,8 @@ because the entanglement spread to a third qubit, it says that rather than
 
 ## Big-state views
 
-**View** (Shift+V, or say "next view") cycles three ways to see a state that is
-too big for one Bloch sphere each.
+**View** (Shift+V, or say "next view") cycles four ways to see a state that is
+too big for one Bloch sphere each, or the whole circuit at once.
 
 | Q-sphere | State city |
 | --- | --- |
@@ -494,6 +553,17 @@ too big for one Bloch sphere each.
 | Two Bell pairs | A four-qubit GHZ state |
 | --- | --- |
 | ![Entanglement map: two Bell pairs light up q0-q1 and q2-q3, and q4 is on its own](docs/screenshots/heatmap.png) | ![Entanglement map of a GHZ state: no pair is entangled on its own, yet every qubit is fully entangled with the rest](docs/screenshots/heatmap-ghz.png) |
+
+- **Circuit unitary**: the circuit up to the timeline cursor as one 2^n x 2^n
+  matrix. Each entry is a square: its size is the magnitude and its colour the
+  phase, on the same colour wheel as the Q-sphere. Column k is what the circuit
+  does to |k>. A sentence says what kind of matrix it is: the identity, only
+  phases (diagonal), a permutation (a classical reversible circuit), partly
+  mixing, or dense. After a measurement it explains why there is no single
+  matrix any more. Unit tests check that every circuit gives a unitary matrix
+  that acts like the circuit itself.
+
+![The circuit unitary of a three-qubit circuit: an 8 x 8 grid of coloured squares, half of them non-zero, with the phase wheel](docs/screenshots/unitary-view.png)
 
 ## Voice commands
 

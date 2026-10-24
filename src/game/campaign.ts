@@ -2,6 +2,7 @@ import type { Lab, LabEvent } from '../lab/lab';
 import type { Op } from '../quantum/circuit';
 import type { Vec3 } from '../quantum/gates';
 import { CHAPTERS, type Chapter, type GoalContext, type Hint, type Step } from './chapters';
+import type { Figure } from '../lab/figures';
 import { LESSONS } from './lessons';
 import { PRESETS } from './presets';
 import { BuildSession } from './build-session';
@@ -234,6 +235,13 @@ export class Campaign {
   }
 
   /** A value the current chapter remembered (read-only, for the board). */
+  /** The current step's own board figure, if it has one. */
+  figure(): Figure | null {
+    if (this.intro) return null;
+    const step = this.current?.steps[this.stepIndex];
+    return step?.figure?.(this.memory, this.lab.state) ?? null;
+  }
+
   memoryValue(key: string): unknown {
     return this.memory[key];
   }

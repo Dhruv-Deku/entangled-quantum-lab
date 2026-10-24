@@ -115,6 +115,8 @@ export function parseVoice(text: string): VoiceCommand | null {
   if (/^(reset|start over|clear)/.test(s)) return { type: 'reset' };
   if (/(add|new) (a )?qubit/.test(s)) return { type: 'add' };
   if (/remove (a )?qubit/.test(s)) return { type: 'remove' };
+  // before Show me and Continue: "next view", "show me the matrix"
+  if (/(change|switch|next) view|state city|q sphere|cue sphere|heat ?map|unitary|the matrix/.test(s)) return { type: 'view' };
   if (/show me/.test(s)) return { type: 'showme' };
   if (/^(next|continue|go on|okay next)/.test(s)) return { type: 'next' };
   if (/notes?\b/.test(s) && has('open', 'show', 'read', 'notes')) return { type: 'notes' };
@@ -123,7 +125,6 @@ export function parseVoice(text: string): VoiceCommand | null {
   if (/\bnoise\b/.test(s)) return { type: 'noise' };
   if (/library|my circuits/.test(s)) return { type: 'library' };
   if (/debug/.test(s)) return { type: 'debug' };
-  if (/(change|switch|next) view|state city|q sphere|cue sphere|heat ?map/.test(s)) return { type: 'view' };
   if (/\b(code|qiskit|kiss kit)\b/.test(s) && has('open', 'show', 'code', 'qiskit')) return { type: 'code' };
   if (/^(close|cancel|hide)/.test(s)) return { type: 'close' };
   let m: RegExpExecArray | null;

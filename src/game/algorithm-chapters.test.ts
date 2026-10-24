@@ -28,9 +28,9 @@ function play(title: string, seed = 1): { c: Campaign; lab: Lab; payoffs: string
 }
 
 describe('algorithm chapters', () => {
-  it('there are 18 chapters, with the six new ones at the end', () => {
-    expect(CHAPTERS).toHaveLength(18);
-    expect(CHAPTERS.slice(12).map((c) => c.title)).toEqual(['Phase Wheel', 'Phase Estimation', 'Factoring 15', 'The H2 Molecule', 'Search 8 Boxes', "Simon's Secret"]);
+  it('the six algorithm chapters follow Max Cut', () => {
+    expect(CHAPTERS.length).toBeGreaterThanOrEqual(18);
+    expect(CHAPTERS.slice(12, 18).map((c) => c.title)).toEqual(['Phase Wheel', 'Phase Estimation', 'Factoring 15', 'The H2 Molecule', 'Search 8 Boxes', "Simon's Secret"]);
   });
 
   it('Phase Wheel: QFT and back to 101', () => {

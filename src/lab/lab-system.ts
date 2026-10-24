@@ -28,6 +28,8 @@ import { noiseLab } from './noise-lab';
 import { runNoisy } from '../quantum/density';
 import { ChipVisual } from './chip';
 import { drawCertificate, type CertificateInfo } from './certificate';
+import { unitaryFigure } from './figures';
+import { circuitUnitary, describeUnitary } from '../quantum/advanced';
 import { QSphereVisual, StateCityVisual } from './state-views-3d';
 import { pureDensity, type StateView } from '../quantum/state-views';
 import { T5 } from '../quantum/routing';
@@ -375,7 +377,7 @@ export class LabSystem extends createSystem({
     if (this.qsphere.root.visible) this.qsphere.update(dt);
     if (this.city.root.visible) this.city.update(dt);
     // on the chip tab the board rises above the code window so the pulse schedule shows
-    const boardY = this.boardRaised || (this.stateView && this.stateView !== 'heatmap') || this.pulseView || this.mathsOn || this.landscapeView || this.densityOn || this.wheelsOn || this.vqeView !== undefined || this.overlayKey ? 0.5 : 0.27;
+    const boardY = this.boardRaised || (this.stateView && this.stateView !== 'heatmap' && this.stateView !== 'unitary') || this.pulseView || this.mathsOn || this.landscapeView || this.densityOn || this.wheelsOn || this.vqeView !== undefined || this.overlayKey ? 0.5 : 0.27;
     this.board.root.position.y += (boardY - this.board.root.position.y) * (1 - Math.exp(-dt * 8));
     if (this.placePending) {
       this.player.head.updateWorldMatrix(true, false);
@@ -469,6 +471,12 @@ export class LabSystem extends createSystem({
       const h = lab.history.toJSON();
       if (this.overlayKey) {
         // the library's view stays until it closes
+      } else if (this.stateView === 'unitary') {
+        // the circuit up to the timeline cursor, as one matrix
+        const ops = lab.history.ops.slice(0, lab.history.cursor);
+        const u = circuitUnitary(lab.n, ops);
+        const fig = unitaryFigure(lab.n, ops.length, u, u ? describeUnitary(u) : 'This circuit measures, so it is not one matrix any more: a measurement is not reversible. Rewind to before the first measurement to see the matrix.');
+        this.board.draw(fig.draw);
       } else if (this.stateView) {
         const rho = noiseLab.on ? noiseLab.rho(lab.n, lab.history.ops) : pureDensity(lab.history.state);
         this.board.renderStateView(this.stateView, lab.history.state, rho, noiseLab.on);

@@ -62,3 +62,9 @@ group('voice: shared rooms', () => {
     expect(parseVoice('unassign module 12')).toEqual({ type: 'assign', module: 11, on: false });
   });
 });
+
+group('voice: views', () => {
+  it('switches the big-state views, including the circuit unitary', () => {
+    for (const s of ['next view', 'show the q sphere', 'state city', 'heat map', 'show the unitary', 'show me the matrix']) expect(parseVoice(s), s).toEqual({ type: 'view' });
+  });
+});

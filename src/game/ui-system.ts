@@ -210,6 +210,9 @@ export class UISystem extends createSystem({
   private notes: NotesPanel | null = null;
   /** Which tab the navigator shows (it follows the mode, but can be browsed). */
   private tab: CampaignView['mode'] = 'campaign';
+  /** Navigator page when a tab has more items than slots (the last slot turns the page). */
+  private navPage = 0;
+  private navCurrent = '';
   private slotStart = 0;
   private els = new Map<string, El>();
   private immersive = false;
@@ -351,18 +354,26 @@ export class UISystem extends createSystem({
     for (const tab of TABS) {
       on(`tab-${tab}`, () => {
         this.tab = tab;
+        this.navPage = this.pageOfCurrent();
         this.renderNav(campaign.view);
         feedback('select');
       });
     }
     for (let i = 0; i < NAV_SLOTS; i++) {
       on(`n-${i}`, () => {
-        if (this.tab === 'course' && i < campaign.course.length) campaign.startCourse(i);
-        else if (this.tab === 'campaign' && i < campaign.chapters.length) campaign.startChapter(i);
-        else if (this.tab === 'learn' && i < campaign.lessons.length) campaign.startLesson(i);
-        else if (this.tab === 'puzzle' && i < campaign.puzzles.length) campaign.startPuzzle(i);
-        else if (this.tab === 'build' && i < BUILDS.length) campaign.enterBuild(i);
-        else if (this.tab === 'sandbox' && i < PRESETS.length) campaign.loadPreset(i);
+        const { paged, per, pages } = this.navPaging();
+        if (paged && i === NAV_SLOTS - 1) {
+          this.navPage = (this.navPage + 1) % pages;
+          this.renderNav(campaign.view);
+          return feedback('select');
+        }
+        const k = paged ? this.navPage * per + i : i;
+        if (this.tab === 'course' && k < campaign.course.length) campaign.startCourse(k);
+        else if (this.tab === 'campaign' && k < campaign.chapters.length) campaign.startChapter(k);
+        else if (this.tab === 'learn' && k < campaign.lessons.length) campaign.startLesson(k);
+        else if (this.tab === 'puzzle' && k < campaign.puzzles.length) campaign.startPuzzle(k);
+        else if (this.tab === 'build' && k < BUILDS.length) campaign.enterBuild(k);
+        else if (this.tab === 'sandbox' && k < PRESETS.length) campaign.loadPreset(k);
         else return;
         feedback('select');
       });
@@ -448,6 +459,12 @@ export class UISystem extends createSystem({
       const onSay = (e: Event) => this.onVoice((e as CustomEvent<string>).detail);
       window.addEventListener('entangled:say', onSay);
       this.cleanupFuncs.push(() => window.removeEventListener('entangled:say', onSay));
+      // and jump to a chapter, press its card button or Show me
+      const onChapter = (e: Event) => campaign.startChapter(Number((e as CustomEvent<string>).detail));
+      const onCard = (e: Event) => ((e as CustomEvent<string>).detail === 'showme' ? campaign.showMe() : campaign.next());
+      window.addEventListener('entangled:chapter', onChapter);
+      window.addEventListener('entangled:card', onCard);
+      this.cleanupFuncs.push(() => window.removeEventListener('entangled:chapter', onChapter), () => window.removeEventListener('entangled:card', onCard));
     }
     const onVoiceKey = () => this.speech?.toggle();
     window.addEventListener('entangled:voice', onVoiceKey);
@@ -1464,11 +1481,40 @@ export class UISystem extends createSystem({
    * Navigator: the tab follows the mode when it changes, and lists chapters,
    * lessons or sandbox presets. Finished items are mint, the current one filled.
    */
+  /** How many items the current tab lists. */
+  private navCount(): number {
+    const t = this.tab;
+    return t === 'course' ? campaign.course.length : t === 'campaign' ? campaign.chapters.length : t === 'learn' ? campaign.lessons.length : t === 'puzzle' ? campaign.puzzles.length : t === 'build' ? BUILDS.length : PRESETS.length;
+  }
+
+  /** More items than slots: pages of NAV_SLOTS - 1, the last slot turns the page. */
+  private navPaging(): { paged: boolean; per: number; pages: number } {
+    const n = this.navCount();
+    const paged = n > NAV_SLOTS;
+    const per = paged ? NAV_SLOTS - 1 : NAV_SLOTS;
+    return { paged, per, pages: Math.max(1, Math.ceil(n / per)) };
+  }
+
+  /** The page holding what is being played on this tab (0 if nothing is). */
+  private pageOfCurrent(): number {
+    const v = campaign.view;
+    const { paged, per } = this.navPaging();
+    if (!paged) return 0;
+    const i = this.tab === 'campaign' && v.mode === 'campaign' ? v.chapterIndex : this.tab === 'course' && v.mode === 'course' ? v.courseIndex : -1;
+    return i < 0 ? 0 : Math.floor(i / per);
+  }
+
   private renderNav(v: CampaignView): void {
     if (!this.nav) return;
     if (v.mode !== this.lastMode) {
       this.tab = v.mode;
       this.lastMode = v.mode;
+    }
+    // follow along when the chapter or module changes (Continue, keys, voice), once the tab matches
+    const current = `${v.mode}:${v.chapterIndex}:${v.courseIndex}`;
+    if (current !== this.navCurrent) {
+      this.navCurrent = current;
+      this.navPage = this.pageOfCurrent();
     }
     for (const tab of TABS) {
       const on = tab === this.tab;
@@ -1487,8 +1533,21 @@ export class UISystem extends createSystem({
             : this.tab === 'build'
               ? BUILDS.map((c, i) => ({ label: c.chip, done: campaign.build.best.get(i) === 3, current: v.mode === 'build' && i === campaign.build.index, stars: campaign.build.best.get(i) ?? 0 }))
               : PRESETS.map((p, i) => ({ label: p.label, done: false, current: v.mode === 'sandbox' && i === campaign.preset }));
+    const { paged, per, pages } = this.navPaging();
+    const page = Math.min(this.navPage, pages - 1);
     for (let i = 0; i < NAV_SLOTS; i++) {
-      const it = items[i];
+      if (paged && i === NAV_SLOTS - 1) {
+        // the page turner
+        const last = page === pages - 1;
+        this.els.get(`n-${i}`)?.setProperties({ display: 'flex', backgroundColor: '#1b1c1f' });
+        this.text(`n-${i}-l`, last ? 'Back' : 'More');
+        this.els.get(`n-${i}-l`)?.setProperties({ color: C.text });
+        this.text(`n-${i}-n`, last ? '<' : '>');
+        this.els.get(`n-${i}-n`)?.setProperties({ color: C.textDim });
+        continue;
+      }
+      const at = paged ? page * per + i : i;
+      const it = items[at];
       this.els.get(`n-${i}`)?.setProperties({
         display: it ? 'flex' : 'none',
         backgroundColor: !it ? '#2d2f33' : it.current ? C.text : it.done ? '#1f3a30' : '#2d2f33',
@@ -1497,7 +1556,7 @@ export class UISystem extends createSystem({
       this.text(`n-${i}-l`, it.label);
       this.els.get(`n-${i}-l`)?.setProperties({ color: it.current ? '#18191b' : it.done ? C.done : C.text });
       const stars = 'stars' in it ? (it.stars as number) : 0;
-      this.text(`n-${i}-n`, stars ? `${stars}/3` : String(i + 1));
+      this.text(`n-${i}-n`, stars ? `${stars}/3` : String(at + 1));
       this.els.get(`n-${i}-n`)?.setProperties({ color: it.current ? '#18191b' : it.done ? C.done : stars ? '#c9ccd1' : '#6b6e75' });
     }
     const starTotal = v.stars.reduce((a, b) => a + b, 0);
@@ -1671,7 +1730,19 @@ export class UISystem extends createSystem({
       }
       return;
     }
-    labSys.showOverlay(null);
+    // a chapter's own figure (a Bell score, a syndrome table ...) unless the code window's Maths or Chip tab wants the board
+    const fig = step && !this.noiseOpen && !(codeOpen && (this.codeFormat === 'maths' || this.codeFormat === 'chip')) ? campaign.figure() : null;
+    labSys.showOverlay(fig ? fig.key : null, fig ? (b) => b.draw(fig.draw) : undefined);
+    if (fig) {
+      labSys.chip.root.visible = false;
+      labSys.showHardware(null);
+      labSys.showMaths(false);
+      labSys.showLandscape(null);
+      labSys.showDensity(false);
+      labSys.showWheels(false);
+      labSys.showVqe(undefined, H2);
+      return;
+    }
     // the noise lab takes the board while it is open
     labSys.showDensity(this.noiseOpen);
     if (this.noiseOpen) {

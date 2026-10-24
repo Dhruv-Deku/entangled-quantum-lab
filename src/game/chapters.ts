@@ -7,6 +7,8 @@ import { pairStrength } from '../quantum/entanglement';
 import type { QState } from '../quantum/state';
 import { maxcutSteps } from './qaoa-steps';
 import { ALGORITHM_CHAPTERS } from './algorithm-chapters';
+import { ADVANCED_CHAPTERS } from './advanced-chapters';
+import type { Figure } from '../lab/figures';
 
 /** What a goal can look at. */
 export interface GoalContext {
@@ -58,6 +60,8 @@ export interface Step {
   id?: string;
   /** What the circuit board shows during this step (default: the circuit). */
   board?: 'maths' | 'landscape' | 'wheel' | 'vqe';
+  /** A chapter's own figure on the board (a Bell score, a syndrome table ...), from its memory and the live state. */
+  figure?: (memory: Record<string, unknown>, state: QState) => Figure | null;
   /** Show the chip, the fridge and the pulse schedule during this step. */
   hardware?: boolean;
   /** Show me: do the task for the player, with the same actions the gestures make. */
@@ -724,6 +728,7 @@ export const CHAPTERS: Chapter[] = [
     outro: 'That was QAOA, a variational algorithm: a quantum circuit with dials, tuned by a classical optimizer. The PennyLane tab in the code window has the same program.',
   },
   ...ALGORITHM_CHAPTERS,
+  ...ADVANCED_CHAPTERS,
 ];
 
 /**

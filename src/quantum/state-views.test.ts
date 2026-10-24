@@ -71,6 +71,7 @@ describe('big-state views', () => {
     expect(nextView(null)).toBe('qsphere');
     expect(nextView('qsphere')).toBe('city');
     expect(nextView('city')).toBe('heatmap');
-    expect(nextView('heatmap')).toBe(null);
+    expect(nextView('heatmap')).toBe('unitary');
+    expect(nextView('unitary')).toBe(null);
   });
 });
