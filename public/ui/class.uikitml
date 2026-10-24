@@ -6,6 +6,7 @@
 <style>
   .card {
     flex-direction: column;
+    anchor-y: top;
     width: 440;
     gap: 9;
     padding-top: 18;

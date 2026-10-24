@@ -67,6 +67,8 @@ const PLACEMENT = {
   'notes-zoom': { pos: new Vector3(0, 0.4, -0.05), rot: new Euler(0, 0, 0, 'YXZ') },
   // notes: in front of the circuit board, low enough to read without looking up
   'notes-panel': { pos: new Vector3(0, 0.3, -0.17), rot: new Euler(-0.1, 0, 0, 'YXZ') },
+  // the debugger and class panel hang from their top edge (anchor-y: top), just under the raised board
+  'under-board': { pos: new Vector3(0, 0.332, -0.17), rot: new Euler(-0.1, 0, 0, 'YXZ') },
   // upper right, opposite the chapter card and above the dock
   'nav-panel': { pos: new Vector3(0.47, 0.26, -0.06), rot: new Euler(-0.12, (-32 * Math.PI) / 180, 0, 'YXZ') },
 } as const;
@@ -177,8 +179,8 @@ export class UISystem extends createSystem({
   private libAsset: UIKitMLAsset | null = null;
   private dbgAsset: UIKitMLAsset | null = null;
   private classAsset: UIKitMLAsset | null = null;
-  /** student rows showing on the class panel: it grows downward as they join */
-  private classRows = 0;
+  /** why the shared lab last refused an op (for the voice reply) */
+  private refused: string | null = null;
   /** Shared lab or classroom, while in one. */
   private room: SharedRoom | null = null;
   private classOpen = false;
@@ -259,6 +261,7 @@ export class UISystem extends createSystem({
           if (e.type === 'select') this.room.select(e.qubit);
         }
         if (e.type === 'rejected' && lab.guard) {
+          this.refused = e.reason;
           this.flash(e.reason);
           feedback('reject');
         }
@@ -732,8 +735,10 @@ export class UISystem extends createSystem({
       this.flash(`Heard "${text.trim()}": not a command I know.`);
       return feedback('reject');
     }
+    this.refused = null;
     const ok = this.runVoice(cmd);
-    this.flash(`Heard "${text.trim()}": ${ok ? describeVoice(cmd) : `${describeVoice(cmd)} is not possible here`}.`);
+    // a shared lab refusing the gate says why (whose qubit it is); keep that rather than a generic no
+    this.flash(`Heard "${text.trim()}": ${ok ? `${describeVoice(cmd)}.` : this.refused ?? `${describeVoice(cmd)} is not possible here.`}`);
     feedback(ok ? 'select' : 'reject');
   }
 
@@ -884,7 +889,9 @@ export class UISystem extends createSystem({
   }
 
   private roomLink(code: string): string {
-    return `${location.origin}${location.pathname}${location.search}#room=${code}`;
+    // keep only the relay choice: other query parameters (dev tooling) don't belong in a shared link
+    const relay = new URLSearchParams(location.search).get('relay');
+    return `${location.origin}${location.pathname}${relay ? `?relay=${encodeURIComponent(relay)}` : ''}#room=${code}`;
   }
 
   /** A #room=CODE link joins that room. */
@@ -1082,7 +1089,9 @@ export class UISystem extends createSystem({
     const students = [...r.peers.values()].filter((p) => p.role === 'student');
     const steps = (m: number) => COURSE[m]?.steps.length ?? 1;
     const titles = (ms: readonly number[]) => ms.map((m) => `${m + 1} ${COURSE[m]?.title ?? ''}`).join(', ');
-    this.text('cl-eyebrow', `Class ${r.code}  /  ${students.length} student${students.length === 1 ? '' : 's'}${teacher ? '' : `  /  you: ${r.me.name}`}`);
+    // the teacher counts students; a student sees who teaches the class
+    const teacherName = [...r.peers.values()].find((p) => p.role === 'teacher')?.name;
+    this.text('cl-eyebrow', teacher ? `Class ${r.code}  /  ${students.length} student${students.length === 1 ? '' : 's'}` : `Class ${r.code}${teacherName ? `  /  teacher ${teacherName}` : ''}  /  you: ${r.me.name}`);
     this.text('cl-title', teacher ? 'Assign modules, watch progress' : 'Your assignment');
     this.els.get('cl-pick')?.setProperties({ display: teacher ? 'flex' : 'none' });
     const picked = r.assigned.includes(this.classPick);
@@ -1094,7 +1103,6 @@ export class UISystem extends createSystem({
     const rows: { name: string; p: Progress | undefined }[] = teacher
       ? students.map((s) => ({ name: s.name, p: r.progress.get(s.id) }))
       : [{ name: r.me.name, p: { mode: campaign.mode, module: campaign.courseIndex, step: campaign.view.chapterDone ? steps(campaign.courseIndex) : campaign.view.stepIndex, steps: steps(campaign.courseIndex), done: [...campaign.coursed] } }];
-    this.classRows = Math.min(rows.length, 6);
     for (let i = 0; i < 6; i++) {
       const row = rows[i];
       this.els.get(`cl-r-${i}`)?.setProperties({ display: row ? 'flex' : 'none' });
@@ -1110,7 +1118,9 @@ export class UISystem extends createSystem({
     }
     if (!rows.length) this.text('cl-line', `${r.assigned.length ? `Assigned: ${titles(r.assigned)}. ` : ''}No students yet: they join with code ${r.code}.`);
     this.els.get('cl-list')?.setProperties({ display: rows.length ? 'flex' : 'none' });
-    this.els.get('cl-go')?.setProperties({ display: teacher ? 'none' : 'flex' });
+    // nothing left to start once every assigned module is done
+    const todo = r.assigned.some((m) => !campaign.coursed.has(m));
+    this.els.get('cl-go')?.setProperties({ display: teacher || !todo ? 'none' : 'flex' });
     this.els.get('cl-cert')?.setProperties({ display: teacher ? 'none' : 'flex' });
     this.bg('cl-cert', this.certificateInfo() ? C.done : '#34363b');
   }
@@ -2031,16 +2041,14 @@ export class UISystem extends createSystem({
       this.notesAsset!.position.copy(PARKED);
     }
     if (this.classOpen) {
-      this.place(this.classAsset!, 'notes-panel');
-      // the panel grows from its centre: keep its top edge under the board
-      this.classAsset!.position.y -= 0.011 * Math.max(0, this.classRows - 1);
+      this.place(this.classAsset!, 'under-board');
       this.classAsset!.visible = true;
     } else {
       this.classAsset!.visible = false;
       this.classAsset!.position.copy(PARKED);
     }
     if (this.dbgOpen) {
-      this.place(this.dbgAsset!, 'notes-panel');
+      this.place(this.dbgAsset!, 'under-board');
       this.dbgAsset!.visible = true;
     } else {
       this.dbgAsset!.visible = false;

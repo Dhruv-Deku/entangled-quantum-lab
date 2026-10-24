@@ -456,7 +456,9 @@ included, in anyone's sandbox. Links are validated before anything is loaded.
 
 ## Step debugger
 
-![The step debugger stopped at a breakpoint on a GHZ circuit, with the histogram and the reason for the change](docs/screenshots/step-debugger.png)
+| Stopped at a breakpoint | Stepping onto a measurement |
+| --- | --- |
+| ![The step debugger stopped at a breakpoint on a GHZ circuit: the pair q0-q1 is no longer entangled on its own because the entanglement spans the whole group](docs/screenshots/step-debugger.png) | ![The debugger on a measured Bell pair: measuring q0 = 1 collapsed the state onto 11, and q0 and q1 are no longer entangled](docs/screenshots/debugger-measure.png) |
 
 **Debug** on the dock (or Shift+D) opens a debugger for the circuit on the orbs.
 Step back and forward one gate at a time, set **breakpoints** on timeline steps
@@ -489,9 +491,13 @@ too big for one Bloch sphere each.
   underneath. A GHZ state shows weak pairs but every qubit fully entangled: the
   entanglement belongs to the whole group.
 
-![Entanglement map: two Bell pairs light up q0-q1 and q2-q3, and q4 is on its own](docs/screenshots/heatmap.png)
+| Two Bell pairs | A four-qubit GHZ state |
+| --- | --- |
+| ![Entanglement map: two Bell pairs light up q0-q1 and q2-q3, and q4 is on its own](docs/screenshots/heatmap.png) | ![Entanglement map of a GHZ state: no pair is entangled on its own, yet every qubit is fully entangled with the rest](docs/screenshots/heatmap-ghz.png) |
 
 ## Voice commands
+
+![The dock after saying "entangle zero and one": the reply shows it heard a CNOT from q0 to q1](docs/screenshots/voice.png)
 
 **Voice** on the dock (or V) listens through the browser's speech recogniser.
 It is forgiving about how things are said, and every
@@ -522,6 +528,10 @@ are refused with a short note. A two-qubit gate is allowed when one of the
 qubits is yours or free, so you can still entangle with a partner. Someone who
 joins as a teacher can turn any qubit.
 
+| The room on the 2D page | Someone else's qubit |
+| --- | --- |
+| ![The share dialog for room LK7QF: a QR code, the link and who is here](docs/screenshots/share-dialog.png) | ![Saying "Hadamard on qubit zero" in a shared lab: q0 belongs to Ana, so the gate is refused](docs/screenshots/shared-refused.png) |
+
 Rooms have a short code (`LK7QF`) and a link with a QR code, so a phone or a
 second headset joins by scanning it. Edits that cross are settled the same way
 on every device (newest version wins, ties by id), so everyone ends up with the
@@ -538,7 +548,9 @@ Without a relay, tabs on the same device still share a room.
 
 ## Classroom and certificate
 
-![The teacher's class panel: two modules assigned and six students' progress](docs/screenshots/class-dashboard.png)
+| The teacher's panel | A student who has finished |
+| --- | --- |
+| ![The teacher's class panel: two modules assigned and six students' progress](docs/screenshots/class-dashboard.png) | ![A student's view: the assignment is done and the certificate is on the board](docs/screenshots/student-certificate.png) |
 
 **Start a class** makes the teacher's room (`C7QF2`). The teacher picks course
 modules on the class panel and presses **Assign** (or says "assign module

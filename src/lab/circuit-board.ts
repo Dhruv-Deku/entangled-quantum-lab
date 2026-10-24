@@ -569,7 +569,8 @@ export class CircuitBoard {
       for (let a = 0; a < n; a++)
         for (let c = 0; c < n; c++) {
           const x = x0 + c * size, y = y0 + a * size;
-          g.fillStyle = '#26272b';
+          // empty cells stay visible; the diagonal (a qubit with itself) is darker
+          g.fillStyle = a === c ? '#232428' : '#303237';
           g.fillRect(x + 2, y + 2, size - 4, size - 4);
           if (a === c) continue;
           const v = m.pair[a][c];

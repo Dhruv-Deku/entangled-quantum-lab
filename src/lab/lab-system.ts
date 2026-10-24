@@ -540,7 +540,7 @@ export class LabSystem extends createSystem({
 
   /** The completion certificate on the board (null puts the circuit back). */
   showCertificate(info: CertificateInfo | null): void {
-    this.showOverlay(info ? `cert:${info.name}:${info.modules.join(',')}` : null, info ? (b) => b.draw((g, w, h) => drawCertificate(g, w, h, info)) : undefined);
+    this.showOverlay(info ? `cert:${info.name}:${info.modules.join(',')}:${info.context}` : null, info ? (b) => b.draw((g, w, h) => drawCertificate(g, w, h, info)) : undefined);
   }
 
   /** A big-state view (null puts the circuit back). */
