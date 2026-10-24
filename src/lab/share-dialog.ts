@@ -36,9 +36,40 @@ export interface ShareActions {
   leave(): void;
   /** A certificate is ready to download (null: none yet). */
   certificate: (() => void) | null;
+  /** Save a picture of the board with a QR code of the circuit. */
+  snapshot: () => void;
 }
 
 let open = false;
+
+/** After the daily challenge: the result as a line to copy and paste. */
+export function openDailyDialog(title: string, line: string): void {
+  if (open) return;
+  open = true;
+  const wrap = document.createElement('div');
+  wrap.style.cssText = WRAP;
+  wrap.innerHTML = `<div style="${CARD}">
+    <div style="font-weight:700;font-size:20px">${title}</div>
+    <div id="dd-line" style="${INPUT};user-select:all;white-space:normal">${line.replace(/</g, '&lt;')}</div>
+    <div id="dd-status" style="min-height:20px;color:#b8bbc1"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button id="dd-copy" style="${BTN};background:#2d7ff9;color:#fff">Copy result</button>
+      <button id="dd-close" style="${BTN};background:#34363b;color:#e4e6eb">Close</button>
+    </div></div>`;
+  document.body.appendChild(wrap);
+  const close = () => {
+    wrap.remove();
+    open = false;
+  };
+  wrap.querySelector<HTMLButtonElement>('#dd-close')!.onclick = close;
+  wrap.querySelector<HTMLButtonElement>('#dd-copy')!.onclick = () => {
+    const status = wrap.querySelector('#dd-status')!;
+    navigator.clipboard?.writeText(line).then(
+      () => (status.textContent = 'Copied: paste it anywhere.'),
+      () => (status.textContent = 'Select the line above and copy it.'),
+    ) ?? (status.textContent = 'Select the line above and copy it.');
+  };
+}
 
 export function openShareDialog(a: ShareActions): void {
   if (open) return;
@@ -81,6 +112,7 @@ export function openShareDialog(a: ShareActions): void {
   wrap.innerHTML = `<div style="${CARD}">${body}
     <div id="sh-status" style="min-height:20px;color:#b8bbc1"></div>
     <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap">
+      <button id="sh-snap" style="${BTN};background:#34363b;color:#e4e6eb">Save picture</button>
       ${a.certificate ? `<button id="sh-cert" style="${BTN};background:#3ddc97;color:#10261c">Download certificate</button>` : ''}
       ${cur ? `<button id="sh-leave" style="${BTN};background:#3a2523;color:#ffb4a8">Leave</button>` : ''}
       <button id="sh-close" style="${BTN};background:#34363b;color:#e4e6eb">Close</button>
@@ -99,6 +131,7 @@ export function openShareDialog(a: ShareActions): void {
     return n;
   };
   $('sh-close')!.onclick = close;
+  $('sh-snap')!.onclick = () => (a.snapshot(), close());
   const cert = $('sh-cert');
   if (cert && a.certificate) cert.onclick = a.certificate;
   const leave = $('sh-leave');

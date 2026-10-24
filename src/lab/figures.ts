@@ -557,3 +557,76 @@ export function rbFigure(r: RbResult | null, one: { gates: string; survival: num
     },
   };
 }
+
+// ---------------------------------------------------------------- profile
+
+export interface ProfileView {
+  level: number;
+  title: string;
+  xp: number;
+  into: number;
+  span: number;
+  streak: number;
+  bestStreak: number;
+  /** Today's daily challenge: its number, and the result if solved. */
+  daily: { number: number; result: { moves: number; par: number } | null };
+  achievements: { title: string; text: string; unlocked: boolean; progress?: [number, number] }[];
+}
+
+/** Left: level, XP and the daily streak. Right: every achievement, unlocked or with its progress. */
+export function profileFigure(v: ProfileView): Figure {
+  return {
+    key: `profile:${JSON.stringify(v)}`,
+    draw: (g, w, h) => {
+      const got = v.achievements.filter((a) => a.unlocked).length;
+      panel(g, w, h, 'Your progress', `${got} of ${v.achievements.length} achievements`);
+      const x0 = 44;
+      text(g, `Level ${v.level}`, x0, 150, INK, '700 64px');
+      text(g, v.title, x0, 196, SOFT_BLUE, '600 30px');
+      roundRect(g, x0, 226, 400, 18, 9);
+      g.fillStyle = '#26272b';
+      g.fill();
+      roundRect(g, x0, 226, Math.max(18, (400 * v.into) / v.span), 18, 9);
+      g.fillStyle = BLUE;
+      g.fill();
+      text(g, `${v.xp} XP   ${v.span - v.into} to level ${v.level + 1}`, x0, 276, DIM, '500 22px');
+      text(g, 'Daily streak', x0, 346, DIM, '600 22px');
+      text(g, `${v.streak} day${v.streak === 1 ? '' : 's'}`, x0, 392, INK, '700 40px');
+      text(g, `best ${v.bestStreak}`, x0 + 230, 392, DIM, '500 22px');
+      const d = v.daily;
+      text(g, `Daily #${d.number}`, x0, 452, DIM, '600 22px');
+      text(g, d.result ? `solved in ${d.result.moves} (par ${d.result.par})` : 'open: Puzzles, then Daily', x0, 488, d.result ? MINT : INK, '600 24px');
+      // achievements grid
+      const gx = 500, gy = 100, cols = 4, gap = 10;
+      const tw = (w - gx - 40 - gap * (cols - 1)) / cols, rows = Math.ceil(v.achievements.length / cols);
+      const th = Math.min(84, (h - gy - 40 - gap * (rows - 1)) / rows);
+      v.achievements.forEach((a, i) => {
+        const x = gx + (i % cols) * (tw + gap), y = gy + Math.floor(i / cols) * (th + gap);
+        roundRect(g, x, y, tw, th, 14);
+        g.fillStyle = a.unlocked ? 'rgba(61,220,151,0.14)' : '#232428';
+        g.fill();
+        if (a.unlocked) {
+          g.lineWidth = 2;
+          g.strokeStyle = 'rgba(61,220,151,0.55)';
+          g.stroke();
+          dot(g, x + tw - 22, y + 22, 9, MINT);
+        }
+        text(g, a.title, x + 14, y + 30, a.unlocked ? INK : '#b8bbc1', '700 20px');
+        const line = wrap(g, a.text, '500 15px', tw - 28)[0] ?? '';
+        text(g, line, x + 14, y + 54, DIM, '500 15px');
+        if (!a.unlocked && a.progress) {
+          const [have, need] = a.progress;
+          roundRect(g, x + 14, y + th - 16, tw - 90, 6, 3);
+          g.fillStyle = '#34363b';
+          g.fill();
+          if (have > 0) {
+            roundRect(g, x + 14, y + th - 16, Math.max(6, ((tw - 90) * have) / need), 6, 3);
+            g.fillStyle = SOFT_BLUE;
+            g.fill();
+          }
+          text(g, `${have}/${need}`, x + tw - 14, y + th - 9, DIM, '600 15px', 'right');
+        }
+      });
+    },
+  };
+}

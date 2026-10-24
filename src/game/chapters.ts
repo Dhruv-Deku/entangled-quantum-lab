@@ -80,6 +80,8 @@ export interface Chapter {
   /** Puzzles only: the reference solution (it defines the target) and its length. */
   solution?: Op[];
   par?: number;
+  /** The daily challenge: which day it is for (its result goes to the streak, not the stars). */
+  daily?: string;
   qubits: number;
   setup?: Op[];
   steps: Step[];

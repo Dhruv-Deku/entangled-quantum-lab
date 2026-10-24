@@ -27,7 +27,7 @@ export function starsFor(moves: number, par: number): 1 | 2 | 3 {
   return moves <= par ? 3 : moves <= par + 2 ? 2 : 1;
 }
 
-interface PuzzleDef {
+export interface PuzzleDef {
   title: string;
   /** Short name for the navigator. */
   chip: string;
@@ -62,7 +62,7 @@ function arrows(s: QState): (Vec3 | null)[] {
   });
 }
 
-function puzzle(d: PuzzleDef): Chapter {
+export function makePuzzle(d: PuzzleDef): Chapter {
   const par = d.solution.length;
   const ch: Chapter = {
     title: d.title,
@@ -98,7 +98,7 @@ function puzzle(d: PuzzleDef): Chapter {
 }
 
 export const PUZZLES: Chapter[] = [
-  puzzle({
+  makePuzzle({
     title: 'Upside down',
     chip: 'Flip',
     qubits: 1,
@@ -107,7 +107,7 @@ export const PUZZLES: Chapter[] = [
     keys: 'Gate keys: H X Y Z S T',
     outro: 'The simplest move in quantum computing.',
   }),
-  puzzle({
+  makePuzzle({
     title: 'Minus',
     chip: 'Minus',
     qubits: 1,
@@ -116,7 +116,7 @@ export const PUZZLES: Chapter[] = [
     keys: 'Gate keys: H X Y Z S T',
     outro: 'Two routes work: X then H, or H then Z.',
   }),
-  puzzle({
+  makePuzzle({
     title: 'Sideways',
     chip: 'Sideways',
     qubits: 1,
@@ -125,7 +125,7 @@ export const PUZZLES: Chapter[] = [
     keys: 'Gate keys: H X Y Z S T',
     outro: 'This state is called |+i>. It needs a complex number to write down.',
   }),
-  puzzle({
+  makePuzzle({
     title: 'Eighth turn',
     chip: 'Eighth',
     qubits: 1,
@@ -134,7 +134,7 @@ export const PUZZLES: Chapter[] = [
     keys: 'Gate keys: H X Y Z S T',
     outro: 'T gates make the in-between phases.',
   }),
-  puzzle({
+  makePuzzle({
     title: 'Double one',
     chip: 'Two ones',
     qubits: 2,
@@ -143,7 +143,7 @@ export const PUZZLES: Chapter[] = [
     keys: 'Press 1 or 2 to pick a qubit',
     outro: 'Or X on one, then a CNOT: also two moves.',
   }),
-  puzzle({
+  makePuzzle({
     title: 'Swap',
     chip: 'Swap',
     qubits: 2,
@@ -153,7 +153,7 @@ export const PUZZLES: Chapter[] = [
     keys: 'SWAP on the dock',
     outro: 'Without the SWAP button it takes three CNOTs, a classic trick.',
   }),
-  puzzle({
+  makePuzzle({
     title: 'Anti-pair',
     chip: 'Anti-pair',
     qubits: 2,
@@ -163,7 +163,7 @@ export const PUZZLES: Chapter[] = [
     control: 0,
     outro: 'One of the four Bell states.',
   }),
-  puzzle({
+  makePuzzle({
     title: 'Minus pair',
     chip: 'Minus pair',
     qubits: 2,
@@ -173,7 +173,7 @@ export const PUZZLES: Chapter[] = [
     control: 0,
     outro: 'Same odds as the Chapter 3 pair. Only the board tells them apart.',
   }),
-  puzzle({
+  makePuzzle({
     title: 'Singlet',
     chip: 'Singlet',
     qubits: 2,
@@ -183,7 +183,7 @@ export const PUZZLES: Chapter[] = [
     control: 0,
     outro: 'The singlet looks the same in every direction. Bell tests use it.',
   }),
-  puzzle({
+  makePuzzle({
     title: 'Three of a kind',
     chip: 'Triple',
     qubits: 3,
@@ -192,7 +192,7 @@ export const PUZZLES: Chapter[] = [
     keys: 'Press 1, H, C, then 2, C',
     outro: 'A GHZ state in three moves.',
   }),
-  puzzle({
+  makePuzzle({
     title: 'Every answer',
     chip: 'All eight',
     qubits: 3,
@@ -201,7 +201,7 @@ export const PUZZLES: Chapter[] = [
     keys: 'Press 1, H, 2, H, 3, H',
     outro: 'Three gates, eight possibilities at once.',
   }),
-  puzzle({
+  makePuzzle({
     title: 'Twisted pair',
     chip: 'Twist pair',
     qubits: 2,

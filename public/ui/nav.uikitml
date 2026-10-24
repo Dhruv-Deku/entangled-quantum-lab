@@ -52,8 +52,18 @@
   }
   .num { font-size: 11; font-weight: 700; color: #6b6e75; }
   .il { font-size: 12; font-weight: 600; color: #e4e6eb; }
-  .foot { flex-direction: row; justify-content: space-between; padding-left: 4; padding-right: 4; }
+  .foot { flex-direction: row; justify-content: space-between; align-items: center; padding-left: 4; padding-right: 4; }
   .fl { font-size: 11; color: #8a8d93; }
+  .me {
+    padding-top: 4;
+    padding-bottom: 4;
+    padding-left: 10;
+    padding-right: 10;
+    border-radius: 10;
+    background-color: #1b1c1f;
+    cursor: pointer;
+  }
+  .ml { font-size: 11; font-weight: 700; color: #7fa9f5; }
 </style>
 <div class="nav">
   <div class="tabs">
@@ -86,6 +96,6 @@
   </div>
   <div class="foot">
     <div id="nav-progress" class="fl">0 of 7 chapters</div>
-    <div id="nav-progress-2" class="fl">0 of 12 lessons</div>
+    <div id="nav-me" class="me"><div id="nav-progress-2" class="ml">Level 1</div></div>
   </div>
 </div>

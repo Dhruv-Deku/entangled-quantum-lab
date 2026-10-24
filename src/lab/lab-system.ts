@@ -546,6 +546,11 @@ export class LabSystem extends createSystem({
     else this.boardVersion = -1;
   }
 
+  /** What the board shows right now, as an image. */
+  boardImage(): HTMLCanvasElement {
+    return this.board.image;
+  }
+
   /** The completion certificate on the board (null puts the circuit back). */
   showCertificate(info: CertificateInfo | null): void {
     this.showOverlay(info ? `cert:${info.name}:${info.modules.join(',')}:${info.context}` : null, info ? (b) => b.draw((g, w, h) => drawCertificate(g, w, h, info)) : undefined);

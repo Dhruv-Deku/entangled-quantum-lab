@@ -16,7 +16,7 @@ your circuit exports to Qiskit and OpenQASM 3.
 ```sh
 npm install
 npm run dev        # managed browser with the Quest 3 emulator (IWER)
-npm test           # 274 unit tests: physics, gestures, the course, 25 chapters, 15 lessons, puzzles, builder, noise, chemistry, import, IBM compiling, Bell tests, error correction, benchmarking, voice, shared rooms and more
+npm test           # 290 unit tests: physics, gestures, the course, 25 chapters, 15 lessons, puzzles, the daily challenge, achievements, builder, noise, chemistry, import, IBM compiling, Bell tests, error correction, benchmarking, voice, shared rooms and more
 npm run typecheck
 npm run build
 ```
@@ -72,6 +72,10 @@ depends on a single input path.
 | – | Big-state views: Q-sphere, state city, entanglement map, circuit unitary | View | Shift+V |
 | – | Voice commands | Voice | V |
 | – | Shared lab or classroom: start, join, claim a qubit | Share | \ (and \| for the class panel) |
+| – | Today's daily challenge | Puzzles tab, Daily | Shift+Q |
+| – | Your progress: level, streak, achievements | navigator footer (Level) | Shift+P |
+| – | Listen to the state as a chord | Listen | Shift+L |
+| – | Save a picture of the circuit with a QR code | Share dialog | Shift+I |
 
 Gesture thresholds live in `src/gestures/config.ts` (with hysteresis, hold times
 and a shared cooldown, so fist, spread and pinch never trigger each other).
@@ -633,6 +637,50 @@ When a student finishes their assigned modules (or, on their own, the whole
 course) the board shows a **certificate**, and the 2D page can save it as a PNG.
 
 ![The certificate: name, modules completed, class and teacher, date, and a seal of two entangled qubits](docs/screenshots/certificate.png)
+
+## Daily challenge, achievements and levels
+
+| The daily challenge, solved | Your progress |
+| --- | --- |
+| ![Daily #25 solved: the result as a line to copy, 2 moves (par 2), 3 of 3 stars, a one-day streak](docs/screenshots/daily-result.png) | ![The progress board: level 4 Experimenter, the XP bar, a one-day daily streak, and 11 of 22 achievements, unlocked ones in mint and the rest with progress bars](docs/screenshots/profile-board.png) |
+
+- **Daily challenge**: one puzzle a day, the same for everyone, at the end of
+  the Puzzles tab (or Shift+Q, "daily challenge", or a `#daily` link). The date
+  seeds a random circuit on two or three qubits, and a breadth-first search over
+  every move the player has (H, X, Y, Z, S, T, CNOT, SWAP) finds the shortest
+  way to make the same state, so par is the true minimum: tests check that no
+  shorter sequence exists. Solving it extends a streak, and on the 2D page the
+  result comes as one line to copy and paste: "Entangled daily #25: 2 moves
+  (par 2), 3 of 3 stars. Streak: 1 day."
+- **Achievements**: 22 of them, from "First move" and "Spooky action" (your
+  first Bell pair) to "All for one" (a five-qubit GHZ state), "Rainmaker"
+  (1,000 shots), "Beyond classical" (the Bell Test), daily streaks of three and
+  seven days, and trying the debugger, every big-state view, voice and the
+  shared lab. Each one pops up above the dock with a chime.
+- **Levels**: XP comes from chapters, lessons, course modules, puzzle stars,
+  daily challenges and achievements; levels go from Newcomer to Quantum master.
+  The navigator's footer shows your level; tap it (or Shift+P, "show my
+  achievements") for the board above.
+
+![An achievement banner above the gate dock: Look! Measure a qubit.](docs/screenshots/achievement-banner.png)
+
+## Listen to a state
+
+**Listen** on the dock (or Shift+L, or say "listen") plays the state as sound.
+Every outcome with a real chance of turning up is a note, |00...0> lowest,
+climbing a pentatonic scale, as loud as its amplitude. Its phase sets when it
+sounds: equal phases ring together as a chord, different phases roll out as an
+arpeggio. |0> is middle C; |+> is a chord of two notes; |-> plays the same two
+notes 0.3 s apart; a Bell pair is two notes at once; after a measurement
+there is only one. A global phase changes nothing, which the tests check.
+
+## Snapshot
+
+The share dialog's **Save picture** (or Shift+I, "take a picture") saves the
+board as it is right now, with a title and a QR code of the link that opens
+the same circuit, ready to post.
+
+![A snapshot: My quantum circuit, 3 qubits, 3 gates, the GHZ circuit and its state on the board, and a QR code to open it](docs/screenshots/snapshot-card.png)
 
 ## Sandbox
 

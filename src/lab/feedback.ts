@@ -98,3 +98,11 @@ export function feedback(cue: Cue): void {
 export function unlockAudio(): void {
   audio();
 }
+
+/** Several soft tones (Listen plays a state as a chord). Gains should add up to about 1. */
+export function playNotes(notes: { freq: number; gain: number; delay: number; dur: number }[]): void {
+  for (const n of notes) {
+    tone(n.freq, n.delay, n.dur, 'sine', 1.6 * n.gain);
+    tone(n.freq * 2, n.delay, n.dur * 0.6, 'sine', 0.25 * n.gain);
+  }
+}

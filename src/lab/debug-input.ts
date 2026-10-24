@@ -35,7 +35,7 @@ const KEYS: [string, string][] = [
   ['Shift+D', 'Step debugger (, . step; ; run to breakpoint; \' set breakpoint)'],
   ['\\', 'Share: open the share dialog; in a shared lab claim the selected qubit'],
   ['|', 'Classroom panel'],
-  ['Shift+V', 'Big-state views: Q-sphere, state city, entanglement map'],
+  ['Shift+V', 'Big-state views: Q-sphere, state city, entanglement map, circuit unitary'],
   ['V', 'Voice commands on or off ("Hadamard on qubit zero", "run a thousand shots")'],
   ['F', 'Library (Shift+F save; U switch tab; Shift+Y use first row; Shift+K QR code; Shift+U import)'],
   ['1  2  3', 'Answer a quiz on the card'],
@@ -50,6 +50,10 @@ const KEYS: [string, string][] = [
   ['Up  Down', 'Code window: previous / next page of code'],
   ['In Build', 'arrows move; H X Y Z S T place; Shift+S/T dagger; V SX; 1 2 3 Rx Ry Rz (, . angle); 4 5 6 your gates; C dot; O open dot; P plus; W swap; Backspace erase'],
   ['P', 'Play the chapters from Chapter 1'],
+  ['Shift+Q', "Today's daily challenge (the same puzzle for everyone)"],
+  ['Shift+P', 'Your progress: level, daily streak, achievements'],
+  ['Shift+L', 'Listen to the state: one note per outcome'],
+  ['Shift+I', 'Save a picture of the circuit with a QR code'],
 ];
 
 export class DebugInputSystem extends createSystem({}) {
@@ -167,6 +171,10 @@ export class DebugInputSystem extends createSystem({}) {
         campaign.next();
         break;
       case 'p':
+        if (k === 'P') {
+          window.dispatchEvent(new CustomEvent('entangled:engage', { detail: 'profile' }));
+          break;
+        }
         campaign.startChapter(0);
         feedback('select');
         break;
@@ -176,6 +184,10 @@ export class DebugInputSystem extends createSystem({}) {
         feedback('select');
         break;
       case 'l':
+        if (k === 'L') {
+          window.dispatchEvent(new CustomEvent('entangled:engage', { detail: 'listen' }));
+          break;
+        }
         campaign.enterLearn();
         feedback('select');
         break;
@@ -219,6 +231,10 @@ export class DebugInputSystem extends createSystem({}) {
         if (campaign.showMe()) feedback('select');
         break;
       case 'q':
+        if (k === 'Q') {
+          window.dispatchEvent(new CustomEvent('entangled:engage', { detail: 'daily' }));
+          break;
+        }
         campaign.startPuzzle(campaign.puzzleIndex);
         feedback('select');
         break;
@@ -227,6 +243,10 @@ export class DebugInputSystem extends createSystem({}) {
         feedback('select');
         break;
       case 'i':
+        if (k === 'I') {
+          window.dispatchEvent(new CustomEvent('entangled:engage', { detail: 'snapshot' }));
+          break;
+        }
         window.dispatchEvent(new Event('entangled:notes'));
         break;
       case 'k':

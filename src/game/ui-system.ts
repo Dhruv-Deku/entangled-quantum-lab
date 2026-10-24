@@ -27,6 +27,7 @@ import { notesFor } from './notes';
 import { NotesPanel } from './notes-ui';
 import { BUILDS, parOf } from './builder';
 import { starsFor } from './puzzles';
+
 import { DEPOL_STEPS, noiseLab, T1_STEPS, T2_STEPS } from '../lab/noise-lab';
 import { library, placeGate } from '../lab/library';
 import { openImportDialog } from '../lab/import-dialog';
@@ -36,7 +37,15 @@ import { explainStep, histogram, nextStop, stepTitle } from './debugger';
 import { nextView, STATE_VIEW_NAMES, type StateView } from '../quantum/state-views';
 import { assignmentProgress, kindOf, makeCode, parseCode, SharedRoom, type Progress, type Role, type RoomKind } from '../net/room';
 import { AutoTransport } from '../net/transport';
-import { openShareDialog, savedName } from '../lab/share-dialog';
+import { openDailyDialog, openShareDialog, savedName } from '../lab/share-dialog';
+import { ACHIEVEMENTS, levelFor, Profile, xpFor, type ProgressContext } from './profile';
+import { bestStreak, dayKey, dailyNumber, emptyDaily, recordDaily, shareText, streak, type DailyRecord } from './daily';
+import { loadDaily, loadProfile, saveDaily, saveProfile } from '../lab/profile-store';
+import { profileFigure, type ProfileView } from '../lab/figures';
+import { listen } from '../lab/sonify';
+import { downloadSnapshot } from '../lab/snapshot';
+import { Banner } from '../lab/banner';
+import { PUZZLES } from './puzzles';
 import { downloadCertificate, type CertificateInfo } from '../lab/certificate';
 import { COURSE } from './course';
 import { SpeechInput } from '../lab/speech';
@@ -250,12 +259,13 @@ export class UISystem extends createSystem({
       campaign.intro = true;
     }
     this.openRoomLink();
-    const onHash = () => this.openShared() || this.openRoomLink();
+    this.openDailyLink();
+    const onHash = () => this.openShared() || this.openRoomLink() || this.openDailyLink();
     window.addEventListener('hashchange', onHash);
     this.cleanupFuncs.push(() => window.removeEventListener('hashchange', onHash));
 
     this.cleanupFuncs.push(
-      campaign.on((v) => (this.render(v), this.afterCampaign(v))),
+      campaign.on((v) => (this.render(v), this.afterCampaign(v), this.afterDaily(), this.checkAchievements())),
       lab.on((e) => {
         this.dirty = true;
         if (this.room) {
@@ -270,6 +280,11 @@ export class UISystem extends createSystem({
         }
         if (e.type === 'select' || e.type === 'reset' || e.type === 'seek' || e.type === 'op') this.renderDock();
         if (e.type === 'reset' && campaign.mode === 'sandbox') this.render(campaign.view);
+        // achievements count what happens on the orbs
+        if (e.type === 'op') this.profile.onOp(e.op, lab.history.state);
+        if (e.type === 'shots') this.profile.onShots(e.shots);
+        if (e.type === 'seek') this.profile.onRewind();
+        if (e.type === 'op' || e.type === 'shots' || e.type === 'seek') this.checkAchievements();
       }),
       this.visibilityState.subscribe((v) => {
         this.immersive = v !== VisibilityState.NonImmersive;
@@ -304,10 +319,10 @@ export class UISystem extends createSystem({
     const ids = ['chapter-eyebrow', 'chapter-title', 'chapter-body', 'goal-dot', 'goal-text', 'btn-next', 'btn-next-label', 'btn-replay', 'btn-replay-label', 'btn-notes', 'pip-0', 'pip-1', 'pip-2', 'pip-3', 'pip-4', 'choices'];
     for (let i = 0; i < 3; i++) ids.push(`choice-${i}`, `choice-${i}-k`, `choice-${i}-l`);
     for (const id of ids) this.els.set(id, this.chapter.requireElementById(id));
-    const navIds = ['tab-course', 'tab-course-l', 'tab-campaign', 'tab-campaign-l', 'tab-learn', 'tab-learn-l', 'tab-puzzle', 'tab-puzzle-l', 'tab-build', 'tab-build-l', 'tab-sandbox', 'tab-sandbox-l', 'nav-progress', 'nav-progress-2'];
+    const navIds = ['tab-course', 'tab-course-l', 'tab-campaign', 'tab-campaign-l', 'tab-learn', 'tab-learn-l', 'tab-puzzle', 'tab-puzzle-l', 'tab-build', 'tab-build-l', 'tab-sandbox', 'tab-sandbox-l', 'nav-progress', 'nav-progress-2', 'nav-me'];
     for (let i = 0; i < NAV_SLOTS; i++) navIds.push(`n-${i}`, `n-${i}-n`, `n-${i}-l`);
     for (const id of navIds) this.els.set(id, this.nav.requireElementById(id));
-    const dockIds = ['g-h', 'g-x', 'g-y', 'g-z', 'g-s', 'g-t', 'g-rl', 'g-rr', 'a-cnot', 'a-swap', 'a-measure', 'a-shots', 'a-export', 't-prev', 't-next', 'dock-status', 'a-voice', 'a-voice-l', 'a-debug', 'a-debug-l', 'a-view', 'a-view-l', 'a-share', 'a-share-l'];
+    const dockIds = ['g-h', 'g-x', 'g-y', 'g-z', 'g-s', 'g-t', 'g-rl', 'g-rr', 'a-cnot', 'a-swap', 'a-measure', 'a-shots', 'a-export', 't-prev', 't-next', 'dock-status', 'a-voice', 'a-voice-l', 'a-debug', 'a-debug-l', 'a-view', 'a-view-l', 'a-share', 'a-share-l', 'a-listen', 'a-listen-l'];
     for (let i = 0; i < SLOTS; i++) dockIds.push(`t-${i}`, `t-${i}-l`);
     for (const id of dockIds) this.els.set(id, this.dock.requireElementById(id));
     const codeIds = ['code-close', 'code-note', 'code-link', 'code-eyebrow', 'code-title', 'code-zoom', 'code-zoom-label', 'code-simplify', 'code-simplify-label', 'code-run', 'code-ibm', 'code-ibm-l', 'code-up', 'code-down'];
@@ -425,6 +440,17 @@ export class UISystem extends createSystem({
     on('cl-assign', () => this.toggleAssigned());
     on('cl-go', () => this.startAssigned());
     on('cl-cert', () => this.toggleCertificate());
+    on('a-listen', () => this.listenNow());
+    on('nav-me', () => this.toggleProfile());
+    const onEngage = (e: Event) => {
+      const what = (e as CustomEvent<string>).detail;
+      if (what === 'listen') this.listenNow();
+      else if (what === 'daily') this.startDaily();
+      else if (what === 'profile') this.toggleProfile();
+      else if (what === 'snapshot') this.snapshot();
+    };
+    window.addEventListener('entangled:engage', onEngage);
+    this.cleanupFuncs.push(() => window.removeEventListener('entangled:engage', onEngage));
     const onShareKey = (e: Event) => {
       const what = (e as CustomEvent<string>).detail ?? 'button';
       if (what === 'dialog') this.openShare();
@@ -739,10 +765,138 @@ export class UISystem extends createSystem({
   private speech: SpeechInput | null = null;
   /** A short message on the dock's status line (what voice heard, and so on), until `until`. */
   private dockFlash: { text: string; until: number } | null = null;
+  /** Pops up above the dock: achievements, the daily challenge solved. */
+  private banner = new Banner();
+  private profile = new Profile(loadProfile());
+  private dailyRec: DailyRecord = loadDaily() ?? emptyDaily();
+  private profileOpen = false;
+  private profileDirty = false;
+  private profileSaveTimer = 0;
 
   private flash(text: string): void {
     this.dockFlash = { text, until: performance.now() + 4000 };
     this.renderDock();
+  }
+
+  // ---- engagement: achievements, levels, the daily challenge, listening, pictures
+
+  /** Progress the achievements need from the campaign and the daily record. */
+  private progressContext(): ProgressContext {
+    const v = campaign.view;
+    return {
+      chaptersDone: v.completed.map((i) => campaign.chapters[i]?.title ?? ''),
+      chapterCount: campaign.chapters.length,
+      lessonsDone: v.learned.length,
+      lessonCount: campaign.lessons.length,
+      courseDone: v.coursed.length,
+      courseCount: campaign.course.length,
+      stars: v.stars.slice(0, PUZZLES.length),
+      dailyDays: Object.keys(this.dailyRec.days).length,
+      streak: streak(this.dailyRec, dayKey()),
+    };
+  }
+
+  /** Unlock what is now earned; each new one gets a turn on the dock line and a chime. */
+  private checkAchievements(): void {
+    this.profileDirty = true;
+    const fresh = this.profile.check(this.progressContext());
+    if (!fresh.length) return;
+    for (const a of fresh) this.banner.show('Achievement unlocked', a.title, a.text);
+    feedback('success');
+    this.renderNav(campaign.view);
+    if (this.profileOpen) this.updateBoardMode();
+  }
+
+  private use(feature: string): void {
+    this.profile.use(feature);
+    this.checkAchievements();
+  }
+
+  private profileView(): ProfileView {
+    const ctx = this.progressContext();
+    const xp = xpFor(this.profile.data, ctx);
+    const lvl = levelFor(xp);
+    const today = dayKey();
+    return {
+      level: lvl.level,
+      title: lvl.title,
+      xp,
+      into: lvl.into,
+      span: lvl.span,
+      streak: ctx.streak,
+      bestStreak: bestStreak(this.dailyRec),
+      daily: { number: dailyNumber(today), result: this.dailyRec.days[today] ?? null },
+      achievements: ACHIEVEMENTS.map((a) => ({ title: a.title, text: a.text, unlocked: !!this.profile.data.unlocked[a.id], progress: a.progress?.(this.profile.data.stats, ctx) })),
+    };
+  }
+
+  private toggleProfile(open = !this.profileOpen): void {
+    this.profileOpen = open;
+    if (open) {
+      this.libOpen = this.dbgOpen = this.classOpen = false;
+      this.certOn = false;
+      if (this.code) this.code.visible = false;
+      if (this.notes?.open) this.notes.close();
+      this.noiseOpen = false;
+      this.renderLibrary();
+    }
+    feedback('select');
+  }
+
+  /** Today's daily challenge: the last puzzle on the Puzzles tab. */
+  private startDaily(): void {
+    this.profileOpen = false;
+    campaign.startPuzzle(campaign.puzzles.length - 1);
+    const today = this.dailyRec.days[dayKey()];
+    this.flash(today ? `Daily #${dailyNumber(dayKey())}: you solved it in ${today.moves}. Try for fewer, or come back tomorrow.` : `Daily #${dailyNumber(dayKey())}: the same puzzle for everyone today.`);
+    feedback('select');
+  }
+
+  /** A #daily link opens today's challenge. */
+  private openDailyLink(): boolean {
+    if (location.hash !== '#daily') return false;
+    try {
+      history.replaceState(null, '', location.pathname + location.search);
+    } catch {
+      // the link stays in the address bar
+    }
+    this.startDaily();
+    return true;
+  }
+
+  /** The daily challenge was just solved: add it to the streak, and offer the result to share. */
+  private afterDaily(): void {
+    const d = campaign.lastDaily;
+    if (!d) return;
+    campaign.lastDaily = null;
+    this.dailyRec = recordDaily(this.dailyRec, d.key, d.moves, d.par);
+    saveDaily(this.dailyRec);
+    const s = streak(this.dailyRec, d.key);
+    this.banner.show(`Daily #${dailyNumber(d.key)} solved`, `${d.moves} move${d.moves === 1 ? '' : 's'}, par ${d.par}`, `Daily streak: ${s} day${s === 1 ? '' : 's'}. A new puzzle tomorrow.`);
+    if (!this.immersive) openDailyDialog(`Daily #${dailyNumber(d.key)} solved`, shareText(this.dailyRec, d.key, `${location.origin}${location.pathname}#daily`));
+  }
+
+  /** Play the state as a chord, and say what is being heard. */
+  private listenNow(): void {
+    const notes = listen(lab.state);
+    const n = lab.n;
+    const ket = (k: number) => `|${k.toString(2).padStart(n, '0')}>`;
+    const together = notes.every((x) => x.delay === notes[0].delay);
+    this.flash(notes.length === 1 ? `One note: the state is ${ket(notes[0].k)}.` : notes.length > 6 ? `${notes.length} notes${together ? ', all together' : ': each phase comes in at its own time'}.` : `${notes.map((x) => ket(x.k)).join(' ')}: ${together ? 'one chord, same phase' : 'rolled out by phase'}.`);
+    this.use('listen');
+  }
+
+  /** Save a picture of the board with a QR code of this circuit. */
+  private snapshot(): void {
+    const labSys = this.world.getSystem(LabSystem);
+    if (!labSys) return;
+    const gates = lab.history.ops.slice(0, lab.history.cursor).filter((o) => o.kind !== 'measure').length;
+    const v = campaign.view;
+    const title = v.mode === 'sandbox' ? 'My quantum circuit' : (v.chapter?.title ?? 'My quantum circuit');
+    const link = `${location.origin}${location.pathname}${SHARE_PREFIX}${encodeURIComponent(encodeCircuit(lab.n, lab.history.ops.slice(0, lab.history.cursor)))}`;
+    downloadSnapshot(labSys.boardImage(), { title, subtitle: `${lab.n} qubit${lab.n === 1 ? '' : 's'}, ${gates} gate${gates === 1 ? '' : 's'}`, link, date: new Date() });
+    this.flash('Saved a picture of the board: entangled-circuit.png, with a QR code that opens this circuit.');
+    this.use('snapshot');
   }
 
   /** What the microphone heard: understand it, do it, and say what was done. */
@@ -754,6 +908,7 @@ export class UISystem extends createSystem({
     }
     this.refused = null;
     const ok = this.runVoice(cmd);
+    if (ok) this.use('voice');
     // a shared lab refusing the gate says why (whose qubit it is); keep that rather than a generic no
     this.flash(`Heard "${text.trim()}": ${ok ? `${describeVoice(cmd)}.` : this.refused ?? `${describeVoice(cmd)} is not possible here.`}`);
     feedback(ok ? 'select' : 'reject');
@@ -862,7 +1017,20 @@ export class UISystem extends createSystem({
         if (this.room?.kind !== 'class') return false;
         this.toggleClass();
         return true;
+      case 'listen':
+        this.listenNow();
+        return true;
+      case 'daily':
+        this.startDaily();
+        return true;
+      case 'profile':
+        this.toggleProfile();
+        return true;
+      case 'snapshot':
+        this.snapshot();
+        return true;
       case 'close':
+        this.profileOpen = false;
         this.certOn = false;
         if (this.code) this.code.visible = false;
         if (this.notes?.open) this.notes.close();
@@ -902,6 +1070,7 @@ export class UISystem extends createSystem({
       join: (code, name, role) => this.joinRoom(code, name, role, false),
       leave: () => this.leaveRoom(),
       certificate: this.certificateInfo() ? () => downloadCertificate(this.certificateInfo()!) : null,
+      snapshot: () => this.snapshot(),
     });
   }
 
@@ -932,6 +1101,7 @@ export class UISystem extends createSystem({
 
   private joinRoom(code: string, name: string, role: Role, creator: boolean): void {
     this.leaveRoom(true);
+    this.use('shared');
     const kind = kindOf(code)!;
     const id = (globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`).replace(/-/g, '').slice(0, 12);
     // a shared lab is one circuit in the sandbox (the creator keeps theirs; people joining get it)
@@ -1162,6 +1332,7 @@ export class UISystem extends createSystem({
   /** The views use the space in front of the board, so they and the debugger or class panel take turns. */
   private setView(view: StateView | null): void {
     this.stateView = view;
+    if (view) this.use(`view:${view}`);
     if (view) this.dbgOpen = this.classOpen = false;
     this.text('a-view-l', this.stateView ? STATE_VIEW_NAMES[this.stateView] : 'View');
     this.bg('a-view', this.stateView ? C.primary : '#2d2f33');
@@ -1172,6 +1343,7 @@ export class UISystem extends createSystem({
     this.dbgOpen = !this.dbgOpen;
     this.dbgRun = null;
     if (this.dbgOpen) {
+      this.use('debugger');
       this.classOpen = false;
       this.setView(null);
       if (this.code) this.code.visible = false;
@@ -1252,7 +1424,7 @@ export class UISystem extends createSystem({
   /** Open or close the library (any mode; loading a circuit moves to the sandbox). */
   private toggleLibrary(): void {
     this.libOpen = !this.libOpen;
-    if (this.libOpen) this.dbgOpen = this.classOpen = false;
+    if (this.libOpen) this.dbgOpen = this.classOpen = this.profileOpen = false;
     this.libQr = false;
     this.libNote = null;
     if (this.libOpen) {
@@ -1559,9 +1731,10 @@ export class UISystem extends createSystem({
       this.text(`n-${i}-n`, stars ? `${stars}/3` : String(at + 1));
       this.els.get(`n-${i}-n`)?.setProperties({ color: it.current ? '#18191b' : it.done ? C.done : stars ? '#c9ccd1' : '#6b6e75' });
     }
-    const starTotal = v.stars.reduce((a, b) => a + b, 0);
     this.text('nav-progress', `${v.coursed.length}/${v.courseCount} course   ${v.completed.length}/${v.chapterCount} chapters   ${v.learned.length}/${v.lessonCount} lessons`);
-    this.text('nav-progress-2', `${starTotal} of ${v.puzzleCount * 3} stars`);
+    const ctx = this.progressContext();
+    const lvl = levelFor(xpFor(this.profile.data, ctx));
+    this.text('nav-progress-2', `Level ${lvl.level}  /  ${Object.keys(this.profile.data.unlocked).length} of ${ACHIEVEMENTS.length}`);
   }
 
   private renderDock(): void {
@@ -1708,6 +1881,19 @@ export class UISystem extends createSystem({
       labSys.showWheels(false);
       labSys.showVqe(undefined, H2);
       labSys.showCertificate(cert);
+      return;
+    }
+    // the progress board: level, streak and achievements
+    if (this.profileOpen) {
+      labSys.chip.root.visible = false;
+      labSys.showHardware(null);
+      labSys.showMaths(false);
+      labSys.showLandscape(null);
+      labSys.showDensity(false);
+      labSys.showWheels(false);
+      labSys.showVqe(undefined, H2);
+      const fig = profileFigure(this.profileView());
+      labSys.showOverlay(fig.key, (b) => b.draw(fig.draw));
       return;
     }
     // the library takes the board while it is open: thumbnails, or a QR code of the current circuit
@@ -2073,6 +2259,23 @@ export class UISystem extends createSystem({
 
   update(delta: number): void {
     if (!this.bind()) return;
+    // the banner floats just above the dock; the profile saves every couple of seconds
+    const ws = this.world.getSystem(LabSystem)?.workspaceObject;
+    if (ws && this.banner.root.parent !== ws) {
+      ws.add(this.banner.root);
+      const { pos, rot } = PLACEMENT['gate-dock'];
+      this.banner.root.position.copy(pos);
+      this.banner.root.quaternion.setFromEuler(rot);
+      this.banner.root.translateY(0.112);
+      this.banner.root.translateZ(0.01);
+    }
+    this.banner.update(Math.min(delta, 0.05));
+    this.profileSaveTimer += delta;
+    if (this.profileDirty && this.profileSaveTimer > 2) {
+      saveProfile(this.profile.toJSON());
+      this.profileDirty = false;
+      this.profileSaveTimer = 0;
+    }
     // ease toward the zoom state and through the open animations (critically damped, about 0.25 s)
     const dt = Math.min(delta, 0.05);
     const ease = 1 - Math.exp(-dt * 14);

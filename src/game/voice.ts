@@ -20,6 +20,7 @@ export type VoiceCommand =
   | { type: 'join'; code: string }
   | { type: 'assign'; module: number; on: boolean }
   | { type: 'share' | 'leave' | 'classroom' }
+  | { type: 'listen' | 'daily' | 'profile' | 'snapshot' }
   | { type: 'undo' | 'redo' | 'reset' | 'add' | 'remove' | 'next' | 'showme' | 'notes' | 'code' | 'simplify' | 'zoom' | 'noise' | 'library' | 'close' | 'debug' | 'view' };
 
 const NUMBERS: Record<string, number> = {
@@ -110,6 +111,10 @@ export function parseVoice(text: string): VoiceCommand | null {
   if (assigning && num(assigning[3]) !== null) return { type: 'assign', module: num(assigning[3])! - 1, on: assigning[1] === 'assign' };
   if (/(start|share|open) (a |the )?(shared )?lab|share (this|the circuit)/.test(s)) return { type: 'share' };
   if (/class ?room|class panel|my class|the class/.test(s)) return { type: 'classroom' };
+  if (/\b(listen|play (the|this) (state|chord)|hear (it|the state))\b/.test(s)) return { type: 'listen' };
+  if (/daily|today'?s (puzzle|challenge)/.test(s)) return { type: 'daily' };
+  if (/trophies|achievements|my (progress|profile|level)/.test(s)) return { type: 'profile' };
+  if (/snapshot|(take|save) a (picture|photo)|screenshot/.test(s)) return { type: 'snapshot' };
   if (/^(undo|go back|take that back)/.test(s)) return { type: 'undo' };
   if (/^redo/.test(s)) return { type: 'redo' };
   if (/^(reset|start over|clear)/.test(s)) return { type: 'reset' };
@@ -194,6 +199,14 @@ export function describe(c: VoiceCommand): string {
       return `${c.on ? 'assign' : 'unassign'} module ${c.module + 1}`;
     case 'leave':
       return 'leave the room';
+    case 'listen':
+      return 'listen to the state';
+    case 'daily':
+      return "today's daily challenge";
+    case 'profile':
+      return 'your progress';
+    case 'snapshot':
+      return 'save a picture of the circuit';
     default:
       return c.type;
   }

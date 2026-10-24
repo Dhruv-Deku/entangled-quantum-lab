@@ -643,6 +643,11 @@ export class CircuitBoard {
     this.tex.needsUpdate = true;
   }
 
+  /** The board's canvas as it is now (for a picture to share). */
+  get image(): HTMLCanvasElement {
+    return this.canvas;
+  }
+
   /** Draw anything on the board's canvas (the certificate). */
   draw(fn: (g: CanvasRenderingContext2D, w: number, h: number) => void): void {
     fn(this.g, W, H);

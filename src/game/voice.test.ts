@@ -68,3 +68,15 @@ group('voice: views', () => {
     for (const s of ['next view', 'show the q sphere', 'state city', 'heat map', 'show the unitary', 'show me the matrix']) expect(parseVoice(s), s).toEqual({ type: 'view' });
   });
 });
+
+group('voice: daily, progress, listening, pictures', () => {
+  it('understands the engagement commands', () => {
+    expect(parseVoice("open today's daily challenge")).toEqual({ type: 'daily' });
+    expect(parseVoice('daily puzzle')).toEqual({ type: 'daily' });
+    expect(parseVoice('show my achievements')).toEqual({ type: 'profile' });
+    expect(parseVoice('trophies')).toEqual({ type: 'profile' });
+    expect(parseVoice('listen')).toEqual({ type: 'listen' });
+    expect(parseVoice('play the state')).toEqual({ type: 'listen' });
+    expect(parseVoice('take a picture')).toEqual({ type: 'snapshot' });
+  });
+});

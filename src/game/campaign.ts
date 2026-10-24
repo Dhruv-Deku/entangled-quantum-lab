@@ -94,6 +94,8 @@ export class Campaign {
   private timer = 0;
   private listeners = new Set<Listener>();
   private off: () => void;
+  /** The daily challenge just solved (the UI adds it to the streak). */
+  lastDaily: { key: string; moves: number; par: number } | null = null;
 
   constructor(
     private lab: Lab,
@@ -338,7 +340,9 @@ export class Campaign {
         this.chapterDone = true;
         if (this.mode === 'learn') this.learned.add(this.lessonIndex);
         else if (this.mode === 'course') this.coursed.add(this.courseIndex);
-        else if (this.mode === 'puzzle') {
+        else if (this.mode === 'puzzle' && ch.daily) {
+          this.lastDaily = { key: ch.daily, moves: (this.memory.moves as number | undefined) ?? 0, par: ch.par ?? 0 };
+        } else if (this.mode === 'puzzle') {
           const got = (this.memory.stars as number | undefined) ?? 1;
           this.stars.set(this.puzzleIndex, Math.max(got, this.stars.get(this.puzzleIndex) ?? 0));
         } else this.completed.add(this.chapterIndex);
