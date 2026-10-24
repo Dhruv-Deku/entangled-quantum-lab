@@ -33,6 +33,8 @@ const KEYS: [string, string][] = [
   ['A', 'Course: everything, in order, with quizzes'],
   ['E', 'Sandbox: noise lab (Shift+E on/off, , . T1, Shift+M mitigate)'],
   ['Shift+D', 'Step debugger (, . step; ; run to breakpoint; \' set breakpoint)'],
+  ['\\', 'Share: open the share dialog; in a shared lab claim the selected qubit'],
+  ['|', 'Classroom panel'],
   ['Shift+V', 'Big-state views: Q-sphere, state city, entanglement map'],
   ['V', 'Voice commands on or off ("Hadamard on qubit zero", "run a thousand shots")'],
   ['F', 'Library (Shift+F save; U switch tab; Shift+Y use first row; Shift+K QR code; Shift+U import)'],
@@ -176,6 +178,12 @@ export class DebugInputSystem extends createSystem({}) {
       case 'l':
         campaign.enterLearn();
         feedback('select');
+        break;
+      case '\\':
+        window.dispatchEvent(new CustomEvent('entangled:share', { detail: 'button' }));
+        break;
+      case '|':
+        window.dispatchEvent(new CustomEvent('entangled:share', { detail: 'class' }));
         break;
       case 'v':
         window.dispatchEvent(new Event(k === 'V' ? 'entangled:view' : 'entangled:voice'));

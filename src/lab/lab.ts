@@ -81,6 +81,11 @@ export class Lab {
 
   apply(op: Op): Op | null {
     this.commitRotation();
+    const refused = this.guard?.(op);
+    if (refused) {
+      this.emit({ type: 'rejected', reason: refused });
+      return null;
+    }
     const before = this.history.state.clone();
     try {
       const done = this.history.push(op, this.rng);
@@ -131,6 +136,10 @@ export class Lab {
     return op;
   }
 
+  /** When set (a shared lab), ops it gives a reason for are refused: someone else's qubit. */
+  guard: ((op: Op) => string | null) | null = null;
+  private blockedTurn: number | null = null;
+
   /** When set (the noise lab), shots come from here instead of the ideal state. */
   sampler: ((count: number) => Uint32Array) | null = null;
 
@@ -150,6 +159,16 @@ export class Lab {
   /** Add wrist rotation to qubit q; previewed live until committed. */
   rotate(q: number, delta: number): void {
     if (this.pending && this.pending.qubit !== q) this.commitRotation();
+    if (!this.pending && this.guard) {
+      const refused = this.guard({ kind: 'gate', gate: 'ry', target: q, params: [delta] });
+      if (refused) {
+        // say it once per turn, not every frame
+        if (this.blockedTurn !== q) this.emit({ type: 'rejected', reason: refused });
+        this.blockedTurn = q;
+        return;
+      }
+    }
+    this.blockedTurn = null;
     this.pending ??= { qubit: q, angle: 0 };
     this.pending.angle += delta;
     this.displayDirty = true;

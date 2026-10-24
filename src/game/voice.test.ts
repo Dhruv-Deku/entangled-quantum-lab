@@ -48,3 +48,17 @@ group('voice commands', () => {
     expect(parseVoice('')).toBeNull();
   });
 });
+
+group('voice: shared rooms', () => {
+  it('joins rooms spelled out, claims qubits, starts and leaves labs', () => {
+    expect(parseVoice('join room L K seven Q F')).toEqual({ type: 'join', code: 'LK7QF' });
+    expect(parseVoice('join LK7QF')).toEqual({ type: 'join', code: 'LK7QF' });
+    expect(parseVoice('claim qubit one')).toEqual({ type: 'claim', qubit: 1 });
+    expect(parseVoice('release this qubit')).toEqual({ type: 'claim', qubit: null });
+    expect(parseVoice('start a shared lab')).toEqual({ type: 'share' });
+    expect(parseVoice('leave the room')).toEqual({ type: 'leave' });
+    expect(parseVoice('open the classroom')).toEqual({ type: 'classroom' });
+    expect(parseVoice('assign module three')).toEqual({ type: 'assign', module: 2, on: true });
+    expect(parseVoice('unassign module 12')).toEqual({ type: 'assign', module: 11, on: false });
+  });
+});

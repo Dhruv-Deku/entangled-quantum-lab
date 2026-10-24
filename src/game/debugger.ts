@@ -1,6 +1,6 @@
 import { blochVector } from '../quantum/bloch';
 import type { Op } from '../quantum/circuit';
-import { pairStrength } from '../quantum/entanglement';
+import { mixedness, pairStrength } from '../quantum/entanglement';
 import { gateName, qubitsOf, toAscii } from '../quantum/matrix';
 import type { QState } from '../quantum/state';
 
@@ -43,7 +43,12 @@ export function explainStep(op: Op, before: QState, after: QState): string[] {
       if (!qs.includes(a) && !qs.includes(b)) continue;
       const s0 = pairStrength(before, a, b), s1 = pairStrength(after, a, b);
       if (s0 < 0.05 && s1 >= 0.05) changes.push(`q${a} and q${b} became entangled (strength ${s1.toFixed(2)})`);
-      else if (s0 >= 0.05 && s1 < 0.05) changes.push(`q${a} and q${b} are no longer entangled`);
+      else if (s0 >= 0.05 && s1 < 0.05)
+        changes.push(
+          mixedness(after, a) > 0.5 && mixedness(after, b) > 0.5
+            ? `q${a} and q${b} are no longer entangled as a pair: the entanglement now spans the whole group`
+            : `q${a} and q${b} are no longer entangled`,
+        );
     }
   if (changes.length) lines.push(changes.slice(0, 2).join('; ') + '.');
   else {

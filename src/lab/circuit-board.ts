@@ -642,6 +642,12 @@ export class CircuitBoard {
     this.tex.needsUpdate = true;
   }
 
+  /** Draw anything on the board's canvas (the certificate). */
+  draw(fn: (g: CanvasRenderingContext2D, w: number, h: number) => void): void {
+    fn(this.g, W, H);
+    this.tex.needsUpdate = true;
+  }
+
   /** VQE for H2: energy against bond length (Hartree-Fock dashed, exact solid, VQE points), and where the dial stands now. */
   renderVqe(points: { r: number; fci: number; hf: number }[], vqe: { r: number; energy: number; hf: number; fci: number; curve: [number, number][] | null; path: [number, number][] } | null): void {
     const g = this.g;

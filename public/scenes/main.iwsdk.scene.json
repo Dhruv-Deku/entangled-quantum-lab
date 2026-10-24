@@ -310,6 +310,26 @@
         "RayInteractable": {},
         "PokeInteractable": {}
       }
+    },
+    {
+      "id": "class-panel",
+      "name": "Classroom",
+      "content": {
+        "type": "asset",
+        "asset": "class-panel"
+      },
+      "transform": {
+        "position": [
+          0,
+          -50,
+          0
+        ],
+        "scale": 0.052
+      },
+      "components": {
+        "RayInteractable": {},
+        "PokeInteractable": {}
+      }
     }
   ],
   "authoring": {

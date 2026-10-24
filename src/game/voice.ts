@@ -16,10 +16,14 @@ export type VoiceCommand =
   | { type: 'shots'; count: number }
   | { type: 'select'; qubit: number }
   | { type: 'answer'; index: number }
+  | { type: 'claim'; qubit: number | null }
+  | { type: 'join'; code: string }
+  | { type: 'assign'; module: number; on: boolean }
+  | { type: 'share' | 'leave' | 'classroom' }
   | { type: 'undo' | 'redo' | 'reset' | 'add' | 'remove' | 'next' | 'showme' | 'notes' | 'code' | 'simplify' | 'zoom' | 'noise' | 'library' | 'close' | 'debug' | 'view' };
 
 const NUMBERS: Record<string, number> = {
-  zero: 0, oh: 0, one: 1, won: 1, two: 2, three: 3, tree: 3, free: 3, four: 4, for: 4, five: 5,
+  zero: 0, oh: 0, one: 1, won: 1, two: 2, three: 3, tree: 3, free: 3, four: 4, for: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12, thirteen: 13, fourteen: 14,
   first: 0, second: 1, third: 2, fourth: 3, fifth: 4,
   hundred: 100, thousand: 1000,
 };
@@ -80,6 +84,13 @@ function angle(ts: string[]): number | null {
   return null;
 }
 
+/** One spoken piece of a room code: a letter, a digit, a number word, or the whole code said as a word. */
+function codeChar(w: string): string {
+  if (w.length === 1) return w;
+  const v = num(w);
+  return v !== null && v < 10 ? String(v) : w;
+}
+
 export function parseVoice(text: string): VoiceCommand | null {
   const ts = tokens(text);
   if (!ts.length) return null;
@@ -87,6 +98,18 @@ export function parseVoice(text: string): VoiceCommand | null {
   const has = (...w: string[]) => w.some((x) => ts.includes(x));
   const qs = qubitNumbers(ts);
 
+  if (/^(leave|exit|quit) (the )?(room|lab|class|shared lab)/.test(s)) return { type: 'leave' };
+  const joining = /^(join|enter) (the )?(room|lab|class|code)? ?(.+)$/.exec(s);
+  if (joining) {
+    // spoken codes come letter by letter: "l k seven q f"
+    const code = tokens(joining[4]).map(codeChar).join('').toUpperCase();
+    return { type: 'join', code };
+  }
+  if (/^(claim|hold|take|release|let go of)\b/.test(s) && /qubit|cubit|this|it\b/.test(s)) return { type: 'claim', qubit: qs[0] ?? null };
+  const assigning = /^(un ?assign|assign|remove) (module |lesson )?(\w+)/.exec(s);
+  if (assigning && num(assigning[3]) !== null) return { type: 'assign', module: num(assigning[3])! - 1, on: assigning[1] === 'assign' };
+  if (/(start|share|open) (a |the )?(shared )?lab|share (this|the circuit)/.test(s)) return { type: 'share' };
+  if (/class ?room|class panel|my class|the class/.test(s)) return { type: 'classroom' };
   if (/^(undo|go back|take that back)/.test(s)) return { type: 'undo' };
   if (/^redo/.test(s)) return { type: 'redo' };
   if (/^(reset|start over|clear)/.test(s)) return { type: 'reset' };
@@ -160,6 +183,16 @@ export function describe(c: VoiceCommand): string {
       return `select q${c.qubit}`;
     case 'answer':
       return `answer ${c.index + 1}`;
+    case 'claim':
+      return `claim ${c.qubit === null ? 'the selected qubit' : `q${c.qubit}`}`;
+    case 'join':
+      return `join room ${c.code}`;
+    case 'share':
+      return 'start a shared lab';
+    case 'assign':
+      return `${c.on ? 'assign' : 'unassign'} module ${c.module + 1}`;
+    case 'leave':
+      return 'leave the room';
     default:
       return c.type;
   }

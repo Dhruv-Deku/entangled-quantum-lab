@@ -6,10 +6,23 @@
  */
 
 import { iwsdkDev } from '@iwsdk/vite-plugin-dev';
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
+import { WebSocketServer } from 'ws';
+import { relayOn } from './server/relay-core.mjs';
+
+/** The shared-lab relay on the dev and preview servers (same host and port as the app). */
+const sharedLabRelay = (): Plugin => ({
+  name: 'entangled-relay',
+  configureServer(server) {
+    if (server.httpServer) relayOn(server.httpServer, WebSocketServer);
+  },
+  configurePreviewServer(server) {
+    relayOn(server.httpServer, WebSocketServer);
+  },
+});
 
 export default defineConfig({
-  plugins: [iwsdkDev()],
+  plugins: [iwsdkDev(), sharedLabRelay()],
   server: {
     host: '0.0.0.0',
     port: 8081,

@@ -22,6 +22,11 @@ describe('step debugger', () => {
     expect(stepTitle(cx.op, 2, 2)).toBe('Step 2 of 2: CX on q0, q1');
   });
 
+  it("says when a pair's entanglement spreads to the whole group (GHZ)", () => {
+    const [, , g] = steps(3, [{ kind: 'gate', gate: 'h', target: 0 }, { kind: 'gate', gate: 'x', target: 1, controls: [0] }, { kind: 'gate', gate: 'x', target: 2, controls: [1] }]);
+    expect(explainStep(g.op, g.before, g.after).join(' ')).toContain('q0 and q1 are no longer entangled as a pair: the entanglement now spans the whole group');
+  });
+
   it('says when only phases changed, and when nothing did', () => {
     const [, z] = steps(1, [{ kind: 'gate', gate: 'h', target: 0 }, { kind: 'gate', gate: 'z', target: 0 }]);
     expect(explainStep(z.op, z.before, z.after)[0]).toMatch(/only shifted phases/);

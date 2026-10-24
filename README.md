@@ -16,7 +16,7 @@ your circuit exports to Qiskit and OpenQASM 3.
 ```sh
 npm install
 npm run dev        # managed browser with the Quest 3 emulator (IWER)
-npm test           # 221 unit tests: physics, gestures, the course, 18 chapters, 15 lessons, puzzles, builder, noise, chemistry, import, IBM compiling and more
+npm test           # 242 unit tests: physics, gestures, the course, 18 chapters, 15 lessons, puzzles, builder, noise, chemistry, import, IBM compiling, voice, shared rooms and more
 npm run typecheck
 npm run build
 ```
@@ -68,6 +68,10 @@ depends on a single input path.
 | – | Noise lab: T1, T2, gate error, zero-noise extrapolation | sandbox card: Noise | E (Shift+E on/off, Shift+M mitigate) |
 | – | Library: save, load, import, QR code, custom gates | sandbox card: Library | F (Shift+F save, U tab, Shift+Y use, Shift+K QR, Shift+U import) |
 | – | Simplify the circuit (Undo brings it back) | Qiskit, then Simplify | O |
+| – | Step debugger: step, run to a breakpoint, see why each step changed the state | Debug | Shift+D (, . step, ; run, ' breakpoint) |
+| – | Big-state views: Q-sphere, state city, entanglement map | View | Shift+V |
+| – | Voice commands | Voice | V |
+| – | Shared lab or classroom: start, join, claim a qubit | Share | \ (and \| for the class panel) |
 
 Gesture thresholds live in `src/gestures/config.ts` (with hysteresis, hold times
 and a shared cooldown, so fist, spread and pinch never trigger each other).
@@ -84,9 +88,14 @@ src/lab/       the lab model, 3D orbs, threads, GHZ ring, probability rain,
                gesture and desktop input systems, sound, autosave
 src/game/      eleven chapters, fifteen lessons, twelve puzzles, the circuit builder,
                notes, sandbox presets, the campaign state machine, hands-only
-               panels, the ghost-hand tutor
+               panels, the ghost-hand tutor, voice commands, the step debugger
+src/net/       shared rooms: one circuit for everyone, qubit ownership, the
+               classroom (assignments, progress), WebSocket and same-device
+               transports
+server/        the room relay (built into the dev and preview servers, or
+               standalone with `node server/relay.mjs`)
 public/ui/     UIKitML panels (chapter card, gate dock, code, navigator, builder,
-               notes)
+               notes, noise, library, debugger, classroom)
 ```
 
 ## Course
@@ -444,6 +453,104 @@ The Qiskit panel has **Copy link**: a short, readable link such as
 included, in anyone's sandbox. Links are validated before anything is loaded.
 
 ![A shared link opened: a GHZ circuit with the recorded measurement M0 = 1](docs/screenshots/shared-circuit.png)
+
+## Step debugger
+
+![The step debugger stopped at a breakpoint on a GHZ circuit, with the histogram and the reason for the change](docs/screenshots/step-debugger.png)
+
+**Debug** on the dock (or Shift+D) opens a debugger for the circuit on the orbs.
+Step back and forward one gate at a time, set **breakpoints** on timeline steps
+(they get a coral border) and **Run** to the next one. For every step it shows
+a live histogram of the outcomes at that point, and says in plain words **why the state
+changed**: which amplitudes a gate mixed, when two qubits became entangled, and
+when a measurement collapsed a partner too. When a pair stops being entangled
+because the entanglement spread to a third qubit, it says that rather than
+"no longer entangled".
+
+## Big-state views
+
+**View** (Shift+V, or say "next view") cycles three ways to see a state that is
+too big for one Bloch sphere each.
+
+| Q-sphere | State city |
+| --- | --- |
+| ![Q-sphere of a four-qubit state: one dot per basis state, size for probability, colour for phase](docs/screenshots/qsphere.png) | ![State city: the real and imaginary parts of the density matrix as towers](docs/screenshots/state-city.png) |
+
+- **Q-sphere**: one dot per basis state with any weight. All 0s at the top, all
+  1s at the bottom, states with the same number of 1s on one latitude. Dot size
+  is probability, colour is phase relative to the largest amplitude (a colour
+  wheel on the board).
+- **State city**: the density matrix as two grids of towers, real and
+  imaginary parts. Grey towers on the diagonal are probabilities, blue ones are
+  coherences, coral ones hang below the plate when negative. With the noise lab
+  on, you watch the blue towers shrink.
+- **Entanglement map**: how strongly each pair is entangled (negativity) and
+  how entangled each qubit is with all the rest, in gold, with a sentence
+  underneath. A GHZ state shows weak pairs but every qubit fully entangled: the
+  entanglement belongs to the whole group.
+
+![Entanglement map: two Bell pairs light up q0-q1 and q2-q3, and q4 is on its own](docs/screenshots/heatmap.png)
+
+## Voice commands
+
+**Voice** on the dock (or V) listens through the browser's speech recogniser.
+It is forgiving about how things are said, and every
+command it hears is shown briefly so you know what it understood:
+
+- gates: "Hadamard on qubit two", "X on zero", "S dagger", "rotate qubit zero
+  by pi over four around x"
+- "entangle zero and one", "CNOT from one to two", "swap one and two"
+- "measure qubit one", "measure everything", "run a thousand shots"
+- "undo", "redo", "reset", "add a qubit", "next", "show me", "answer two"
+- "open the code", "simplify", "zoom", "noise", "library", "debug", "next view"
+- rooms: "start a shared lab", "join L K seven Q F", "claim this qubit",
+  "assign module three", "classroom", "leave the room"
+
+The grammar is unit tested, including the words recognisers write for numbers
+("to", "too", "for", "tree").
+
+## Shared lab
+
+![A shared lab: a Bell pair where q0 belongs to Ana and q1 to you, with the room code on the Share button](docs/screenshots/shared-lab.png)
+
+**Share** opens a room. Everyone in a **shared lab** works on one circuit: a
+gate anyone applies, an undo, a rewind or 100 shots shows up for everyone. Late
+joiners catch up straight away. Two people can each **hold half of a Bell
+pair**: select a qubit and press Share (or say "claim this qubit") and only you
+can turn it; its desk label shows your name, and gates on someone else's qubit
+are refused with a short note. A two-qubit gate is allowed when one of the
+qubits is yours or free, so you can still entangle with a partner. Someone who
+joins as a teacher can turn any qubit.
+
+Rooms have a short code (`LK7QF`) and a link with a QR code, so a phone or a
+second headset joins by scanning it. Edits that cross are settled the same way
+on every device (newest version wins, ties by id), so everyone ends up with the
+same circuit.
+
+The relay is built into the dev and preview servers (`/entangled-relay`). For a
+static deployment run it anywhere with Node:
+
+```sh
+node server/relay.mjs 8787      # then open the app with ?relay=wss://your-host:8787
+```
+
+Without a relay, tabs on the same device still share a room.
+
+## Classroom and certificate
+
+![The teacher's class panel: two modules assigned and six students' progress](docs/screenshots/class-dashboard.png)
+
+**Start a class** makes the teacher's room (`C7QF2`). The teacher picks course
+modules on the class panel and presses **Assign** (or says "assign module
+two"). Each student's headset goes straight to the first assigned module they
+have not finished, and reports their progress as they go. The panel lists every
+student with a bar and where they are ("Module 2, step 3 of 5"), green once they
+are done.
+
+When a student finishes their assigned modules (or, on their own, the whole
+course) the board shows a **certificate**, and the 2D page can save it as a PNG.
+
+![The certificate: name, modules completed, class and teacher, date, and a seal of two entangled qubits](docs/screenshots/certificate.png)
 
 ## Sandbox
 

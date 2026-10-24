@@ -1,0 +1,88 @@
+<!--
+  Classroom: the teacher picks course modules to assign and sees each
+  student's progress; a student sees the assignment and their certificate.
+  UIKit units are cm.
+-->
+<style>
+  .card {
+    flex-direction: column;
+    width: 440;
+    gap: 9;
+    padding-top: 18;
+    padding-bottom: 16;
+    padding-left: 22;
+    padding-right: 22;
+    background-color: #1b1c1f;
+    border-radius: 26;
+    border-width: 1;
+    border-color: #34363b;
+  }
+  .head { flex-direction: row; justify-content: space-between; align-items: center; }
+  .titles { flex-direction: column; gap: 2; flex-shrink: 1; }
+  .eyebrow { font-size: 11; font-weight: 600; color: #8a8d93; }
+  .title { font-size: 17; font-weight: 700; color: #f2f3f5; }
+  .line { font-size: 12; line-height: 1.4; color: #c9ccd1; }
+  .pick { flex-direction: row; gap: 6; align-items: center; }
+  .mod { flex-grow: 1; height: 30; border-radius: 15; padding-left: 12; align-items: center; background-color: #242528; }
+  .modt { font-size: 12; font-weight: 700; color: #e4e6eb; }
+  .btn { height: 30; padding-left: 12; padding-right: 12; border-radius: 15; align-items: center; justify-content: center; background-color: #34363b; cursor: pointer; }
+  .bt { font-size: 12; font-weight: 700; color: #e4e6eb; }
+  .list { flex-direction: column; gap: 5; padding-top: 6; padding-bottom: 6; padding-left: 10; padding-right: 10; border-radius: 14; background-color: #141517; }
+  .srow { flex-direction: row; gap: 8; align-items: center; height: 20; }
+  .sname { width: 80; font-size: 11; font-weight: 700; color: #e4e6eb; }
+  .track { width: 130; height: 6; border-radius: 3; background-color: #2a2c30; }
+  .fill { width: 0; height: 6; border-radius: 3; background-color: #2d7ff9; }
+  .sstat { flex-grow: 1; font-size: 10; color: #8a8d93; }
+</style>
+<div class="card">
+  <div class="head">
+    <div class="titles">
+      <div id="cl-eyebrow" class="eyebrow">Class</div>
+      <div id="cl-title" class="title">-</div>
+    </div>
+    <div id="cl-close" class="btn"><div class="bt">Close</div></div>
+  </div>
+  <div id="cl-pick" class="pick">
+    <div id="cl-prev" class="btn"><div class="bt">&lt;</div></div>
+    <div class="mod"><div id="cl-mod" class="modt">-</div></div>
+    <div id="cl-next" class="btn"><div class="bt">&gt;</div></div>
+    <div id="cl-assign" class="btn"><div id="cl-assign-l" class="bt">Assign</div></div>
+  </div>
+  <div id="cl-line" class="line">-</div>
+  <div id="cl-list" class="list">
+    <div id="cl-r-0" class="srow">
+      <div id="cl-n-0" class="sname">-</div>
+      <div class="track"><div id="cl-f-0" class="fill"></div></div>
+      <div id="cl-s-0" class="sstat">-</div>
+    </div>
+    <div id="cl-r-1" class="srow">
+      <div id="cl-n-1" class="sname">-</div>
+      <div class="track"><div id="cl-f-1" class="fill"></div></div>
+      <div id="cl-s-1" class="sstat">-</div>
+    </div>
+    <div id="cl-r-2" class="srow">
+      <div id="cl-n-2" class="sname">-</div>
+      <div class="track"><div id="cl-f-2" class="fill"></div></div>
+      <div id="cl-s-2" class="sstat">-</div>
+    </div>
+    <div id="cl-r-3" class="srow">
+      <div id="cl-n-3" class="sname">-</div>
+      <div class="track"><div id="cl-f-3" class="fill"></div></div>
+      <div id="cl-s-3" class="sstat">-</div>
+    </div>
+    <div id="cl-r-4" class="srow">
+      <div id="cl-n-4" class="sname">-</div>
+      <div class="track"><div id="cl-f-4" class="fill"></div></div>
+      <div id="cl-s-4" class="sstat">-</div>
+    </div>
+    <div id="cl-r-5" class="srow">
+      <div id="cl-n-5" class="sname">-</div>
+      <div class="track"><div id="cl-f-5" class="fill"></div></div>
+      <div id="cl-s-5" class="sstat">-</div>
+    </div>
+  </div>
+  <div class="pick">
+    <div id="cl-go" class="btn"><div id="cl-go-l" class="bt">Start next module</div></div>
+    <div id="cl-cert" class="btn"><div class="bt">Certificate</div></div>
+  </div>
+</div>

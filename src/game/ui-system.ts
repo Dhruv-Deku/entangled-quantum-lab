@@ -34,6 +34,11 @@ import { codeLines, FORMAT_NAMES, FORMATS, linesOf, pages, program, routeOrError
 import { describe as describeVoice, parseVoice, type VoiceCommand } from './voice';
 import { explainStep, histogram, nextStop, stepTitle } from './debugger';
 import { nextView, STATE_VIEW_NAMES, type StateView } from '../quantum/state-views';
+import { assignmentProgress, kindOf, makeCode, parseCode, SharedRoom, type Progress, type Role, type RoomKind } from '../net/room';
+import { AutoTransport } from '../net/transport';
+import { openShareDialog, savedName } from '../lab/share-dialog';
+import { downloadCertificate, type CertificateInfo } from '../lab/certificate';
+import { COURSE } from './course';
 import { SpeechInput } from '../lab/speech';
 import { landscape, SQUARE, toPennyLaneQaoa } from '../quantum/qaoa';
 import { H2 } from '../quantum/h2-data';
@@ -171,6 +176,21 @@ export class UISystem extends createSystem({
   private noiseAsset: UIKitMLAsset | null = null;
   private libAsset: UIKitMLAsset | null = null;
   private dbgAsset: UIKitMLAsset | null = null;
+  private classAsset: UIKitMLAsset | null = null;
+  /** student rows showing on the class panel: it grows downward as they join */
+  private classRows = 0;
+  /** Shared lab or classroom, while in one. */
+  private room: SharedRoom | null = null;
+  private classOpen = false;
+  /** The course module the teacher is looking at in the class panel. */
+  private classPick = 0;
+  /** The certificate is on the board; and whether this session already showed it unasked. */
+  private certOn = false;
+  private certOffered = false;
+  /** Where the player was when the certificate went up: moving on puts it away. */
+  private certAt = '';
+  private lastReport = '';
+  private lastCoursed = -1;
   /** Step debugger: open, breakpoints (step numbers), and a run in progress (seconds to the next step). */
   private dbgOpen = false;
   private breakpoints = new Set<number>();
@@ -224,14 +244,24 @@ export class UISystem extends createSystem({
       campaign.startChapter(0);
       campaign.intro = true;
     }
-    const onHash = () => this.openShared();
+    this.openRoomLink();
+    const onHash = () => this.openShared() || this.openRoomLink();
     window.addEventListener('hashchange', onHash);
     this.cleanupFuncs.push(() => window.removeEventListener('hashchange', onHash));
 
     this.cleanupFuncs.push(
-      campaign.on((v) => this.render(v)),
+      campaign.on((v) => (this.render(v), this.afterCampaign(v))),
       lab.on((e) => {
         this.dirty = true;
+        if (this.room) {
+          if (e.type === 'op' || e.type === 'reset' || e.type === 'seek') this.room.localChange();
+          if (e.type === 'shots') this.room.localShots(e.counts);
+          if (e.type === 'select') this.room.select(e.qubit);
+        }
+        if (e.type === 'rejected' && lab.guard) {
+          this.flash(e.reason);
+          feedback('reject');
+        }
         if (e.type === 'select' || e.type === 'reset' || e.type === 'seek' || e.type === 'op') this.renderDock();
         if (e.type === 'reset' && campaign.mode === 'sandbox') this.render(campaign.view);
       }),
@@ -253,12 +283,13 @@ export class UISystem extends createSystem({
     this.noiseAsset = this.world.getSceneObject<UIKitMLAsset>('noise-panel') ?? null;
     this.libAsset = this.world.getSceneObject<UIKitMLAsset>('library-panel') ?? null;
     this.dbgAsset = this.world.getSceneObject<UIKitMLAsset>('debug-panel') ?? null;
-    if (!this.chapter || !this.dock || !this.code || !this.nav || !this.builderAsset || !this.notesAsset || !this.noiseAsset || !this.libAsset || !this.dbgAsset) return false;
+    this.classAsset = this.world.getSceneObject<UIKitMLAsset>('class-panel') ?? null;
+    if (!this.classAsset || !this.chapter || !this.dock || !this.code || !this.nav || !this.builderAsset || !this.notesAsset || !this.noiseAsset || !this.libAsset || !this.dbgAsset) return false;
     this.code.visible = false;
 
     // panels take poke and ray input but must never capture the grab pointer,
     // or a hand reaching for an orb just above the dock grabs the dock instead
-    for (const panel of [this.chapter, this.dock, this.code, this.nav, this.builderAsset, this.notesAsset, this.noiseAsset, this.libAsset, this.dbgAsset]) {
+    for (const panel of [this.chapter, this.dock, this.code, this.nav, this.builderAsset, this.notesAsset, this.noiseAsset, this.libAsset, this.dbgAsset, this.classAsset]) {
       panel.traverse((o) => {
         (o as unknown as { pointerEventsType: unknown }).pointerEventsType = { deny: 'grab' };
       });
@@ -288,6 +319,9 @@ export class UISystem extends createSystem({
     const dbgIds = ['dbg-eyebrow', 'dbg-title', 'dbg-close', 'dbg-why-0', 'dbg-why-1', 'dbg-why-2', 'dbg-start', 'dbg-back', 'dbg-step', 'dbg-run', 'dbg-run-l', 'dbg-bp', 'dbg-bp-l'];
     for (let i = 0; i < 8; i++) dbgIds.push(`dbg-c-${i}`, `dbg-p-${i}`, `dbg-b-${i}`, `dbg-l-${i}`);
     for (const id of dbgIds) this.els.set(id, this.dbgAsset.requireElementById(id));
+    const classIds = ['cl-eyebrow', 'cl-title', 'cl-close', 'cl-pick', 'cl-prev', 'cl-mod', 'cl-next', 'cl-assign', 'cl-assign-l', 'cl-line', 'cl-list', 'cl-go', 'cl-go-l', 'cl-cert'];
+    for (let i = 0; i < 6; i++) classIds.push(`cl-r-${i}`, `cl-n-${i}`, `cl-f-${i}`, `cl-s-${i}`);
+    for (const id of classIds) this.els.set(id, this.classAsset.requireElementById(id));
     this.codeScale = this.code.scale.x;
     this.notesScale = this.notesAsset.scale.x;
     for (const [id, el] of this.els) el.name = id;
@@ -370,6 +404,22 @@ export class UISystem extends createSystem({
     on('a-voice', () => this.speech?.toggle());
     on('a-debug', () => this.toggleDebugger());
     on('a-view', () => this.cycleView());
+    on('a-share', () => this.shareButton());
+    on('cl-close', () => this.toggleClass(false));
+    on('cl-prev', () => this.pickModule(-1));
+    on('cl-next', () => this.pickModule(1));
+    on('cl-assign', () => this.toggleAssigned());
+    on('cl-go', () => this.startAssigned());
+    on('cl-cert', () => this.toggleCertificate());
+    const onShareKey = (e: Event) => {
+      const what = (e as CustomEvent<string>).detail ?? 'button';
+      if (what === 'dialog') this.openShare();
+      else if (what === 'class') this.toggleClass();
+      else this.shareButton();
+    };
+    window.addEventListener('entangled:share', onShareKey);
+    this.cleanupFuncs.push(() => window.removeEventListener('entangled:share', onShareKey), () => this.leaveRoom(true));
+    this.cleanupFuncs.push(this.addShareButton());
     const onViewKey = () => this.cycleView();
     window.addEventListener('entangled:view', onViewKey);
     this.cleanupFuncs.push(() => window.removeEventListener('entangled:view', onViewKey));
@@ -381,7 +431,7 @@ export class UISystem extends createSystem({
     on('dbg-bp', () => this.dbgToggleBreakpoint());
     const onDebugKey = (e: Event) => {
       const what = (e as CustomEvent<string>).detail ?? 'toggle';
-      if (what === 'toggle') return this.toggleDebugger();
+      if (what === 'toggle' || (what === 'open' && !this.dbgOpen)) return this.toggleDebugger();
       if (!this.dbgOpen) return;
       if (what === 'back') this.dbgSeek(lab.history.cursor - 1);
       else if (what === 'step') this.dbgSeek(lab.history.cursor + 1);
@@ -761,7 +811,37 @@ export class UISystem extends createSystem({
       case 'view':
         window.dispatchEvent(new Event('entangled:view'));
         return true;
+      case 'claim':
+        if (!this.room || this.room.kind !== 'lab') return false;
+        return this.room.claim(c.qubit ?? lab.selected);
+      case 'join': {
+        const code = parseCode(c.code);
+        if (!code) return false;
+        this.joinRoom(code, savedName() || 'Player', 'student', false);
+        return true;
+      }
+      case 'share':
+        if (this.room) return false;
+        this.startRoom('lab', savedName() || 'Player');
+        return true;
+      case 'leave':
+        if (!this.room) return false;
+        this.leaveRoom();
+        return true;
+      case 'assign': {
+        const r = this.room;
+        if (r?.kind !== 'class' || r.me.role !== 'teacher' || c.module < 0 || c.module >= COURSE.length) return false;
+        this.classPick = c.module;
+        r.assign(c.on ? [...r.assigned, c.module] : r.assigned.filter((m) => m !== c.module));
+        if (!this.classOpen) this.toggleClass(true);
+        return true;
+      }
+      case 'classroom':
+        if (this.room?.kind !== 'class') return false;
+        this.toggleClass();
+        return true;
       case 'close':
+        this.certOn = false;
         if (this.code) this.code.visible = false;
         if (this.notes?.open) this.notes.close();
         this.libOpen = false;
@@ -771,13 +851,293 @@ export class UISystem extends createSystem({
     }
   }
 
+  // ---- shared lab and classroom
+
+  /**
+   * The dock's Share button: outside a room it opens the share dialog (in the
+   * headset, where the page cannot be seen, it opens a shared lab at once);
+   * in a shared lab it claims or releases the selected qubit; in a class it
+   * opens the class panel.
+   */
+  private shareButton(): void {
+    if (!this.room) {
+      if (this.immersive) this.startRoom('lab', savedName() || 'Player');
+      else this.openShare();
+      return;
+    }
+    if (this.room.kind === 'lab') {
+      const q = lab.selected;
+      if (this.room.claim(q)) this.flash(this.room.me.owns.includes(q) ? `q${q} is yours: only you (or a teacher) can turn it. Press Share again to let go.` : `q${q} is free again.`);
+      feedback('select');
+    } else this.toggleClass();
+  }
+
+  private openShare(): void {
+    const r = this.room;
+    openShareDialog({
+      current: r ? { code: r.code, kind: r.kind, role: r.me.role, peers: [...r.peers.values()].map((p) => `${p.name}${p.role === 'teacher' ? ' (teacher)' : ''}`), link: this.roomLink(r.code) } : null,
+      start: (kind, name) => this.startRoom(kind, name),
+      join: (code, name, role) => this.joinRoom(code, name, role, false),
+      leave: () => this.leaveRoom(),
+      certificate: this.certificateInfo() ? () => downloadCertificate(this.certificateInfo()!) : null,
+    });
+  }
+
+  private roomLink(code: string): string {
+    return `${location.origin}${location.pathname}${location.search}#room=${code}`;
+  }
+
+  /** A #room=CODE link joins that room. */
+  private openRoomLink(): boolean {
+    const m = /^#room=([A-Za-z0-9]+)/.exec(location.hash);
+    if (!m) return false;
+    try {
+      history.replaceState(null, '', location.pathname + location.search);
+    } catch {
+      // the link stays in the address bar
+    }
+    const code = parseCode(m[1]);
+    if (!code) return false;
+    this.joinRoom(code, savedName() || 'Guest', 'student', false);
+    return true;
+  }
+
+  private startRoom(kind: RoomKind, name: string): void {
+    this.joinRoom(makeCode(kind), name, kind === 'class' ? 'teacher' : 'student', true);
+  }
+
+  private joinRoom(code: string, name: string, role: Role, creator: boolean): void {
+    this.leaveRoom(true);
+    const kind = kindOf(code)!;
+    const id = (globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`).replace(/-/g, '').slice(0, 12);
+    // a shared lab is one circuit in the sandbox (the creator keeps theirs; people joining get it)
+    if (kind === 'lab' && campaign.mode !== 'sandbox') campaign.enterSandbox(lab.n, creator ? [...lab.history.ops] : []);
+    const transport = new AutoTransport(code, () => this.flash('No relay server here: sharing only with other tabs of this browser. See the README for running one.'));
+    this.room = new SharedRoom(
+      code,
+      { id, name: name || 'Player', role, owns: [], selected: lab.selected },
+      transport,
+      {
+        snapshot: () => lab.history.toJSON(),
+        restore: (h) => {
+          if (campaign.mode !== 'sandbox') campaign.enterSandbox(h.n, []);
+          lab.restore({ history: h, selected: Math.min(lab.selected, h.n - 1) });
+        },
+        showShots: (counts) => lab.showShots(counts),
+        assigned: (modules) => this.onAssigned(modules),
+        changed: () => this.roomChanged(),
+        notify: (text) => this.flash(text),
+      },
+      creator,
+    );
+    lab.guard = (op) => this.room?.guard(op) ?? null;
+    this.lastReport = '';
+    this.flash(
+      creator
+        ? kind === 'lab'
+          ? `Shared lab ${code} is open. Others join with that code (Share on their page, or say "join room ${code.split('').join(' ')}").`
+          : `Class ${code} is open: students join with that code. Pick modules to assign in the class panel.`
+        : `Joining ${kind === 'lab' ? 'shared lab' : 'class'} ${code}...`,
+    );
+    if (kind === 'class' && role === 'teacher') this.toggleClass(true);
+    this.roomChanged();
+    this.afterCampaign(campaign.view);
+  }
+
+  private leaveRoom(quiet = false): void {
+    if (!this.room) return;
+    this.room.close();
+    this.room = null;
+    lab.guard = null;
+    this.classOpen = false;
+    if (!quiet) this.flash('You left the room.');
+    this.roomChanged();
+  }
+
+  /** Presence, claims, assignments or progress changed. */
+  private roomChanged(): void {
+    const r = this.room;
+    this.text('a-share-l', r ? `${r.code} (${r.peers.size + 1})` : 'Share');
+    this.bg('a-share', r ? C.primary : '#2d2f33');
+    const owners = Array.from({ length: lab.n }, (_, q) => {
+      const o = r?.kind === 'lab' ? r.ownerOf(q) : null;
+      return o ? (o === r!.me ? 'you' : o.name) : null;
+    });
+    this.world.getSystem(LabSystem)?.setOwners(owners);
+    this.renderClass();
+  }
+
+  /** The teacher assigned modules: start the first one not done yet. */
+  private onAssigned(modules: number[]): void {
+    const names = modules.map((m) => COURSE[m]?.title ?? `module ${m + 1}`);
+    this.flash(modules.length ? `Your teacher assigned: ${names.join(', ')}.` : 'Your teacher cleared the assignment.');
+    this.certOffered = false;
+    const todo = modules.find((m) => !campaign.coursed.has(m));
+    if (todo !== undefined && !(campaign.mode === 'course' && campaign.courseIndex === todo)) campaign.startCourse(todo);
+    else if (todo === undefined && modules.length) {
+      // finished before they were assigned: the certificate is ready now
+      this.certOffered = true;
+      this.certOn = true;
+      this.certAt = `${campaign.mode}:${campaign.courseIndex}`;
+      this.flash(`Your teacher assigned ${names.join(', ')}: you have already finished ${modules.length > 1 ? 'them' : 'it'}. Your certificate is on the board.`);
+    }
+    this.renderClass();
+  }
+
+  /** After each campaign change: report progress to the teacher, and offer the certificate once it is earned. */
+  private afterCampaign(v: CampaignView): void {
+    const r = this.room;
+    if (r?.kind === 'class' && r.me.role === 'student') {
+      const p: Progress = { mode: v.mode, module: v.courseIndex, step: v.chapterDone ? (v.chapter?.steps.length ?? 0) : v.stepIndex, steps: v.chapter?.steps.length ?? 0, done: [...v.coursed] };
+      const key = JSON.stringify(p);
+      if (key !== this.lastReport) {
+        this.lastReport = key;
+        r.report(p);
+      }
+    }
+    const at = `${v.mode}:${v.courseIndex}`;
+    if (this.certOn && this.certAt && at !== this.certAt) this.certOn = false;
+    if (!this.certOn) this.certAt = '';
+    // the certificate: all assigned modules done (in a class), or the whole course
+    const earned = this.certificateInfo() !== null;
+    const finishedNow = this.lastCoursed >= 0 && v.coursed.length > this.lastCoursed;
+    this.lastCoursed = v.coursed.length;
+    if (earned && finishedNow && !this.certOffered) {
+      this.certOffered = true;
+      this.certOn = true;
+      this.certAt = at;
+      this.flash('Certificate earned! It is on the board; download it from Share on the page.');
+      feedback('success');
+    }
+    this.renderClass();
+  }
+
+  private certificateInfo(): CertificateInfo | null {
+    const r = this.room;
+    const done = campaign.coursed;
+    const name = r?.me.name || savedName() || 'A student';
+    if (r?.kind === 'class' && r.me.role === 'student' && r.assigned.length) {
+      if (!r.assigned.every((m) => done.has(m))) return null;
+      const teacher = [...r.peers.values()].find((p) => p.role === 'teacher');
+      return { name, modules: r.assigned.map((m) => COURSE[m]?.title ?? `Module ${m + 1}`), context: `Class ${r.code}${teacher ? `, teacher ${teacher.name}` : ''}`, date: new Date() };
+    }
+    if (COURSE.every((_, m) => done.has(m))) return { name, modules: COURSE.map((c) => c.title), context: 'The full Entangled course', date: new Date() };
+    return null;
+  }
+
+  private toggleCertificate(): void {
+    const info = this.certificateInfo();
+    if (!info) {
+      this.flash('Not yet: finish the assigned modules first.');
+      return feedback('reject');
+    }
+    this.certOn = !this.certOn;
+    this.certAt = this.certOn ? `${campaign.mode}:${campaign.courseIndex}` : '';
+    if (!this.immersive && this.certOn) downloadCertificate(info);
+    feedback('select');
+  }
+
+  private toggleClass(open = !this.classOpen): void {
+    if (this.room?.kind !== 'class') open = false;
+    this.classOpen = open;
+    if (open) {
+      if (this.code) this.code.visible = false;
+      if (this.notes?.open) this.notes.close();
+      this.libOpen = false;
+      this.noiseOpen = false;
+      this.dbgOpen = false;
+      this.setView(null);
+    }
+    this.renderClass();
+    feedback('select');
+  }
+
+  private pickModule(dir: number): void {
+    this.classPick = (this.classPick + dir + COURSE.length) % COURSE.length;
+    this.renderClass();
+  }
+
+  private toggleAssigned(): void {
+    const r = this.room;
+    if (!r || r.me.role !== 'teacher') return;
+    const m = this.classPick;
+    r.assign(r.assigned.includes(m) ? r.assigned.filter((x) => x !== m) : [...r.assigned, m]);
+    feedback('select');
+  }
+
+  /** A student: go to the next assigned module not done yet. */
+  private startAssigned(): void {
+    const r = this.room;
+    if (!r) return;
+    const todo = r.assigned.find((m) => !campaign.coursed.has(m));
+    if (todo === undefined) return this.flash(r.assigned.length ? 'All assigned modules are done.' : 'Nothing assigned yet.');
+    campaign.startCourse(todo);
+    this.toggleClass(false);
+  }
+
+  private renderClass(): void {
+    const r = this.room;
+    if (!this.classAsset || !this.classOpen || r?.kind !== 'class') return;
+    const teacher = r.me.role === 'teacher';
+    const students = [...r.peers.values()].filter((p) => p.role === 'student');
+    const steps = (m: number) => COURSE[m]?.steps.length ?? 1;
+    const titles = (ms: readonly number[]) => ms.map((m) => `${m + 1} ${COURSE[m]?.title ?? ''}`).join(', ');
+    this.text('cl-eyebrow', `Class ${r.code}  /  ${students.length} student${students.length === 1 ? '' : 's'}${teacher ? '' : `  /  you: ${r.me.name}`}`);
+    this.text('cl-title', teacher ? 'Assign modules, watch progress' : 'Your assignment');
+    this.els.get('cl-pick')?.setProperties({ display: teacher ? 'flex' : 'none' });
+    const picked = r.assigned.includes(this.classPick);
+    this.text('cl-mod', `${this.classPick + 1}. ${COURSE[this.classPick].title}`);
+    this.text('cl-assign-l', picked ? 'Unassign' : 'Assign');
+    this.bg('cl-assign', picked ? '#3a2523' : C.primary);
+    this.text('cl-line', r.assigned.length ? `Assigned: ${titles(r.assigned)}` : teacher ? 'Nothing assigned yet: pick a module and press Assign.' : 'Your teacher has not assigned anything yet.');
+    // the teacher sees every student; a student sees themself
+    const rows: { name: string; p: Progress | undefined }[] = teacher
+      ? students.map((s) => ({ name: s.name, p: r.progress.get(s.id) }))
+      : [{ name: r.me.name, p: { mode: campaign.mode, module: campaign.courseIndex, step: campaign.view.chapterDone ? steps(campaign.courseIndex) : campaign.view.stepIndex, steps: steps(campaign.courseIndex), done: [...campaign.coursed] } }];
+    this.classRows = Math.min(rows.length, 6);
+    for (let i = 0; i < 6; i++) {
+      const row = rows[i];
+      this.els.get(`cl-r-${i}`)?.setProperties({ display: row ? 'flex' : 'none' });
+      if (!row) continue;
+      const { fraction, complete } = assignmentProgress(r.assigned, row.p, steps);
+      this.text(`cl-n-${i}`, row.name);
+      this.els.get(`cl-f-${i}`)?.setProperties({ width: 130 * fraction, backgroundColor: complete ? C.done : C.primary });
+      const p = row.p;
+      this.text(
+        `cl-s-${i}`,
+        !p ? 'joined' : complete ? 'All done: certificate earned' : p.mode === 'course' ? `Module ${p.module + 1}, step ${Math.min(p.step + 1, p.steps)} of ${p.steps}` : `In ${p.mode}`,
+      );
+    }
+    if (!rows.length) this.text('cl-line', `${r.assigned.length ? `Assigned: ${titles(r.assigned)}. ` : ''}No students yet: they join with code ${r.code}.`);
+    this.els.get('cl-list')?.setProperties({ display: rows.length ? 'flex' : 'none' });
+    this.els.get('cl-go')?.setProperties({ display: teacher ? 'none' : 'flex' });
+    this.els.get('cl-cert')?.setProperties({ display: teacher ? 'none' : 'flex' });
+    this.bg('cl-cert', this.certificateInfo() ? C.done : '#34363b');
+  }
+
+  /** A Share button on the 2D page, beside IBM Quantum. */
+  private addShareButton(): () => void {
+    const b = document.createElement('button');
+    b.textContent = 'Share';
+    b.style.cssText = 'position:fixed;right:150px;bottom:16px;z-index:10;height:36px;padding:0 16px;border-radius:18px;border:none;background:rgba(28,29,32,.88);color:#e4e6eb;font:600 13px Inter,system-ui,sans-serif;cursor:pointer';
+    b.onclick = () => this.openShare();
+    document.body.appendChild(b);
+    return () => b.remove();
+  }
+
   /** Q-sphere, then the state city, then the entanglement map, then back to the circuit. */
   private cycleView(): void {
-    this.stateView = nextView(this.stateView);
-    this.text('a-view-l', this.stateView ? STATE_VIEW_NAMES[this.stateView] : 'View');
-    this.bg('a-view', this.stateView ? C.primary : '#2d2f33');
+    this.setView(nextView(this.stateView));
     this.flash(this.stateView ? `${STATE_VIEW_NAMES[this.stateView]}. Press View again for the next one.` : 'Back to the circuit.');
     feedback('select');
+  }
+
+  /** The views use the space in front of the board, so they and the debugger or class panel take turns. */
+  private setView(view: StateView | null): void {
+    this.stateView = view;
+    if (view) this.dbgOpen = this.classOpen = false;
+    this.text('a-view-l', this.stateView ? STATE_VIEW_NAMES[this.stateView] : 'View');
+    this.bg('a-view', this.stateView ? C.primary : '#2d2f33');
   }
 
   /** Open or close the step debugger. */
@@ -785,6 +1145,8 @@ export class UISystem extends createSystem({
     this.dbgOpen = !this.dbgOpen;
     this.dbgRun = null;
     if (this.dbgOpen) {
+      this.classOpen = false;
+      this.setView(null);
       if (this.code) this.code.visible = false;
       if (this.notes?.open) this.notes.close();
       this.libOpen = false;
@@ -863,7 +1225,7 @@ export class UISystem extends createSystem({
   /** Open or close the library (any mode; loading a circuit moves to the sandbox). */
   private toggleLibrary(): void {
     this.libOpen = !this.libOpen;
-    if (this.libOpen) this.dbgOpen = false;
+    if (this.libOpen) this.dbgOpen = this.classOpen = false;
     this.libQr = false;
     this.libNote = null;
     if (this.libOpen) {
@@ -1266,6 +1628,19 @@ export class UISystem extends createSystem({
     const playing = v.mode === 'course' || v.mode === 'campaign' || v.mode === 'learn' || v.mode === 'puzzle';
     const step = playing && !v.intro ? v.step : null;
     const codeOpen = this.code!.visible;
+    // a certificate stays on the board until it is put away
+    const cert = this.certOn ? this.certificateInfo() : null;
+    if (cert) {
+      labSys.chip.root.visible = false;
+      labSys.showHardware(null);
+      labSys.showMaths(false);
+      labSys.showLandscape(null);
+      labSys.showDensity(false);
+      labSys.showWheels(false);
+      labSys.showVqe(undefined, H2);
+      labSys.showCertificate(cert);
+      return;
+    }
     // the library takes the board while it is open: thumbnails, or a QR code of the current circuit
     if (this.libOpen) {
       labSys.chip.root.visible = false;
@@ -1581,7 +1956,7 @@ export class UISystem extends createSystem({
     const want = this.pokeOn ? near > 0.14 : near > 0.2;
     if (want === this.pokeOn) return;
     this.pokeOn = want;
-    for (const id of ['chapter-panel', 'gate-dock', 'code-panel', 'nav-panel', 'builder-panel', 'notes-panel', 'noise-panel', 'library-panel', 'debug-panel']) {
+    for (const id of ['chapter-panel', 'gate-dock', 'code-panel', 'nav-panel', 'builder-panel', 'notes-panel', 'noise-panel', 'library-panel', 'debug-panel', 'class-panel']) {
       const e = this.world.getSceneEntity(id);
       if (!e) continue;
       if (want && !e.hasComponent(PokeInteractable)) e.addComponent(PokeInteractable);
@@ -1644,7 +2019,7 @@ export class UISystem extends createSystem({
     this.updateBoardMode();
     const lsys = this.world.getSystem(LabSystem);
     if (lsys) {
-      lsys.boardRaised = this.dbgOpen;
+      lsys.boardRaised = this.dbgOpen || this.classOpen;
       lsys.showStateView(this.libOpen ? null : this.stateView);
     }
     // notes sit where the code panel does; only one of the two is open at a time
@@ -1654,6 +2029,15 @@ export class UISystem extends createSystem({
     } else {
       this.notesAsset!.visible = false;
       this.notesAsset!.position.copy(PARKED);
+    }
+    if (this.classOpen) {
+      this.place(this.classAsset!, 'notes-panel');
+      // the panel grows from its centre: keep its top edge under the board
+      this.classAsset!.position.y -= 0.011 * Math.max(0, this.classRows - 1);
+      this.classAsset!.visible = true;
+    } else {
+      this.classAsset!.visible = false;
+      this.classAsset!.position.copy(PARKED);
     }
     if (this.dbgOpen) {
       this.place(this.dbgAsset!, 'notes-panel');

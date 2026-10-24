@@ -422,6 +422,14 @@ export class OrbVisual {
    * angle from the gate's rotation, starting at the current state `from`), and
    * float the gate's name above the orb. `axis` null shows only the name.
    */
+  /** In a shared lab: whose qubit this is, shown beside its name on the desk. */
+  setOwner(name: string | null): void {
+    const mat = this.label.material as MeshBasicMaterial;
+    mat.map?.dispose();
+    mat.map = textTexture(name ? [{ text: `q${this.index} `, color: qubitColor(this.index) }, { text: name.slice(0, 6), color: '#c9ccd1' }] : [{ text: `q${this.index}`, color: qubitColor(this.index) }], 700);
+    mat.needsUpdate = true;
+  }
+
   showGate(label: string, axis: Vec3 | null, angle: number, from: Vec3, color: string = qubitColor(this.index)): void {
     this.glyphMat.map = pill(label, color);
     this.glyphMat.needsUpdate = true;

@@ -27,6 +27,7 @@ import { FridgeVisual } from './fridge';
 import { noiseLab } from './noise-lab';
 import { runNoisy } from '../quantum/density';
 import { ChipVisual } from './chip';
+import { drawCertificate, type CertificateInfo } from './certificate';
 import { QSphereVisual, StateCityVisual } from './state-views-3d';
 import { pureDensity, type StateView } from '../quantum/state-views';
 import { T5 } from '../quantum/routing';
@@ -298,6 +299,7 @@ export class LabSystem extends createSystem({
       const i = this.orbs.length;
       const visual = new OrbVisual(i, ORB_RADIUS, ORB_HEIGHT);
       visual.root.name = `Qubit${i}`;
+      if (this.owners[i]) visual.setOwner(this.owners[i]);
       const entity = this.world.createTransformEntity(visual.root, { parent: this.workspace });
       entity.addComponent(Qubit, { index: i });
       entity.addComponent(OneHandGrabbable, { rotate: false });
@@ -517,6 +519,14 @@ export class LabSystem extends createSystem({
   }
 
   /** Let the UI draw on the board (library thumbnails, a QR code); null gives it back. Same key again does nothing. */
+  private owners: (string | null)[] = [];
+  /** Shared lab: who holds each qubit (names show on the desk beside the orbs). */
+  setOwners(owners: (string | null)[]): void {
+    if (owners.length === this.owners.length && owners.every((o, i) => o === this.owners[i])) return;
+    this.owners = owners;
+    this.orbs.forEach((o, i) => o.visual.setOwner(owners[i] ?? null));
+  }
+
   /** Lift the board above a window open in front of it (the step debugger). */
   boardRaised = false;
 
@@ -526,6 +536,11 @@ export class LabSystem extends createSystem({
     this.overlayKey = k;
     if (k && draw) draw(this.board);
     else this.boardVersion = -1;
+  }
+
+  /** The completion certificate on the board (null puts the circuit back). */
+  showCertificate(info: CertificateInfo | null): void {
+    this.showOverlay(info ? `cert:${info.name}:${info.modules.join(',')}` : null, info ? (b) => b.draw((g, w, h) => drawCertificate(g, w, h, info)) : undefined);
   }
 
   /** A big-state view (null puts the circuit back). */
