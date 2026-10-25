@@ -1,17 +1,77 @@
 # Entangled
 
-**Hold a qubit in your hand.** A seated, hands-first mixed-reality app where your
-hands are a quantum computer. Built for the Meta VR Start Developer Competition
-2026 (Productivity track) with the Meta Immersive Web SDK (IWSDK), three.js and
-TypeScript.
+### Hold a qubit in your hand.
 
-Every number on screen comes from a real statevector simulator: Bloch arrows
-shrink honestly when qubits entangle, measurement follows the Born rule, and
-your circuit exports to Qiskit and OpenQASM 3.
+Entangled turns your hands into a quantum computer. Pinch a qubit and twist your
+wrist to rotate it, spread your fingers for a Hadamard, close your fist to
+measure, touch two orbs together and watch a gold thread of entanglement appear
+between them. Every number on screen comes from a real simulator, and when you
+are ready, the same circuit runs on a 3D trapped-ion trap, a neutral-atom
+array, a superconducting chip in its dilution refrigerator, or a real IBM
+quantum computer.
 
-![Chapter 10, Hidden Number: four qubits, the circuit board above them and 100 shots that all read 1101](docs/screenshots/ch10-hidden-number.png)
+Built for the Meta VR Start Developer Competition 2026 (Productivity track) with
+the Meta Immersive Web SDK (IWSDK), three.js and TypeScript.
 
-## Run it
+<p align="center">
+  <img src="docs/screenshots/anim-bell.gif" width="680" alt="Two orbs on the desk: q0 swings onto the equator, a CNOT flashes both orbs gold, a gold thread ties them together, and 100 shots rain down onto 00 and 11 only">
+</p>
+<p align="center"><sub>"Hadamard on qubit zero." "Entangle zero and one." "Run 100 shots." Every shot lands on 00 or 11.</sub></p>
+
+## Why it is different
+
+- **Your hands are the interface.** Five natural gestures do the work of a
+  quantum programming language, a ghost hand demonstrates each one, and every
+  gesture also has a button, a key and a voice command.
+- **Real physics, not animation.** Statevector and density-matrix simulators,
+  Born-rule measurement, honest Bloch arrows that shrink when qubits entangle,
+  entanglement measured as negativity, noise that matches Qiskit to 3e-16, and
+  circuits that export to Qiskit, OpenQASM 3 and PennyLane.
+- **Three quantum computers in 3D.** Watch lasers address a chain of trapped
+  ions, atoms fly across an optical-tweezer array to entangle, or pulses travel
+  down a dilution refrigerator to a superconducting chip, then compare all three
+  on the same circuit.
+- **From the first qubit to research topics.** A 14-module course with quizzes,
+  25 chapters from superposition to Shor's algorithm, VQE for the H2 molecule, a
+  Bell test, error correction, quantum walks and randomized benchmarking.
+- **Learn together.** Shared labs where two people each hold half of a Bell
+  pair, and classes where a teacher assigns modules, watches progress and
+  students earn certificates.
+- **A reason to come back.** A daily challenge whose par is provably optimal,
+  streaks, 23 achievements and levels.
+
+## Highlights
+
+| Atoms carried into place to entangle | Lasers on a chain of trapped ions |
+| --- | --- |
+| ![A neutral atom is carried along the lane to its partner, the pair glow gold while the Rydberg interaction entangles them, and it is carried back](docs/screenshots/anim-atoms.gif) | ![Gold laser beams address ions in the trap during two-qubit gates](docs/screenshots/anim-ions.gif) |
+| **The same circuit on three machines** | **Beat the classical limit** |
+| ![Superconducting 89.4%, trapped ions 97.3%, neutral atoms 93.8%, with shot times and wiring costs](docs/screenshots/machines-compare.png) | ![The Bell test: S = 2.93 +- 0.09 with entanglement, 1.45 without, against the classical limit 2](docs/screenshots/ch19-bell-test.png) |
+| **Inside a superconducting quantum computer** | **On your real desk, in mixed reality** |
+| ![The dilution refrigerator, the pulse schedule, the chip and the falling shots](docs/screenshots/quantum-hardware.png) | ![Panels and orbs on a real desk with hand tracking](docs/screenshots/ar-passthrough-hands.png) |
+| **See a whole state at once** | **Your progress** |
+| ![The Q-sphere of a four-qubit state](docs/screenshots/qsphere.png) | ![Level, daily streak and achievements](docs/screenshots/profile-board.png) |
+
+**By the numbers:** 25 chapters, a 14-module course, 15 lessons, 12 puzzles and
+a daily challenge, 4 big-state views, 3 kinds of quantum computer in 3D, 23
+achievements, voice control, shared labs and classes, and 295 unit tests.
+
+## Contents
+
+- [Try it](#try-it)
+- [Part 1: Your hands are the quantum computer](#part-1-your-hands-are-the-quantum-computer)
+  - [Gestures](#gestures), [Gates you can see](#gates-you-can-see), [Circuit board](#circuit-board), [Sandbox](#sandbox), [Share links](#share-links)
+- [Part 2: Learn, from the first qubit to research topics](#part-2-learn-from-the-first-qubit-to-research-topics)
+  - [Course](#course), [Learn](#learn), [Notes](#notes), [The Mystery Qubit](#the-mystery-qubit), [QAOA: a variational algorithm](#qaoa-a-variational-algorithm), [Algorithm chapters](#algorithm-chapters), [Advanced chapters](#advanced-chapters), [The maths of every step](#the-maths-of-every-step)
+- [Part 3: Real quantum hardware](#part-3-real-quantum-hardware)
+  - [On a real chip](#on-a-real-chip), [Run on a real quantum computer](#run-on-a-real-quantum-computer), [Noise lab](#noise-lab)
+- [Part 4: Tools for exploring](#part-4-tools-for-exploring)
+  - [Build: circuit builder](#build-circuit-builder), [Code window: tabs, zoom, simplify](#code-window-tabs-zoom-simplify), [Step debugger](#step-debugger), [Big-state views](#big-state-views), [Library, import and custom gates](#library-import-and-custom-gates), [Voice commands](#voice-commands), [Listen to a state](#listen-to-a-state), [Snapshot](#snapshot)
+- [Part 5: Together, and every day](#part-5-together-and-every-day)
+  - [Shared lab](#shared-lab), [Classroom and certificate](#classroom-and-certificate), [Daily challenge, achievements and levels](#daily-challenge-achievements-and-levels), [Puzzles](#puzzles)
+- [Under the hood](#under-the-hood)
+
+## Try it
 
 ```sh
 npm install
@@ -25,9 +85,9 @@ On a Quest on the same Wi-Fi: run `npx @iwsdk/cli dev status`, open one of the
 `runtimeUrls.network` addresses in the Quest browser, accept the local
 certificate warning, and tap Enter XR.
 
-![In mixed reality: the panels and orbs sit on your real desk, with hand tracking](docs/screenshots/ar-passthrough-hands.png)
+## Part 1: Your hands are the quantum computer
 
-## Gestures
+### Gestures
 
 ![Chapter 4: the ghost hand shows how to touch two orbs together](docs/screenshots/ch4-ghost-hands.png)
 
@@ -81,32 +141,51 @@ depends on a single input path.
 Gesture thresholds live in `src/gestures/config.ts` (with hysteresis, hold times
 and a shared cooldown, so fist, spread and pinch never trigger each other).
 
-## What's inside
+### Gates you can see
 
-```
-src/quantum/   statevector simulator, gates, measurement, Bloch vectors,
-               entanglement measures, noise, history, Qiskit/PennyLane export,
-               teleportation / Grover / BB84, the CHSH game, the bit-flip code,
-               quantum walks, Trotter evolution, randomized benchmarking
-               (pure TypeScript, fully tested)
-src/gestures/  hand-joint features and the gesture state machine (tested with a
-               synthetic hand, including tracking noise)
-src/lab/       the lab model, 3D orbs, threads, GHZ ring, probability rain,
-               gesture and desktop input systems, sound, autosave, the board's
-               figures (Bell score, syndrome table, walk, Trotter, unitary ...)
-src/game/      25 chapters, fifteen lessons, twelve puzzles, the circuit builder,
-               notes, sandbox presets, the campaign state machine, hands-only
-               panels, the ghost-hand tutor, voice commands, the step debugger
-src/net/       shared rooms: one circuit for everyone, qubit ownership, the
-               classroom (assignments, progress), WebSocket and same-device
-               transports
-server/        the room relay (built into the dev and preview servers, or
-               standalone with `node server/relay.mjs`)
-public/ui/     UIKitML panels (chapter card, gate dock, code, navigator, builder,
-               notes, noise, library, debugger, classroom)
-```
+When a gate starts, the orb draws the exact circle the arrow tip is about to
+travel (the gate's rotation axis and angle, starting from the current state) with
+an arrowhead, so every single-qubit gate reads as what it is: a rotation. The
+gate's name ("H", "Ry +45°") rises out of the orb; two-qubit gates send a gold
+spark from control to target; a measurement shows "M = 1". A wrist turn is shown
+live by the hand and is not replayed when it is released.
 
-## Course
+### Circuit board
+
+A board at the back of the desk shows the circuit so far as a standard diagram
+(gate boxes in each qubit's colour, gold CNOT dots and targets, faded steps after
+a rewind, a blue cursor) and the full state as circles: the filled area is a
+basis state's probability, the hand is its phase.
+
+![One round of Grover's search on the board: the full circuit, and all 100 shots on 11](docs/screenshots/sandbox-grover.png)
+
+### Sandbox
+
+Up to 5 qubits, every gate unlocked, plus ready-made circuits: Bell pair, GHZ
+(3 and 5 qubits), an even superposition of 16 outcomes, a finished
+teleportation to scrub through, and one round of Grover's search.
+
+| Bell pair: 100 shots, only 00 and 11 | GHZ x5: five qubits, one shared coin |
+| --- | --- |
+| ![Sandbox: a Bell pair with probability rain](docs/screenshots/sandbox-bell-rain.png) | ![Sandbox: a five-qubit GHZ state with the gold ring](docs/screenshots/sandbox-ghz5.png) |
+
+Each qubit keeps one colour everywhere (arrow, trail, desk label, timeline step,
+outcome digit). Gold is reserved for entanglement: threads, cores, the GHZ ring
+and multi-qubit gates on the timeline.
+
+### Share links
+
+The Qiskit panel has **Copy link**: a short, readable link such as
+`#c=3_h0/x1c0/x2c1/M0=1` that opens the circuit, recorded measurement outcomes
+included, in anyone's sandbox. Links are validated before anything is loaded.
+
+![A shared link opened: a GHZ circuit with the recorded measurement M0 = 1](docs/screenshots/shared-circuit.png)
+
+## Part 2: Learn, from the first qubit to research topics
+
+### Course
+
+![Chapter 10, Hidden Number: four qubits, the circuit board above them and 100 shots that all read 1101](docs/screenshots/ch10-hidden-number.png)
 
 ![A course quiz answered: the right answer in mint, with its explanation held until Continue](docs/screenshots/course-quiz.png)
 
@@ -150,7 +229,7 @@ the way a learner would, and check that a wrong answer waits.
 | --- | --- |
 | ![Entanglement: 100 shots land only on 00 and 11](docs/screenshots/ch3-entangled-rain.png) | ![Superdense coding: every shot reads 10](docs/screenshots/ch8-superdense.png) |
 
-## Learn
+### Learn
 
 | Z gate: the target ring turns mint | Kickback: the control flips, the target stays put |
 | --- | --- |
@@ -166,26 +245,7 @@ scripted solution in the tests.
 The **navigator** panel (upper right) switches between Chapters, Learn and the
 Sandbox, and shows what you have finished.
 
-## Puzzles
-
-![A puzzle solved at par, with the circuit board behind the orbs](docs/screenshots/puzzle-solved-board.png)
-
-Twelve "make this state" puzzles, from a single flip to the singlet. The target
-is drawn as mint outlines on the circuit board (and as target arrows when a
-qubit's target is not entangled). Par is the length of a reference solution:
-3 stars at par or under, 2 within two moves, 1 for any solution. Any route to the
-same state counts, global phase is ignored, relative phase is not.
-
-## Gates you can see
-
-When a gate starts, the orb draws the exact circle the arrow tip is about to
-travel (the gate's rotation axis and angle, starting from the current state) with
-an arrowhead, so every single-qubit gate reads as what it is: a rotation. The
-gate's name ("H", "Ry +45°") rises out of the orb; two-qubit gates send a gold
-spark from control to target; a measurement shows "M = 1". A wrist turn is shown
-live by the hand and is not replayed when it is released.
-
-## Notes
+### Notes
 
 ![Notes for the Z gate lesson](docs/screenshots/notes-z-gate.png)
 
@@ -197,32 +257,7 @@ page at a time; **Listen** reads the page aloud with the browser's speech engine
 so nothing has to be read in the headset. All notes text is checked in the tests
 to be plain ASCII (the panel font has no special symbols) and to fit the panel.
 
-## Build: circuit builder
-
-| Challenge 10: a Fredkin from a Toffoli and two CNOTs | Free build: every tool, the orbs run it live |
-| --- | --- |
-| ![The builder: a Fredkin gate in cross-dot notation](docs/screenshots/build-fredkin.png) | ![Free build: a GHZ state followed by single-qubit gates](docs/screenshots/build-free.png) |
-
-A fifth tab turns the gate dock into a grid editor written in standard circuit
-notation: filled dots (controls), open dots (anti-controls), circled-plus targets
-and swap marks. Dots control every gate in their column, so a dot over a plus is a
-CNOT, two dots a Toffoli, a dot with two swap marks a Fredkin. Every edit runs on
-the orbs, the circuit board and the timeline immediately.
-
-Ten tools are new beyond the dock: S dagger, T dagger, square root of X and its
-dagger, Rx, Rz, control, anti-control, target and swap.
-
-Ten challenges are checked as whole gates (the same output for every input, up to
-one global phase), not just one state: Z from H and X, X from square roots of X,
-T dagger from seven Ts, CZ from a CNOT, a reversed CNOT with dots only on q0, an
-open dot built from X, controlled-Y, SWAP from three CNOTs, a Fredkin from a
-Toffoli, and (expert) a Toffoli from two-qubit gates, H, T and T dagger. Rules
-block the easy way out, par is the reference solution's step count, and stars
-work like puzzles. Desktop: arrows move a cursor; H X Y Z S T place gates (Shift
-for the daggers), V is SX, 1 2 3 are Rx Ry Rz, C a dot, O an open dot, P a plus,
-W a swap mark.
-
-## The Mystery Qubit
+### The Mystery Qubit
 
 ![Chapter 11: three looks of 100 copies each, the rebuilt qubit and the revealed state, fidelity 0.96](docs/screenshots/ch11-mystery-qubit.png)
 
@@ -234,35 +269,7 @@ around the vertical axis), then Reveal draws the real state and the fidelity.
 With 100 copies per axis it lands within about 0.1 of the truth, which the tests
 check across 30 random states.
 
-## Code window: tabs, zoom, simplify
-
-![The code window zoomed, seen from the headset: tabs for Qiskit, OpenQASM 3 and PennyLane, numbered lines](docs/screenshots/code-window-zoom.png)
-
-The **Qiskit** button opens the code window: the whole program, not just the
-gates, as **Qiskit**, **OpenQASM 3** (the text format IBM Quantum, Qiskit and
-Amazon Braket read; any controlled gate is written exactly with `ctrl @`) or
-**PennyLane**, one tab each. Lines are numbered with the gate or call name
-picked out, ten to a page with Back and More, and a new step keeps you on the
-last page. **Zoom** makes the window 1.3 times bigger and brings it to eye level
-just above the orbs, where code is readable in a headset; Unzoom puts it back.
-The Notes panel shares the same Zoom.
-
-![The code window in OpenQASM 3 after Simplify: 7 steps down to 2](docs/screenshots/code-simplify-qasm.png)
- **Simplify** shortens the circuit the way a
-compiler's first passes do: gates that undo each other cancel (H H, S S dagger,
-CNOT CNOT), gates that add up merge (T T is S, two SX are X, rotations add), and
-gates slide past others they commute with so more of them meet, e.g. a Z on a
-CNOT's control passes through it. Measurements and classically controlled gates
-never move. In the sandbox the circuit is replaced and Undo brings yours back;
-in a chapter the panel only previews the shorter version.
-
-Both exports and the simplifier were cross-checked against Qiskit 2.5 (the QASM
-loaded with `qiskit.qasm3.loads`, every circuit compared as a full unitary) on
-60 random circuits with every gate, one and two controls, swaps and iSWAP. The
-unit tests check the simplifier on 300 random circuits, and that every pair of
-gates it calls commuting really does.
-
-## QAOA: a variational algorithm
+### QAOA: a variational algorithm
 
 ![QAOA on the board: the ring of four with its best cut, the cost landscape over gamma and beta, and the optimiser's path into the minimum](docs/screenshots/qaoa-landscape.png)
 
@@ -284,72 +291,7 @@ parameters found. Run with PennyLane 0.42 it prints exactly the same <H_C> and
 ratio as the app: -3.000 / 0.750 for one layer on the ring, -3.4573 / 0.8643
 for two layers on a kite.
 
-## Run on a real quantum computer
-
-The code window's **On chip** tab has **Run on IBM**: your circuit runs on an
-actual IBM Quantum computer through your own IBM Quantum Platform account (the
-free Open Plan works). Add your API key and instance CRN once on the 2D page
-(the **IBM Quantum** button at the bottom right; they stay in this browser).
-The app then does what Qiskit's transpiler does at its simplest:
-
-- picks the least busy operational backend with CZ gates (IBM Heron), reads its
-  wiring and calibration, and chooses a connected group of good qubits;
-- routes the circuit onto them, adding SWAPs where qubits are not wired;
-- rewrites every gate in the chip's native set: one-qubit gates become
-  RZ SX RZ SX RZ from their Euler angles, controlled gates become CNOTs and
-  one-qubit gates, and each CNOT is a CZ between Hadamards;
-- submits a 1000-shot Sampler job as OpenQASM 3 on the physical qubits, polls it
-  (it survives a reload), and rains the real counts on the desk next to how
-  close they are to the ideal circuit and to the noise model's prediction.
-
-Tests check the native translation (same unitary for every gate), compiling 40
-random circuits onto a heavy-hex fragment (native gates only, wired pairs only,
-same result through the layouts), Qiskit parsing the output as RZ/SX/CZ only,
-and the client's requests against a scripted stand-in for IBM's API (paths,
-`Service-CRN`, `IBM-API-Version: 2026-04-15`, the Sampler body). Through the dev
-server's proxy, IBM's live login and API both answer a fake key with the
-right rejection. A real hardware run needs your key, so it is the one step
-not run here; queues on the free plan can take minutes.
-
-Browsers cannot call IBM's servers directly (CORS), so `vite.config.ts`
-forwards `/ibm-iam`, `/ibm-api` and `/ibm-api-eu`; a hosted build needs the
-same three forwards.
-
-## Noise lab
-
-![The noise lab: density matrix, Bloch lengths, purity and zero-noise extrapolation](docs/screenshots/noise-lab.png)
-
-In the sandbox, **Noise** (or E) opens the noise lab. Turn it on and every gate
-runs as on a real chip: depolarizing error (ten times more for two-qubit gates),
-**T1** energy loss and **T2** dephasing during each gate's duration (36 ns, 280
-ns, 1.2 us readout). The orbs show the mixed state, so arrows shrink inside the
-spheres; shots sample it; and the board shows the **density matrix** (square
-size = |rho_ij|, probabilities on the diagonal, coherences off it), each qubit's
-Bloch length and the purity. **Mitigate** runs **zero-noise extrapolation**: the
-fidelity with the ideal state at 1x, 2x and 3x the noise, fitted back to zero.
-
-The density-matrix simulator matches the statevector exactly without noise,
-gives e^(-t/T1) decay and T2 dephasing, and matches Qiskit's `quantum_info`
-density matrices with the same channels to 3e-16.
-
-## Library, import and custom gates
-
-- **Library** (sandbox card, or F): My circuits and My gates, saved on this
-  device. The board shows them as thumbnails; Load opens a circuit.
-- **Import** reads OpenQASM 2 or 3 and Qiskit code, pasted on the 2D page.
-  Every exported program reads back as the same circuit (120 random round trips
-  each), and QASM written by Qiskit itself imports exactly.
-- **QR code** draws the current circuit's share link on the board; a phone
-  camera opens it (checked by decoding the rendered code). Where the browser
-  has a barcode detector and a camera, the import dialog can scan one too.
-- **Make gate** turns the circuit on the orbs into one reusable block: tiles
-  G1-G3 in Build (a dot in the column controls the whole block), or Apply in the
-  sandbox onto the selected qubit and up.
-- Builder rotations take any angle in steps of pi/8 (, and . on a keyboard),
-  and the Maths tab shows every one-qubit gate's Euler angles,
-  U = e^{i a} Rz(phi) Ry(theta) Rz(lambda), checked to rebuild 50 gates exactly.
-
-## Algorithm chapters
+### Algorithm chapters
 
 | QFT phase wheels | VQE for H2 |
 | --- | --- |
@@ -364,7 +306,7 @@ bond lengths, and the minimum sits at 0.74 Angstrom. Tests check the QFT
 against the discrete Fourier transform, phase estimation for every k/8, Shor's
 period and factors, Grover's 94.5%, and Simon's secret.
 
-## Advanced chapters
+### Advanced chapters
 
 Chapters 19 to 25 go past textbook algorithms into the physics that real
 quantum computers are built and judged on. Each one draws its own figure on the
@@ -420,7 +362,7 @@ with the numbers checked.
   formula under depolarizing noise, and that the fit recovers the error it was
   given.
 
-## The maths of every step
+### The maths of every step
 
 ![The Maths tab: CX as a 4x4 matrix with kets on the rows, its formula, U = CX, the state before and after as column vectors, and the new state in Dirac notation](docs/screenshots/maths-board.png)
 
@@ -444,7 +386,9 @@ e^{iπ/4}/√2) and as decimals otherwise. The panel shows the same in plain
 text. Tests check the matrices (Qiskit qubit order, unitarity, the Toffoli
 permutation, projectors), the exact forms and the Dirac strings.
 
-## On a real chip
+## Part 3: Real quantum hardware
+
+### On a real chip
 
 ![Run on chip: the routed circuit, the T5 chip at the upper right, and 1000 noisy shots that agree 87% with the ideal circuit](docs/screenshots/chip-run.png)
 
@@ -474,7 +418,7 @@ matches the ideal, readout flips about 2%, and SWAPs cost fidelity.
 
 ![The T5 chip from the headset, beside the code window](docs/screenshots/chip-headset.png)
 
-### Inside the machine
+#### Inside the machine
 
 ![From the headset during a run: the dilution refrigerator, the pulse schedule with its sweeping cursor, the code window, the chip and the falling shots](docs/screenshots/quantum-hardware.png)
 
@@ -501,7 +445,7 @@ SWAPs add. A blue cursor sweeps across it while the run plays.
 Windows now settle into place when they open, and Zoom glides between sizes
 instead of jumping.
 
-### Three kinds of quantum computer
+#### Three kinds of quantum computer
 
 | Trapped ions | Neutral atoms |
 | --- | --- |
@@ -548,24 +492,110 @@ non-neighbours.
 | --- | --- |
 | ![The ultra-high-vacuum chamber: an octagonal steel chamber with viewports and bolted flanges on a three-legged stand, an ion pump on top, and a violet laser entering a window](docs/screenshots/machine-ions-room.png) | ![The optics table: a breadboard of tapped holes, a laser, two mirrors steering a red beam into a small glass cell, and the camera above it](docs/screenshots/machine-atoms-room.png) |
 
-## Circuit board
+### Run on a real quantum computer
 
-A board at the back of the desk shows the circuit so far as a standard diagram
-(gate boxes in each qubit's colour, gold CNOT dots and targets, faded steps after
-a rewind, a blue cursor) and the full state as circles: the filled area is a
-basis state's probability, the hand is its phase.
+The code window's **On chip** tab has **Run on IBM**: your circuit runs on an
+actual IBM Quantum computer through your own IBM Quantum Platform account (the
+free Open Plan works). Add your API key and instance CRN once on the 2D page
+(the **IBM Quantum** button at the bottom right; they stay in this browser).
+The app then does what Qiskit's transpiler does at its simplest:
 
-![One round of Grover's search on the board: the full circuit, and all 100 shots on 11](docs/screenshots/sandbox-grover.png)
+- picks the least busy operational backend with CZ gates (IBM Heron), reads its
+  wiring and calibration, and chooses a connected group of good qubits;
+- routes the circuit onto them, adding SWAPs where qubits are not wired;
+- rewrites every gate in the chip's native set: one-qubit gates become
+  RZ SX RZ SX RZ from their Euler angles, controlled gates become CNOTs and
+  one-qubit gates, and each CNOT is a CZ between Hadamards;
+- submits a 1000-shot Sampler job as OpenQASM 3 on the physical qubits, polls it
+  (it survives a reload), and rains the real counts on the desk next to how
+  close they are to the ideal circuit and to the noise model's prediction.
 
-## Share links
+Tests check the native translation (same unitary for every gate), compiling 40
+random circuits onto a heavy-hex fragment (native gates only, wired pairs only,
+same result through the layouts), Qiskit parsing the output as RZ/SX/CZ only,
+and the client's requests against a scripted stand-in for IBM's API (paths,
+`Service-CRN`, `IBM-API-Version: 2026-04-15`, the Sampler body). Through the dev
+server's proxy, IBM's live login and API both answer a fake key with the
+right rejection. A real hardware run needs your key, so it is the one step
+not run here; queues on the free plan can take minutes.
 
-The Qiskit panel has **Copy link**: a short, readable link such as
-`#c=3_h0/x1c0/x2c1/M0=1` that opens the circuit, recorded measurement outcomes
-included, in anyone's sandbox. Links are validated before anything is loaded.
+Browsers cannot call IBM's servers directly (CORS), so `vite.config.ts`
+forwards `/ibm-iam`, `/ibm-api` and `/ibm-api-eu`; a hosted build needs the
+same three forwards.
 
-![A shared link opened: a GHZ circuit with the recorded measurement M0 = 1](docs/screenshots/shared-circuit.png)
+### Noise lab
 
-## Step debugger
+![The noise lab: density matrix, Bloch lengths, purity and zero-noise extrapolation](docs/screenshots/noise-lab.png)
+
+In the sandbox, **Noise** (or E) opens the noise lab. Turn it on and every gate
+runs as on a real chip: depolarizing error (ten times more for two-qubit gates),
+**T1** energy loss and **T2** dephasing during each gate's duration (36 ns, 280
+ns, 1.2 us readout). The orbs show the mixed state, so arrows shrink inside the
+spheres; shots sample it; and the board shows the **density matrix** (square
+size = |rho_ij|, probabilities on the diagonal, coherences off it), each qubit's
+Bloch length and the purity. **Mitigate** runs **zero-noise extrapolation**: the
+fidelity with the ideal state at 1x, 2x and 3x the noise, fitted back to zero.
+
+The density-matrix simulator matches the statevector exactly without noise,
+gives e^(-t/T1) decay and T2 dephasing, and matches Qiskit's `quantum_info`
+density matrices with the same channels to 3e-16.
+
+## Part 4: Tools for exploring
+
+### Build: circuit builder
+
+| Challenge 10: a Fredkin from a Toffoli and two CNOTs | Free build: every tool, the orbs run it live |
+| --- | --- |
+| ![The builder: a Fredkin gate in cross-dot notation](docs/screenshots/build-fredkin.png) | ![Free build: a GHZ state followed by single-qubit gates](docs/screenshots/build-free.png) |
+
+A fifth tab turns the gate dock into a grid editor written in standard circuit
+notation: filled dots (controls), open dots (anti-controls), circled-plus targets
+and swap marks. Dots control every gate in their column, so a dot over a plus is a
+CNOT, two dots a Toffoli, a dot with two swap marks a Fredkin. Every edit runs on
+the orbs, the circuit board and the timeline immediately.
+
+Ten tools are new beyond the dock: S dagger, T dagger, square root of X and its
+dagger, Rx, Rz, control, anti-control, target and swap.
+
+Ten challenges are checked as whole gates (the same output for every input, up to
+one global phase), not just one state: Z from H and X, X from square roots of X,
+T dagger from seven Ts, CZ from a CNOT, a reversed CNOT with dots only on q0, an
+open dot built from X, controlled-Y, SWAP from three CNOTs, a Fredkin from a
+Toffoli, and (expert) a Toffoli from two-qubit gates, H, T and T dagger. Rules
+block the easy way out, par is the reference solution's step count, and stars
+work like puzzles. Desktop: arrows move a cursor; H X Y Z S T place gates (Shift
+for the daggers), V is SX, 1 2 3 are Rx Ry Rz, C a dot, O an open dot, P a plus,
+W a swap mark.
+
+### Code window: tabs, zoom, simplify
+
+![The code window zoomed, seen from the headset: tabs for Qiskit, OpenQASM 3 and PennyLane, numbered lines](docs/screenshots/code-window-zoom.png)
+
+The **Qiskit** button opens the code window: the whole program, not just the
+gates, as **Qiskit**, **OpenQASM 3** (the text format IBM Quantum, Qiskit and
+Amazon Braket read; any controlled gate is written exactly with `ctrl @`) or
+**PennyLane**, one tab each. Lines are numbered with the gate or call name
+picked out, ten to a page with Back and More, and a new step keeps you on the
+last page. **Zoom** makes the window 1.3 times bigger and brings it to eye level
+just above the orbs, where code is readable in a headset; Unzoom puts it back.
+The Notes panel shares the same Zoom.
+
+![The code window in OpenQASM 3 after Simplify: 7 steps down to 2](docs/screenshots/code-simplify-qasm.png)
+ **Simplify** shortens the circuit the way a
+compiler's first passes do: gates that undo each other cancel (H H, S S dagger,
+CNOT CNOT), gates that add up merge (T T is S, two SX are X, rotations add), and
+gates slide past others they commute with so more of them meet, e.g. a Z on a
+CNOT's control passes through it. Measurements and classically controlled gates
+never move. In the sandbox the circuit is replaced and Undo brings yours back;
+in a chapter the panel only previews the shorter version.
+
+Both exports and the simplifier were cross-checked against Qiskit 2.5 (the QASM
+loaded with `qiskit.qasm3.loads`, every circuit compared as a full unitary) on
+60 random circuits with every gate, one and two controls, swaps and iSWAP. The
+unit tests check the simplifier on 300 random circuits, and that every pair of
+gates it calls commuting really does.
+
+### Step debugger
 
 | Stopped at a breakpoint | Stepping onto a measurement |
 | --- | --- |
@@ -580,7 +610,7 @@ when a measurement collapsed a partner too. When a pair stops being entangled
 because the entanglement spread to a third qubit, it says that rather than
 "no longer entangled".
 
-## Big-state views
+### Big-state views
 
 **View** (Shift+V, or say "next view") cycles four ways to see a state that is
 too big for one Bloch sphere each, or the whole circuit at once.
@@ -617,7 +647,24 @@ too big for one Bloch sphere each, or the whole circuit at once.
 
 ![The circuit unitary of a three-qubit circuit: an 8 x 8 grid of coloured squares, half of them non-zero, with the phase wheel](docs/screenshots/unitary-view.png)
 
-## Voice commands
+### Library, import and custom gates
+
+- **Library** (sandbox card, or F): My circuits and My gates, saved on this
+  device. The board shows them as thumbnails; Load opens a circuit.
+- **Import** reads OpenQASM 2 or 3 and Qiskit code, pasted on the 2D page.
+  Every exported program reads back as the same circuit (120 random round trips
+  each), and QASM written by Qiskit itself imports exactly.
+- **QR code** draws the current circuit's share link on the board; a phone
+  camera opens it (checked by decoding the rendered code). Where the browser
+  has a barcode detector and a camera, the import dialog can scan one too.
+- **Make gate** turns the circuit on the orbs into one reusable block: tiles
+  G1-G3 in Build (a dot in the column controls the whole block), or Apply in the
+  sandbox onto the selected qubit and up.
+- Builder rotations take any angle in steps of pi/8 (, and . on a keyboard),
+  and the Maths tab shows every one-qubit gate's Euler angles,
+  U = e^{i a} Rz(phi) Ry(theta) Rz(lambda), checked to rebuild 50 gates exactly.
+
+### Voice commands
 
 ![The dock after saying "entangle zero and one": the reply shows it heard a CNOT from q0 to q1](docs/screenshots/voice.png)
 
@@ -637,7 +684,27 @@ command it hears is shown briefly so you know what it understood:
 The grammar is unit tested, including the words recognisers write for numbers
 ("to", "too", "for", "tree").
 
-## Shared lab
+### Listen to a state
+
+**Listen** on the dock (or Shift+L, or say "listen") plays the state as sound.
+Every outcome with a real chance of turning up is a note, |00...0> lowest,
+climbing a pentatonic scale, as loud as its amplitude. Its phase sets when it
+sounds: equal phases ring together as a chord, different phases roll out as an
+arpeggio. |0> is middle C; |+> is a chord of two notes; |-> plays the same two
+notes 0.3 s apart; a Bell pair is two notes at once; after a measurement
+there is only one. A global phase changes nothing, which the tests check.
+
+### Snapshot
+
+The share dialog's **Save picture** (or Shift+I, "take a picture") saves the
+board as it is right now, with a title and a QR code of the link that opens
+the same circuit, ready to post.
+
+![A snapshot: My quantum circuit, 3 qubits, 3 gates, the GHZ circuit and its state on the board, and a QR code to open it](docs/screenshots/snapshot-card.png)
+
+## Part 5: Together, and every day
+
+### Shared lab
 
 ![A shared lab: a Bell pair where q0 belongs to Ana and q1 to you, with the room code on the Share button](docs/screenshots/shared-lab.png)
 
@@ -668,7 +735,7 @@ node server/relay.mjs 8787      # then open the app with ?relay=wss://your-host:
 
 Without a relay, tabs on the same device still share a room.
 
-## Classroom and certificate
+### Classroom and certificate
 
 | The teacher's panel | A student who has finished |
 | --- | --- |
@@ -686,7 +753,7 @@ course) the board shows a **certificate**, and the 2D page can save it as a PNG.
 
 ![The certificate: name, modules completed, class and teacher, date, and a seal of two entangled qubits](docs/screenshots/certificate.png)
 
-## Daily challenge, achievements and levels
+### Daily challenge, achievements and levels
 
 | The daily challenge, solved | Your progress |
 | --- | --- |
@@ -712,36 +779,39 @@ course) the board shows a **certificate**, and the 2D page can save it as a PNG.
 
 ![An achievement banner above the gate dock: Look! Measure a qubit.](docs/screenshots/achievement-banner.png)
 
-## Listen to a state
+### Puzzles
 
-**Listen** on the dock (or Shift+L, or say "listen") plays the state as sound.
-Every outcome with a real chance of turning up is a note, |00...0> lowest,
-climbing a pentatonic scale, as loud as its amplitude. Its phase sets when it
-sounds: equal phases ring together as a chord, different phases roll out as an
-arpeggio. |0> is middle C; |+> is a chord of two notes; |-> plays the same two
-notes 0.3 s apart; a Bell pair is two notes at once; after a measurement
-there is only one. A global phase changes nothing, which the tests check.
+![A puzzle solved at par, with the circuit board behind the orbs](docs/screenshots/puzzle-solved-board.png)
 
-## Snapshot
+Twelve "make this state" puzzles, from a single flip to the singlet. The target
+is drawn as mint outlines on the circuit board (and as target arrows when a
+qubit's target is not entangled). Par is the length of a reference solution:
+3 stars at par or under, 2 within two moves, 1 for any solution. Any route to the
+same state counts, global phase is ignored, relative phase is not.
 
-The share dialog's **Save picture** (or Shift+I, "take a picture") saves the
-board as it is right now, with a title and a QR code of the link that opens
-the same circuit, ready to post.
+## Under the hood
 
-![A snapshot: My quantum circuit, 3 qubits, 3 gates, the GHZ circuit and its state on the board, and a QR code to open it](docs/screenshots/snapshot-card.png)
-
-## Sandbox
-
-Up to 5 qubits, every gate unlocked, plus ready-made circuits: Bell pair, GHZ
-(3 and 5 qubits), an even superposition of 16 outcomes, a finished
-teleportation to scrub through, and one round of Grover's search.
-
-| Bell pair: 100 shots, only 00 and 11 | GHZ x5: five qubits, one shared coin |
-| --- | --- |
-| ![Sandbox: a Bell pair with probability rain](docs/screenshots/sandbox-bell-rain.png) | ![Sandbox: a five-qubit GHZ state with the gold ring](docs/screenshots/sandbox-ghz5.png) |
-
-Each qubit keeps one colour everywhere (arrow, trail, desk label, timeline step,
-outcome digit). Gold is reserved for entanglement: threads, cores, the GHZ ring
-and multi-qubit gates on the timeline.
+```
+src/quantum/   statevector simulator, gates, measurement, Bloch vectors,
+               entanglement measures, noise, history, Qiskit/PennyLane export,
+               teleportation / Grover / BB84, the CHSH game, the bit-flip code,
+               quantum walks, Trotter evolution, randomized benchmarking
+               (pure TypeScript, fully tested)
+src/gestures/  hand-joint features and the gesture state machine (tested with a
+               synthetic hand, including tracking noise)
+src/lab/       the lab model, 3D orbs, threads, GHZ ring, probability rain,
+               gesture and desktop input systems, sound, autosave, the board's
+               figures (Bell score, syndrome table, walk, Trotter, unitary ...)
+src/game/      25 chapters, fifteen lessons, twelve puzzles, the circuit builder,
+               notes, sandbox presets, the campaign state machine, hands-only
+               panels, the ghost-hand tutor, voice commands, the step debugger
+src/net/       shared rooms: one circuit for everyone, qubit ownership, the
+               classroom (assignments, progress), WebSocket and same-device
+               transports
+server/        the room relay (built into the dev and preview servers, or
+               standalone with `node server/relay.mjs`)
+public/ui/     UIKitML panels (chapter card, gate dock, code, navigator, builder,
+               notes, noise, library, debugger, classroom)
+```
 
 See `DECISIONS.md` for design choices and `TODO.md` for the plan to the Nov 17 submission.

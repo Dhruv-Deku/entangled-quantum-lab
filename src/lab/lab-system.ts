@@ -404,7 +404,9 @@ export class LabSystem extends createSystem({
   }
 
   update(delta: number): void {
-    const dt = Math.min(delta, 0.05);
+    // development: slow motion (window.__entangledSlowmo), for recording the animations frame by frame
+    const slow = import.meta.env.DEV ? ((globalThis as { __entangledSlowmo?: number }).__entangledSlowmo ?? 1) : 1;
+    const dt = Math.min(delta, 0.05) * slow;
     // one machine at a time: the device where the chip floats, its surroundings where the fridge stands
     const device = this.hardwareWanted, room = !!this.pulseView;
     this.chip.root.visible = device && this.machine === 'superconducting';
