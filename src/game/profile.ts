@@ -78,6 +78,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   counter('streak3', 'Habit', 'A three-day daily streak.', (_s, c) => c.streak, () => 3),
   counter('streak7', 'Devoted', 'A seven-day daily streak.', (_s, c) => c.streak, () => 7),
   { id: 'bell-test', title: 'Beyond classical', text: 'Win the Bell Test chapter.', done: (_s, c) => c.chaptersDone.includes('Bell Test') },
+  { id: 'hunt', title: 'Ghost hunter', text: 'Catch every pair in the Quantum Hunt.', done: (_s, c) => c.chaptersDone.includes('Quantum Hunt') },
   { id: 'qec', title: 'Error free', text: 'Finish Error Correction.', done: (_s, c) => c.chaptersDone.includes('Error Correction') },
   counter('views', 'Big picture', 'Try all four big-state views.', (s) => VIEWS.filter((v) => used(s, `view:${v}`)).length, () => VIEWS.length),
   { id: 'debugger', title: 'Inspector', text: 'Open the step debugger.', done: (s) => used(s, 'debugger') },

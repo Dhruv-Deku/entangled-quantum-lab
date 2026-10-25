@@ -11,6 +11,7 @@ import { pairStrength } from '../quantum/entanglement';
 import { entanglementMap } from '../quantum/state-views';
 import type { QState } from '../quantum/state';
 import type { Chapter, GoalContext, Step } from './chapters';
+import { huntStatus, HUNT_TITLE } from './hunt';
 
 /**
  * Chapters 19 to 25: the CHSH Bell test, the bit-flip code, entanglement
@@ -558,6 +559,23 @@ export const ADVANCED_CHAPTERS: Chapter[] = [
       },
     ],
     outro: 'Hardware makers report gate quality measured this way. The best single-qubit gates today go wrong less than once in a thousand times.',
+  },
+  {
+    title: HUNT_TITLE,
+    chip: 'Hunt',
+    qubits: 2,
+    steps: [
+      {
+        text: 'Three entangled pairs have escaped into your room, each tied to its partner by a gold thread. Walk around, find the glowing qubits on your furniture and floor, and catch them with your hand.',
+        goal: () => `Catch all three pairs (${huntStatus.caught} of 3)`,
+        keys: 'Press J to catch the next one',
+        done: () => huntStatus.done,
+        solve: () => void huntStatus.catchNext?.(),
+        payoff: 'Every pair matched, or mismatched, perfectly, though the two qubits were metres apart. Measuring one decided the other at that instant, with no signal between them: that is entanglement.',
+        hold: true,
+      },
+    ],
+    outro: 'Einstein called this spooky action at a distance. Experiments have since shown it across 1,200 km, between a satellite and two ground stations.',
   },
 ];
 

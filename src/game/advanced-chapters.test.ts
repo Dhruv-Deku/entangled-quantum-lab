@@ -58,8 +58,8 @@ function play(title: string, seed = 1): { c: Campaign; lab: Lab; payoffs: string
 
 describe('advanced chapters', () => {
   it('seven more chapters close the list', () => {
-    expect(CHAPTERS).toHaveLength(25);
-    expect(CHAPTERS.slice(18).map((c) => c.title)).toEqual(['Bell Test', 'Error Correction', 'Entanglement Swapping', 'Quantum Walk', 'Time Evolution', 'Quantum Zeno', 'Benchmarking']);
+    expect(CHAPTERS).toHaveLength(26);
+    expect(CHAPTERS.slice(18).map((c) => c.title)).toEqual(['Bell Test', 'Error Correction', 'Entanglement Swapping', 'Quantum Walk', 'Time Evolution', 'Quantum Zeno', 'Benchmarking', 'Quantum Hunt']);
   });
 
   it('Quantum Zeno: unwatched it reaches |1>; watched often, it stays', () => {

@@ -45,6 +45,7 @@ import { profileFigure, type ProfileView } from '../lab/figures';
 import { listen } from '../lab/sonify';
 import { downloadSnapshot } from '../lab/snapshot';
 import { Banner } from '../lab/banner';
+import { huntStatus } from './hunt';
 import { compareFigure } from '../lab/figures';
 import { compileFor, comparePlatforms, formatTime, machineQubits, PLATFORMS, platformSchedule, runPlatform, type PlatformId, type PlatformResult } from '../quantum/platforms';
 import { toQasm } from '../quantum/export';
@@ -2442,6 +2443,8 @@ export class UISystem extends createSystem({
       this.noiseAsset!.position.copy(PARKED);
     }
     this.place(this.nav!, 'nav-panel');
+    // the Quantum Hunt uses the whole room: the panels step aside for its small task card
+    if (huntStatus.active) for (const p of [this.chapter, this.dock, this.builderAsset, this.code, this.notesAsset, this.classAsset, this.dbgAsset, this.libAsset, this.noiseAsset, this.nav]) p?.position.copy(PARKED);
     campaign.update(Math.min(delta, 0.05));
     this.pollIbm(Math.min(delta, 0.05));
     this.updateDebugger(Math.min(delta, 0.05));

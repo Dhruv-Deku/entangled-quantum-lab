@@ -43,3 +43,6 @@ pids/
 .cursor/mcp.json
 .vscode/mcp.json
 .codex/config.toml
+
+# reference videos (not part of the project)
+Screen Recording*.mp4
