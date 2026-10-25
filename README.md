@@ -42,9 +42,9 @@ the Meta Immersive Web SDK (IWSDK), three.js and TypeScript.
 
 ## Highlights
 
-| Atoms carried into place to entangle | Lasers on a chain of trapped ions |
+| Atoms carried into place to entangle | The density matrix as a 3D city |
 | --- | --- |
-| ![A neutral atom is carried along the lane to its partner, the pair glow gold while the Rydberg interaction entangles them, and it is carried back](docs/screenshots/anim-atoms.gif) | ![Gold laser beams address ions in the trap during two-qubit gates](docs/screenshots/anim-ions.gif) |
+| ![A neutral atom is carried along the lane to its partner, the pair glow gold while the Rydberg interaction entangles them, and it is carried back](docs/screenshots/anim-atoms.gif) | ![State city: the real and imaginary parts of the density matrix as towers](docs/screenshots/state-city.png) |
 | **The same circuit on three machines** | **Beat the classical limit** |
 | ![Superconducting 89.4%, trapped ions 97.3%, neutral atoms 93.8%, with shot times and wiring costs](docs/screenshots/machines-compare.png) | ![The Bell test: S = 2.93 +- 0.09 with entanglement, 1.45 without, against the classical limit 2](docs/screenshots/ch19-bell-test.png) |
 | **Inside a superconducting quantum computer** | **On your real desk, in mixed reality** |
