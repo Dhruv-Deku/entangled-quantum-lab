@@ -27,6 +27,10 @@ import { FridgeVisual } from './fridge';
 import { noiseLab } from './noise-lab';
 import { runNoisy } from '../quantum/density';
 import { ChipVisual } from './chip';
+import { IonChamberVisual, IonTrapVisual } from './ion-trap';
+import { AtomArrayVisual, OpticsTableVisual } from './atom-array';
+import type { PlatformId } from '../quantum/platforms';
+import type { Routed } from '../quantum/routing';
 import { drawCertificate, type CertificateInfo } from './certificate';
 import { unitaryFigure } from './figures';
 import { circuitUnitary, describeUnitary } from '../quantum/advanced';
@@ -75,6 +79,15 @@ export class LabSystem extends createSystem({
   chip!: ChipVisual;
   /** The dilution refrigerator the chip lives in, shown with it. */
   fridge!: FridgeVisual;
+  /** The other two kinds of machine: an ion trap in its vacuum chamber, and an atom array on its optics table. */
+  ionTrap!: IonTrapVisual;
+  ionChamber!: IonChamberVisual;
+  atomArray!: AtomArrayVisual;
+  opticsTable!: OpticsTableVisual;
+  /** Which machine the hardware views show. */
+  machine: PlatformId = 'superconducting';
+  /** The UI wants the machine shown (the chip tab, or a course step about hardware). */
+  hardwareWanted = false;
   /** Big-state views: the Q-sphere and the state city float where the board was; the board shows their legend. */
   private qsphere!: QSphereVisual;
   private city!: StateCityVisual;
@@ -149,6 +162,26 @@ export class LabSystem extends createSystem({
     this.fridge.root.rotation.y = 0.5;
     this.fridge.root.visible = false;
     ws.add(this.fridge.root);
+    // the ion trap and the atom array take the chip's place; their chamber and optics table the fridge's
+    this.ionTrap = new IonTrapVisual();
+    this.atomArray = new AtomArrayVisual();
+    for (const device of [this.ionTrap.root, this.atomArray.root]) {
+      device.position.set(0.3, 0.14, -0.27);
+      device.rotation.set(0.42, -0.34, 0, 'YXZ');
+      device.scale.setScalar(1.5);
+      device.visible = false;
+      ws.add(device);
+    }
+    this.ionChamber = new IonChamberVisual();
+    this.opticsTable = new OpticsTableVisual();
+    this.ionChamber.root.position.set(-0.37, 0.0, -0.33);
+    this.ionChamber.root.rotation.y = 0.5;
+    this.opticsTable.root.position.set(-0.36, 0.0, -0.3);
+    this.opticsTable.root.rotation.y = 0.5;
+    for (const m of [this.ionChamber.root, this.opticsTable.root]) {
+      m.visible = false;
+      ws.add(m);
+    }
     this.qsphere = new QSphereVisual();
     this.qsphere.root.position.set(0, 0.25, -0.27);
     this.qsphere.root.visible = false;
@@ -372,8 +405,24 @@ export class LabSystem extends createSystem({
 
   update(delta: number): void {
     const dt = Math.min(delta, 0.05);
+    // one machine at a time: the device where the chip floats, its surroundings where the fridge stands
+    const device = this.hardwareWanted, room = !!this.pulseView;
+    this.chip.root.visible = device && this.machine === 'superconducting';
+    this.fridge.root.visible = room && this.machine === 'superconducting';
+    this.ionTrap.root.visible = device && this.machine === 'ions';
+    this.ionChamber.root.visible = room && this.machine === 'ions';
+    this.atomArray.root.visible = device && this.machine === 'atoms';
+    this.opticsTable.root.visible = room && this.machine === 'atoms';
+    if (this.ionTrap.root.visible || this.atomArray.root.visible) {
+      this.ionTrap.setQubits(lab.n);
+      this.atomArray.setQubits(lab.n);
+    }
     if (this.chip.root.visible) this.chip.update(dt);
     if (this.fridge.root.visible) this.fridge.update(dt);
+    if (this.ionTrap.root.visible) this.ionTrap.update(dt);
+    if (this.ionChamber.root.visible) this.ionChamber.update(dt);
+    if (this.atomArray.root.visible) this.atomArray.update(dt);
+    if (this.opticsTable.root.visible) this.opticsTable.update(dt);
     if (this.qsphere.root.visible) this.qsphere.update(dt);
     if (this.city.root.visible) this.city.update(dt);
     // on the chip tab the board rises above the code window so the pulse schedule shows
@@ -517,10 +566,10 @@ export class LabSystem extends createSystem({
     this.pulseKey = key;
     this.pulseView = view;
     this.pulseClock = -1;
-    this.fridge.root.visible = !!view;
     if (view) {
       this.fridge.setHolders(view.holders);
-      this.board.renderPulses(view, null);
+      // an overlay (the machine comparison) keeps the board until it is put away
+      if (!this.overlayKey) this.board.renderPulses(view, null);
     } else {
       this.boardVersion = -1;
     }
@@ -617,5 +666,22 @@ export class LabSystem extends createSystem({
     this.pulseClock = 0;
     this.pulseSeconds = seconds;
     this.fridge.play(this.pulseView.schedule.pulses, this.pulseView.schedule.duration, seconds);
+    this.ionChamber.play(seconds);
+    this.opticsTable.play(seconds);
+  }
+
+  /** Play a compiled run on whichever machine is showing. */
+  playMachine(routed: Routed): void {
+    if (this.machine === 'superconducting') this.chip.play(routed);
+    else if (this.machine === 'ions') this.ionTrap.play(routed.ops);
+    else this.atomArray.play(routed.ops);
+  }
+
+  /** How long the run takes to play back on the machine, seconds. */
+  machineSeconds(routed: Routed): number {
+    if (this.machine === 'superconducting') return Math.max(1.6, routed.ops.length * 0.16 + 0.4);
+    if (this.machine === 'ions') return Math.max(1.6, routed.ops.length * 0.24 + 0.4);
+    const far = routed.ops.filter((o) => o.kind === 'gate' && o.controls?.length === 1 && Math.abs(o.controls[0] - o.target) > 1).length;
+    return Math.max(1.6, routed.ops.length * 0.3 + far * 2.0 + 0.4);
   }
 }

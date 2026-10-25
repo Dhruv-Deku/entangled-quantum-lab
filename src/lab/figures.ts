@@ -630,3 +630,69 @@ export function profileFigure(v: ProfileView): Figure {
     },
   };
 }
+
+// ---------------------------------------------------------------- three machines compared
+
+export interface MachineResult {
+  name: string;
+  examples: string;
+  counts: Uint32Array;
+  agreement: number;
+  time: string;
+  twoQubit: number;
+  overhead: string;
+}
+
+/** One column per machine: its shots against the ideal outlines, how close it came, and what it cost. */
+export function compareFigure(n: number, ideal: ArrayLike<number>, results: MachineResult[]): Figure {
+  return {
+    key: `compare:${n}:${results.map((r) => `${r.name}:${r.agreement.toFixed(4)}`).join('|')}`,
+    draw: (g, w, h) => {
+      const shots = results[0] ? results[0].counts.reduce((a, b) => a + b, 0) : 0;
+      panel(g, w, h, 'The same circuit on three kinds of quantum computer', `${shots} shots each`);
+      const best = Math.max(...results.map((r) => r.agreement));
+      const colW = (w - 88 - 2 * 24) / 3;
+      const dim = 1 << n;
+      results.forEach((r, i) => {
+        const x = 44 + i * (colW + 24), y = 92;
+        const top = r.agreement === best;
+        roundRect(g, x, y, colW, h - y - 36, 22);
+        g.fillStyle = top ? 'rgba(61,220,151,0.08)' : '#232428';
+        g.fill();
+        if (top) {
+          g.lineWidth = 2;
+          g.strokeStyle = 'rgba(61,220,151,0.6)';
+          g.stroke();
+        }
+        text(g, r.name, x + 22, y + 44, INK, '700 28px');
+        text(g, r.examples, x + 22, y + 74, DIM, '500 18px');
+        // the outcomes: ideal as outlines, the machine's shots as bars
+        const cx = x + 22, cy = y + 100, cw = colW - 44, ch = 170, bw = cw / dim;
+        const tot = r.counts.reduce((a, b) => a + b, 0) || 1;
+        const peak = Math.max(0.5, ...Array.from(ideal), ...Array.from(r.counts, (c) => c / tot));
+        g.fillStyle = LINE;
+        g.fillRect(cx, cy + ch, cw, 2);
+        for (let k = 0; k < dim; k++) {
+          const bx = cx + k * bw;
+          const hm = ((r.counts[k] / tot) / peak) * ch;
+          if (hm > 0.5) {
+            g.fillStyle = SOFT_BLUE;
+            g.fillRect(bx + bw * 0.18, cy + ch - hm, bw * 0.64, hm);
+          }
+          const hi = (ideal[k] / peak) * ch;
+          if (hi > 0.5) {
+            g.strokeStyle = INK;
+            g.lineWidth = 2;
+            g.strokeRect(bx + bw * 0.12, cy + ch - hi, bw * 0.76, hi);
+          }
+          if (dim <= 8) text(g, k.toString(2).padStart(n, '0'), bx + bw / 2, cy + ch + 24, DIM, '500 16px', 'center');
+        }
+        const ty = cy + ch + (dim <= 8 ? 70 : 50);
+        text(g, `${(r.agreement * 100).toFixed(1)}%`, x + 22, ty, top ? MINT : INK, '700 44px');
+        text(g, 'agree with the ideal', x + 22 + 150, ty - 6, DIM, '500 18px');
+        text(g, `one shot: ${r.time}`, x + 22, ty + 40, INK, '600 20px');
+        text(g, `${r.twoQubit} two-qubit gate${r.twoQubit === 1 ? '' : 's'}, ${r.overhead}`, x + 22, ty + 70, DIM, '500 18px');
+      });
+    },
+  };
+}

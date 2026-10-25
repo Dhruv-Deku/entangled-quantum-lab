@@ -45,13 +45,16 @@ import { profileFigure, type ProfileView } from '../lab/figures';
 import { listen } from '../lab/sonify';
 import { downloadSnapshot } from '../lab/snapshot';
 import { Banner } from '../lab/banner';
+import { compareFigure } from '../lab/figures';
+import { compileFor, comparePlatforms, formatTime, machineQubits, PLATFORMS, platformSchedule, runPlatform, type PlatformId, type PlatformResult } from '../quantum/platforms';
+import { toQasm } from '../quantum/export';
 import { PUZZLES } from './puzzles';
 import { downloadCertificate, type CertificateInfo } from '../lab/certificate';
 import { COURSE } from './course';
 import { SpeechInput } from '../lab/speech';
 import { landscape, SQUARE, toPennyLaneQaoa } from '../quantum/qaoa';
 import { H2 } from '../quantum/h2-data';
-import { agreement, NO_NOISE, runOnChip, TYPICAL_NOISE } from '../quantum/hardware';
+import { agreement, runOnChip, TYPICAL_NOISE } from '../quantum/hardware';
 import { T5, type Routed } from '../quantum/routing';
 import { compileForIbm, samplesToCounts } from '../quantum/ibm-compile';
 import { IbmClient, loadPending, loadSettings, savePending, type PendingJob } from '../lab/ibm';
@@ -325,7 +328,7 @@ export class UISystem extends createSystem({
     const dockIds = ['g-h', 'g-x', 'g-y', 'g-z', 'g-s', 'g-t', 'g-rl', 'g-rr', 'a-cnot', 'a-swap', 'a-measure', 'a-shots', 'a-export', 't-prev', 't-next', 'dock-status', 'a-voice', 'a-voice-l', 'a-debug', 'a-debug-l', 'a-view', 'a-view-l', 'a-share', 'a-share-l', 'a-listen', 'a-listen-l'];
     for (let i = 0; i < SLOTS; i++) dockIds.push(`t-${i}`, `t-${i}-l`);
     for (const id of dockIds) this.els.set(id, this.dock.requireElementById(id));
-    const codeIds = ['code-close', 'code-note', 'code-link', 'code-eyebrow', 'code-title', 'code-zoom', 'code-zoom-label', 'code-simplify', 'code-simplify-label', 'code-run', 'code-ibm', 'code-ibm-l', 'code-up', 'code-down'];
+    const codeIds = ['code-close', 'code-note', 'code-link', 'code-eyebrow', 'code-title', 'code-zoom', 'code-zoom-label', 'code-simplify', 'code-simplify-label', 'code-run', 'code-ibm', 'code-ibm-l', 'code-up', 'code-down', 'code-mach', 'code-m-superconducting', 'code-m-ions', 'code-m-atoms', 'code-compare'];
     for (const f of FORMATS) codeIds.push(`code-tab-${f}`, `code-tab-${f}-l`);
     for (let i = 0; i < CODE_LINES; i++) codeIds.push(`code-r-${i}`, `code-n-${i}`, `code-h-${i}`, `code-t-${i}`);
     for (const id of codeIds) this.els.set(id, this.code.requireElementById(id));
@@ -499,6 +502,8 @@ export class UISystem extends createSystem({
     for (const f of FORMATS) on(`code-tab-${f}`, () => this.setFormat(f));
     on('code-simplify', () => this.simplifyCircuit());
     on('code-run', () => this.runChip());
+    for (const id of ['superconducting', 'ions', 'atoms'] as const) on(`code-m-${id}`, () => this.setMachine(id));
+    on('code-compare', () => this.compareMachines());
     on('code-ibm', () => void this.runIbm());
     this.cleanupFuncs.push(addIbmButton());
     // a job submitted before a reload: keep waiting for it
@@ -770,6 +775,10 @@ export class UISystem extends createSystem({
   private profile = new Profile(loadProfile());
   private dailyRec: DailyRecord = loadDaily() ?? emptyDaily();
   private profileOpen = false;
+  /** The machine the chip tab compiles for and runs on. */
+  private machine: PlatformId = 'superconducting';
+  /** The last Compare all three, for this circuit. */
+  private compared: { key: string; results: PlatformResult[]; ideal: number[] } | null = null;
   private profileDirty = false;
   private profileSaveTimer = 0;
 
@@ -1028,6 +1037,20 @@ export class UISystem extends createSystem({
         return true;
       case 'snapshot':
         this.snapshot();
+        return true;
+      case 'machine':
+        if (!this.code?.visible || this.codeFormat !== 'chip') {
+          this.codeFormat = 'chip';
+          this.showCode(false);
+        }
+        this.setMachine(c.id);
+        return true;
+      case 'compare':
+        if (!this.code?.visible || this.codeFormat !== 'chip') {
+          this.codeFormat = 'chip';
+          this.showCode(false);
+        }
+        this.compareMachines();
         return true;
       case 'close':
         this.profileOpen = false;
@@ -1830,27 +1853,29 @@ export class UISystem extends createSystem({
    */
   private runChip(): void {
     const ops = lab.history.ops.slice();
-    const routed = routeOrError(lab.n, ops);
+    const routed = this.compiled(ops);
     if (typeof routed === 'string') {
       feedback('reject');
       return;
     }
     const shots = 1000;
-    const noisy = runOnChip(routed, lab.n, T5.qubits, shots, Math.random, TYPICAL_NOISE);
-    // the ideal answer: exact when nothing is measured mid-circuit, otherwise a noiseless run
-    const midMeasure = ops.some((op) => op.kind === 'measure' || op.kind === 'reset');
-    const ideal = midMeasure
-      ? Array.from(runOnChip(routed, lab.n, T5.qubits, 4000, Math.random, NO_NOISE).counts, (c) => c / 4000)
-      : Array.from(lab.history.state.probabilities());
-    const score = agreement(noisy.counts, ideal);
+    const noisy = this.machine === 'superconducting' ? runOnChip(routed, lab.n, T5.qubits, shots, Math.random, TYPICAL_NOISE) : runPlatform(this.machine, routed, lab.n, shots, Math.random);
+    const score = agreement(noisy.counts, this.idealOf(ops));
     const labSys = this.world.getSystem(LabSystem);
-    labSys?.chip.play(routed);
-    labSys?.playHardware(Math.max(1.6, routed.ops.length * 0.16 + 0.4));
+    labSys?.playMachine(routed);
+    labSys?.playHardware(labSys.machineSeconds(routed));
     lab.showShots(noisy.counts);
+    const p = PLATFORMS[this.machine];
+    const shot = formatTime((platformSchedule(this.machine, routed, lab.n).duration + p.timing.readout) / 1000);
+    const how =
+      this.machine === 'superconducting'
+        ? routed.swaps ? `The ${routed.swaps} routing SWAP${routed.swaps === 1 ? '' : 's'} cost some of that.` : 'No SWAPs were needed.'
+        : this.machine === 'ions' ? 'Every ion reaches every other, so nothing was rerouted.' : 'Atoms that were not neighbours flew over and back for their gates.';
     this.codeNote = {
       key: JSON.stringify(ops),
-      text: `${shots} shots with typical chip errors (CNOT 1%, readout 2%): ${(score * 100).toFixed(1)}% agree with the ideal circuit. ${routed.swaps ? `The ${routed.swaps} routing SWAP${routed.swaps === 1 ? '' : 's'} cost some of that.` : 'No SWAPs were needed.'}`,
+      text: `${shots} shots on the ${p.name.toLowerCase()} (two-qubit error ${(p.noise.p2 * 100).toFixed(1)}%, readout ${(p.noise.readout * 100).toFixed(1)}%): ${(score * 100).toFixed(1)}% agree with the ideal. One shot takes ${shot}. ${how}`,
     };
+    this.use(`machine:${this.machine}`);
     this.showCode(false);
     feedback('shots');
   }
@@ -1873,7 +1898,7 @@ export class UISystem extends createSystem({
     // a certificate stays on the board until it is put away
     const cert = this.certOn ? this.certificateInfo() : null;
     if (cert) {
-      labSys.chip.root.visible = false;
+      labSys.hardwareWanted = false;
       labSys.showHardware(null);
       labSys.showMaths(false);
       labSys.showLandscape(null);
@@ -1885,7 +1910,7 @@ export class UISystem extends createSystem({
     }
     // the progress board: level, streak and achievements
     if (this.profileOpen) {
-      labSys.chip.root.visible = false;
+      labSys.hardwareWanted = false;
       labSys.showHardware(null);
       labSys.showMaths(false);
       labSys.showLandscape(null);
@@ -1898,7 +1923,7 @@ export class UISystem extends createSystem({
     }
     // the library takes the board while it is open: thumbnails, or a QR code of the current circuit
     if (this.libOpen) {
-      labSys.chip.root.visible = false;
+      labSys.hardwareWanted = false;
       labSys.showHardware(null);
       labSys.showMaths(false);
       labSys.showLandscape(null);
@@ -1917,10 +1942,15 @@ export class UISystem extends createSystem({
       return;
     }
     // a chapter's own figure (a Bell score, a syndrome table ...) unless the code window's Maths or Chip tab wants the board
-    const fig = step && !this.noiseOpen && !(codeOpen && (this.codeFormat === 'maths' || this.codeFormat === 'chip')) ? campaign.figure() : null;
+    const cmp = codeOpen && this.codeFormat === 'chip' && this.compared?.key === JSON.stringify(lab.history.ops) ? this.compared : null;
+    const fig = cmp
+      ? compareFigure(lab.n, cmp.ideal, cmp.results.map((r) => ({ name: r.name, examples: PLATFORMS[r.id].examples, counts: r.counts, agreement: r.agreement, time: formatTime(r.micros), twoQubit: r.twoQubit, overhead: r.overhead })))
+      : step && !this.noiseOpen && !(codeOpen && (this.codeFormat === 'maths' || this.codeFormat === 'chip'))
+        ? campaign.figure()
+        : null;
     labSys.showOverlay(fig ? fig.key : null, fig ? (b) => b.draw(fig.draw) : undefined);
     if (fig) {
-      labSys.chip.root.visible = false;
+      labSys.hardwareWanted = false;
       labSys.showHardware(null);
       labSys.showMaths(false);
       labSys.showLandscape(null);
@@ -1932,7 +1962,7 @@ export class UISystem extends createSystem({
     // the noise lab takes the board while it is open
     labSys.showDensity(this.noiseOpen);
     if (this.noiseOpen) {
-      labSys.chip.root.visible = false;
+      labSys.hardwareWanted = false;
       labSys.showHardware(null);
       labSys.showMaths(false);
       labSys.showLandscape(null);
@@ -1944,7 +1974,9 @@ export class UISystem extends createSystem({
     labSys.showWheels(!wantHardware && !wantMaths && step?.board === 'wheel');
     labSys.showVqe(!wantHardware && !wantMaths && step?.board === 'vqe' ? ((campaign.memoryValue('vqe') as never) ?? null) : undefined, H2);
     const wantLandscape = !wantHardware && !wantMaths && step?.board === 'landscape';
-    labSys.chip.root.visible = wantHardware;
+    labSys.hardwareWanted = wantHardware;
+    // course steps about hardware show the superconducting machine; the chip tab shows the one picked
+    labSys.machine = codeChip ? this.machine : 'superconducting';
     if (!wantHardware) labSys.showHardware(null);
     else if (!codeChip) {
       const key = JSON.stringify(lab.history.ops);
@@ -1955,7 +1987,7 @@ export class UISystem extends createSystem({
       const r = this.stepRouted.routed;
       if (r) {
         if (!labSys.chip.playing) labSys.chip.showLayout(r.initial);
-        labSys.showHardware(this.pulseView(r));
+        labSys.showHardware(this.pulseView(r, 'superconducting'));
       }
     }
     labSys.showMaths(wantMaths);
@@ -2055,15 +2087,73 @@ export class UISystem extends createSystem({
   }
 
   /** The board's pulse view for a routed circuit. */
-  private pulseView(routed: Routed) {
-    const holders = new Array<number>(T5.qubits).fill(-1);
+  private pulseView(routed: Routed, machine: PlatformId = this.machine) {
+    const qubits = machineQubits(machine, lab.n);
+    const holders = new Array<number>(qubits).fill(-1);
     routed.initial.forEach((p, i) => (holders[p] = i));
-    return {
-      schedule: schedule(routed.ops, T5.qubits),
-      qubits: T5.qubits,
-      holders,
-      title: `Pulse schedule on T5${routed.swaps ? `  /  ${routed.swaps} routing SWAP${routed.swaps === 1 ? '' : 's'}` : ''}`,
-    };
+    const sched = machine === 'superconducting' ? schedule(routed.ops, T5.qubits) : platformSchedule(machine, routed, lab.n);
+    const title =
+      machine === 'superconducting'
+        ? `Pulse schedule on T5${routed.swaps ? `  /  ${routed.swaps} routing SWAP${routed.swaps === 1 ? '' : 's'}` : ''}`
+        : machine === 'ions'
+          ? 'Laser pulses on the ion chain  /  every pair can interact'
+          : 'Laser pulses on the atom array  /  the long gaps are atoms moving';
+    return { schedule: sched, qubits, holders, title };
+  }
+
+  /** The chip tab's machine: superconducting chip, trapped ions or neutral atoms. */
+  private setMachine(id: PlatformId): void {
+    this.machine = id;
+    this.compared = null;
+    this.codeNote = null;
+    const p = PLATFORMS[id];
+    this.flash(`${p.name} (${p.examples}). ${p.facts[2]}`);
+    feedback('select');
+    this.showCode(false);
+  }
+
+  /** Compile for the current machine (T5 routing can fail with a message). */
+  private compiled(ops: readonly Op[]): Routed | string {
+    if (this.machine === 'superconducting') return routeOrError(lab.n, ops);
+    try {
+      return compileFor(this.machine, lab.n, ops);
+    } catch (err) {
+      return (err as Error).message;
+    }
+  }
+
+  /** The ideal answer: exact when nothing is measured mid-circuit, otherwise a noiseless run. */
+  private idealOf(ops: readonly Op[]): number[] {
+    const midMeasure = ops.some((op) => op.kind === 'measure' || op.kind === 'reset');
+    if (!midMeasure) return Array.from(lab.history.state.probabilities());
+    const routed = compileFor('ions', lab.n, ops);
+    const saved = { ...PLATFORMS.ions.noise };
+    Object.assign(PLATFORMS.ions.noise, { p1: 0, p2: 0, readout: 0 });
+    const counts = runPlatform('ions', routed, lab.n, 4000, Math.random).counts;
+    Object.assign(PLATFORMS.ions.noise, saved);
+    return Array.from(counts, (c) => c / 4000);
+  }
+
+  /** Run the circuit on all three machines and compare them on the board. */
+  private compareMachines(): void {
+    const ops = lab.history.ops.slice();
+    const ideal = this.idealOf(ops);
+    let results: PlatformResult[];
+    try {
+      results = comparePlatforms(lab.n, ops, ideal, 1000, Math.random);
+    } catch (err) {
+      this.codeNote = { key: JSON.stringify(ops), text: (err as Error).message };
+      this.showCode(false);
+      return feedback('reject');
+    }
+    this.compared = { key: JSON.stringify(ops), results, ideal };
+    const best = results.reduce((a, b) => (b.agreement > a.agreement ? b : a));
+    const fastest = results.reduce((a, b) => (b.micros < a.micros ? b : a));
+    this.codeNote = { key: JSON.stringify(ops), text: `Most accurate: ${best.name} (${(best.agreement * 100).toFixed(1)}%). Fastest shot: ${fastest.name} (${formatTime(fastest.micros)}). Each machine trades speed, accuracy and wiring differently.` };
+    for (const r of results) this.profile.use(`machine:${r.id}`);
+    this.checkAchievements();
+    this.showCode(false);
+    feedback('shots');
   }
 
   private pageCode(dir: number): void {
@@ -2137,16 +2227,20 @@ export class UISystem extends createSystem({
     const shownOps = this.preview !== null ? simplify(ops).ops : ops;
     const lang = FORMAT_NAMES[this.codeFormat];
     const onChip = this.codeFormat === 'chip';
-    const routed = onChip ? routeOrError(lab.n, shownOps) : null;
+    const routed = onChip ? this.compiled(shownOps) : null;
     const labSys = this.world.getSystem(LabSystem);
     const chipVisual = labSys?.chip;
-    if (routed && typeof routed !== 'string' && chipVisual && !chipVisual.playing) chipVisual.showLayout(routed.initial);
-    if (onChip) labSys?.showHardware(routed && typeof routed !== 'string' ? this.pulseView(routed) : null);
+    if (this.machine === 'superconducting' && routed && typeof routed !== 'string' && chipVisual && !chipVisual.playing) chipVisual.showLayout(routed.initial);
+    if (onChip && this.compared?.key !== key) labSys?.showHardware(routed && typeof routed !== 'string' ? this.pulseView(routed) : null);
     // in the MaxCut chapter and the course's QAOA module the PennyLane tab is the QAOA program itself
     const qaoa = this.codeFormat === 'pennylane' ? campaign.qaoa : null;
     const code = qaoa ? toPennyLaneQaoa(SQUARE, qaoa.gammas, qaoa.betas) : program(this.codeFormat, lab.n, shownOps);
     // a page at a time
-    const all = qaoa ? linesOf(code, 'pennylane') : codeLines(this.codeFormat, lab.n, shownOps);
+    // on an all-to-all machine the circuit runs as written
+    const native = onChip && this.machine !== 'superconducting' && routed && typeof routed !== 'string'
+      ? `// ${PLATFORMS[this.machine].name}: every ${PLATFORMS[this.machine].qubit} reaches every other, so no SWAPs.\n${toQasm(lab.n, routed.ops)}`
+      : null;
+    const all = qaoa ? linesOf(code, 'pennylane') : native ? linesOf(native, 'qasm') : codeLines(this.codeFormat, lab.n, shownOps);
     const count = pages(all.length, CODE_LINES);
     if (!sound && this.codePage === this.codePages - 1) this.codePage = count - 1;
     this.codePages = count;
@@ -2177,7 +2271,10 @@ export class UISystem extends createSystem({
     const range = count > 1 ? `lines ${first + 1}-${Math.min(all.length, first + CODE_LINES)} of ${all.length}` : `${all.length} lines`;
     this.text('code-eyebrow', `Code  /  ${ops.length} steps on ${lab.n} qubit${lab.n === 1 ? '' : 's'}  /  ${range}`);
     const onMaths = this.codeFormat === 'maths';
-    this.text('code-title', onChip ? 'Your circuit on the T5 chip' : onMaths ? 'The maths of this step' : `Your circuit in ${lang}`);
+    this.text('code-title', onChip ? (this.machine === 'superconducting' ? 'Your circuit on the T5 chip' : `Your circuit on ${PLATFORMS[this.machine].name.toLowerCase()}`) : onMaths ? 'The maths of this step' : `Your circuit in ${lang}`);
+    this.els.get('code-mach')?.setProperties({ display: onChip ? 'flex' : 'none' });
+    for (const m of ['superconducting', 'ions', 'atoms'] as const) this.bg(`code-m-${m}`, m === this.machine ? C.primary : '#34363b');
+    this.bg('code-compare', this.compared?.key === key ? C.done : '#34363b');
     this.els.get('code-simplify')?.setProperties({ display: onChip ? 'none' : 'flex' });
     this.els.get('code-run')?.setProperties({ display: onChip ? 'flex' : 'none' });
     this.els.get('code-ibm')?.setProperties({ display: onChip ? 'flex' : 'none' });
@@ -2190,7 +2287,9 @@ export class UISystem extends createSystem({
       ? ''
       : typeof routed === 'string'
         ? routed
-        : `Five qubits in a T, wired only to neighbours. ${routed.swaps ? `${routed.swaps} SWAP${routed.swaps === 1 ? '' : 's'} added: ${routed.twoQubitBefore} two-qubit gates became ${routed.twoQubitAfter}.` : `No SWAPs needed: all ${routed.twoQubitBefore} two-qubit gates land on wired pairs.`}`;
+        : this.machine === 'superconducting'
+          ? `Five qubits in a T, wired only to neighbours. ${routed.swaps ? `${routed.swaps} SWAP${routed.swaps === 1 ? '' : 's'} added: ${routed.twoQubitBefore} two-qubit gates became ${routed.twoQubitAfter}.` : `No SWAPs needed: all ${routed.twoQubitBefore} two-qubit gates land on wired pairs.`}`
+          : `${PLATFORMS[this.machine].facts[0]} ${PLATFORMS[this.machine].facts[1]}`;
     this.text('code-note', (onChip && this.ibmNote) || (this.codeNote?.text ?? (onChip ? chipNote : `${where}${this.immersive ? '.' : '; copied to your clipboard.'}`)));
     this.code.visible = true;
     if (sound) {

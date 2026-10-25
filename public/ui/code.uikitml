@@ -69,6 +69,7 @@
   .hd { font-size: 12; font-weight: 600; color: #8fb7ff; }
   .ln { font-size: 12; color: #c9ccd1; }
   .foot { flex-direction: row; justify-content: space-between; align-items: center; }
+  .mach { flex-direction: row; gap: 6; align-items: center; }
 </style>
 <div class="card">
   <div class="head">
@@ -100,6 +101,12 @@
     <div id="code-r-7" class="row"><div id="code-n-7" class="no">8</div><div id="code-h-7" class="hd">-</div><div id="code-t-7" class="ln">-</div></div>
     <div id="code-r-8" class="row"><div id="code-n-8" class="no">9</div><div id="code-h-8" class="hd">-</div><div id="code-t-8" class="ln">-</div></div>
     <div id="code-r-9" class="row"><div id="code-n-9" class="no">10</div><div id="code-h-9" class="hd">-</div><div id="code-t-9" class="ln">-</div></div>
+  </div>
+  <div id="code-mach" class="mach">
+    <div id="code-m-superconducting" class="btn"><div class="bt">Chip</div></div>
+    <div id="code-m-ions" class="btn"><div class="bt">Ions</div></div>
+    <div id="code-m-atoms" class="btn"><div class="bt">Atoms</div></div>
+    <div id="code-compare" class="btn"><div class="bt">Compare all three</div></div>
   </div>
   <div class="foot">
     <div class="btns">

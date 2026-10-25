@@ -16,7 +16,7 @@ your circuit exports to Qiskit and OpenQASM 3.
 ```sh
 npm install
 npm run dev        # managed browser with the Quest 3 emulator (IWER)
-npm test           # 290 unit tests: physics, gestures, the course, 25 chapters, 15 lessons, puzzles, the daily challenge, achievements, builder, noise, chemistry, import, IBM compiling, Bell tests, error correction, benchmarking, voice, shared rooms and more
+npm test           # 295 unit tests: physics, three kinds of quantum computer, gestures, the course, 25 chapters, 15 lessons, puzzles, the daily challenge, achievements, builder, noise, chemistry, import, IBM compiling, Bell tests, error correction, benchmarking, voice, shared rooms and more
 npm run typecheck
 npm run build
 ```
@@ -63,6 +63,7 @@ depends on a single input path.
 | – | Zoom the code window and notes (bigger, at eye level) | Zoom | = |
 | – | Page through long code | Back / More | Up / Down |
 | – | Route onto the 5-qubit chip and run with hardware errors | Qiskit, On chip, Run on chip | K, G to On chip, O |
+| – | Pick the machine: superconducting chip, trapped ions, neutral atoms; compare all three | On chip: Chip / Ions / Atoms, Compare all three | voice: "trapped ions", "compare the machines" |
 | – | The maths of each step: matrix, formula, state vectors | Qiskit, Maths | K, G to Maths, then Ctrl+Z / Ctrl+Y |
 | – | Run on a real IBM quantum computer | Qiskit, On chip, Run on IBM | Shift+O on the On chip tab |
 | – | Noise lab: T1, T2, gate error, zero-noise extrapolation | sandbox card: Noise | E (Shift+E on/off, Shift+M mitigate) |
@@ -500,6 +501,53 @@ SWAPs add. A blue cursor sweeps across it while the run plays.
 Windows now settle into place when they open, and Zoom glides between sizes
 instead of jumping.
 
+### Three kinds of quantum computer
+
+| Trapped ions | Neutral atoms |
+| --- | --- |
+| ![The ion trap during a run: four glowing ions in a line between gold rods, needle endcaps at each end, and gold laser beams on q0 and q3 for a two-qubit gate](docs/screenshots/machine-ions.png) | ![The atom array during a gate: atoms held in red tweezer beams under the objective, spare atoms behind, and q3 carried over to q0 where the two glow gold](docs/screenshots/machine-atoms-gate.png) |
+
+The chip tab now has a row for the machine: **Chip**, **Ions** or **Atoms**
+(or say "trapped ions", "neutral atoms"). Each one compiles and runs your
+circuit its own way, with its own 3D model where the chip floats and its own
+surroundings where the fridge stands:
+
+- **Trapped ions** (Quantinuum, IonQ): a linear Paul trap, four gold rods and
+  two needle endcaps holding a chain of glowing ions, one per qubit, with the
+  imaging lens above, inside a steel vacuum chamber with viewports and a violet
+  laser. During a run a laser lights each ion a gate addresses; a two-qubit gate
+  lights both in gold and sets the chain swaying, because the ions talk through
+  their shared motion. Every ion reaches every other, so nothing is rerouted.
+  Gates are slow (10 us and 200 us) but very accurate (0.3% two-qubit error).
+- **Neutral atoms** (QuEra, Pasqal, Atom Computing): a glass cell under a
+  microscope objective, a row of atoms each held in a red optical tweezer, and
+  spare atoms waiting behind, on an optics table with the laser, mirrors and
+  camera. Neighbours interact directly; for a gate between atoms further apart
+  one atom is carried along the lane in front, the two glow gold while the
+  Rydberg interaction entangles them, and it is carried back. Moving costs time
+  and a little error; reading the atoms takes a camera exposure (about 10 ms).
+- **Superconducting** (IBM, Google, Rigetti): the T5 chip and the fridge, as
+  above.
+
+The board shows each machine's pulse schedule with its own timings, so the
+long gaps on the atom array are atoms moving.
+
+**Compare all three** runs the same circuit 1,000 times on each machine and
+puts the results side by side: every machine's outcomes against the ideal, how
+closely it agrees, how long one shot takes and what its wiring cost (SWAPs,
+atom moves, or nothing). Superconducting chips are fastest; ions are most
+accurate; atoms are in between and can move qubits to where they are needed.
+The error rates and timings are typical published figures, rounded; tests
+check that every machine without noise gives the ideal answer, that all-to-all
+wiring never needs SWAPs, and that atoms only move for gates between
+non-neighbours.
+
+![Compare all three: 89.4% agreement and 1.8 us per shot on the superconducting chip, 97.3% and 560 us on trapped ions, 93.8% and 10 ms with one atom move on neutral atoms](docs/screenshots/machines-compare.png)
+
+| The ion trap's vacuum chamber | The atom array's optics table |
+| --- | --- |
+| ![The ultra-high-vacuum chamber: an octagonal steel chamber with viewports and bolted flanges on a three-legged stand, an ion pump on top, and a violet laser entering a window](docs/screenshots/machine-ions-room.png) | ![The optics table: a breadboard of tapped holes, a laser, two mirrors steering a red beam into a small glass cell, and the camera above it](docs/screenshots/machine-atoms-room.png) |
+
 ## Circuit board
 
 A board at the back of the desk shows the circuit so far as a standard diagram
@@ -642,7 +690,7 @@ course) the board shows a **certificate**, and the 2D page can save it as a PNG.
 
 | The daily challenge, solved | Your progress |
 | --- | --- |
-| ![Daily #25 solved: the result as a line to copy, 2 moves (par 2), 3 of 3 stars, a one-day streak](docs/screenshots/daily-result.png) | ![The progress board: level 4 Experimenter, the XP bar, a one-day daily streak, and 11 of 22 achievements, unlocked ones in mint and the rest with progress bars](docs/screenshots/profile-board.png) |
+| ![Daily #25 solved: the result as a line to copy, 2 moves (par 2), 3 of 3 stars, a one-day streak](docs/screenshots/daily-result.png) | ![The progress board: level 4 Experimenter, the XP bar, a one-day daily streak, and 13 of 23 achievements, unlocked ones in mint and the rest with progress bars](docs/screenshots/profile-board.png) |
 
 - **Daily challenge**: one puzzle a day, the same for everyone, at the end of
   the Puzzles tab (or Shift+Q, "daily challenge", or a `#daily` link). The date
@@ -652,11 +700,11 @@ course) the board shows a **certificate**, and the 2D page can save it as a PNG.
   shorter sequence exists. Solving it extends a streak, and on the 2D page the
   result comes as one line to copy and paste: "Entangled daily #25: 2 moves
   (par 2), 3 of 3 stars. Streak: 1 day."
-- **Achievements**: 22 of them, from "First move" and "Spooky action" (your
+- **Achievements**: 23 of them, from "First move" and "Spooky action" (your
   first Bell pair) to "All for one" (a five-qubit GHZ state), "Rainmaker"
   (1,000 shots), "Beyond classical" (the Bell Test), daily streaks of three and
-  seven days, and trying the debugger, every big-state view, voice and the
-  shared lab. Each one pops up above the dock with a chime.
+  seven days, and trying the debugger, every big-state view, voice, the
+  shared lab and all three kinds of quantum computer. Each one pops up above the dock with a chime.
 - **Levels**: XP comes from chapters, lessons, course modules, puzzle stars,
   daily challenges and achievements; levels go from Newcomer to Quantum master.
   The navigator's footer shows your level; tap it (or Shift+P, "show my

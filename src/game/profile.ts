@@ -84,6 +84,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'voice', title: 'Say it', text: 'Give a voice command.', done: (s) => used(s, 'voice') },
   { id: 'listen', title: 'Hear it', text: 'Listen to a quantum state.', done: (s) => used(s, 'listen') },
   { id: 'shared', title: 'Together', text: 'Join a shared lab or a class.', done: (s) => used(s, 'shared') },
+  counter('machines', 'Hardware tour', 'Try all three machines.', (s) => ['superconducting', 'ions', 'atoms'].filter((m) => used(s, `machine:${m}`)).length, () => 3),
 ];
 
 export const emptyProfile = (): ProfileData => ({ stats: { gates: 0, measures: 0, shots: 0, rewinds: 0, bellPairs: 0, ghz: 0, used: [] }, unlocked: {} });

@@ -21,6 +21,8 @@ export type VoiceCommand =
   | { type: 'assign'; module: number; on: boolean }
   | { type: 'share' | 'leave' | 'classroom' }
   | { type: 'listen' | 'daily' | 'profile' | 'snapshot' }
+  | { type: 'machine'; id: 'superconducting' | 'ions' | 'atoms' }
+  | { type: 'compare' }
   | { type: 'undo' | 'redo' | 'reset' | 'add' | 'remove' | 'next' | 'showme' | 'notes' | 'code' | 'simplify' | 'zoom' | 'noise' | 'library' | 'close' | 'debug' | 'view' };
 
 const NUMBERS: Record<string, number> = {
@@ -113,6 +115,10 @@ export function parseVoice(text: string): VoiceCommand | null {
   if (/class ?room|class panel|my class|the class/.test(s)) return { type: 'classroom' };
   if (/\b(listen|play (the|this) (state|chord)|hear (it|the state))\b/.test(s)) return { type: 'listen' };
   if (/daily|today'?s (puzzle|challenge)/.test(s)) return { type: 'daily' };
+  if (/compare (the |all )?(machines|computers|platforms|three)/.test(s)) return { type: 'compare' };
+  if (/trapped ions?|ion trap|\bions\b/.test(s)) return { type: 'machine', id: 'ions' };
+  if (/neutral atoms?|atom array|\batoms\b/.test(s)) return { type: 'machine', id: 'atoms' };
+  if (/superconduct/.test(s)) return { type: 'machine', id: 'superconducting' };
   if (/trophies|achievements|my (progress|profile|level)/.test(s)) return { type: 'profile' };
   if (/snapshot|(take|save) a (picture|photo)|screenshot/.test(s)) return { type: 'snapshot' };
   if (/^(undo|go back|take that back)/.test(s)) return { type: 'undo' };
@@ -207,6 +213,10 @@ export function describe(c: VoiceCommand): string {
       return 'your progress';
     case 'snapshot':
       return 'save a picture of the circuit';
+    case 'machine':
+      return c.id === 'ions' ? 'the trapped-ion computer' : c.id === 'atoms' ? 'the neutral-atom computer' : 'the superconducting chip';
+    case 'compare':
+      return 'run on all three machines';
     default:
       return c.type;
   }

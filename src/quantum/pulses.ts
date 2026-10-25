@@ -58,13 +58,26 @@ function amplitudeOf(gate: GateName, params: readonly number[] = []): number {
   }
 }
 
+/** How long each kind of operation takes on a machine (nanoseconds). */
+export interface Timing {
+  drive: number;
+  /** A two-qubit gate between physical qubits a and b (neutral atoms add the time to move one next to the other). */
+  two: (a: number, b: number) => number;
+  readout: number;
+  /** Two-qubit pulses in a SWAP (three CNOTs). */
+  swapPulses: number;
+}
+
+/** A superconducting chip: the durations above. */
+export const SUPERCONDUCTING_TIMING: Timing = { drive: DRIVE_NS, two: () => CROSS_NS, readout: READOUT_NS, swapPulses: 3 };
+
 export interface Schedule {
   pulses: Pulse[];
   /** Total time in nanoseconds. */
   duration: number;
 }
 
-export function schedule(ops: readonly Op[], qubits: number): Schedule {
+export function schedule(ops: readonly Op[], qubits: number, timing: Timing = SUPERCONDUCTING_TIMING): Schedule {
   const free = new Array<number>(qubits).fill(0);
   const pulses: Pulse[] = [];
   const at = (qs: number[]) => Math.max(...qs.map((q) => free[q]));
@@ -78,27 +91,29 @@ export function schedule(ops: readonly Op[], qubits: number): Schedule {
           continue;
         }
         const t = free[op.target];
-        pulses.push({ kind: 'drive', qubit: op.target, start: t, duration: DRIVE_NS, amplitude: amplitudeOf(op.gate, op.params), label: op.gate.toUpperCase() });
-        busy([op.target], t + DRIVE_NS);
+        pulses.push({ kind: 'drive', qubit: op.target, start: t, duration: timing.drive, amplitude: amplitudeOf(op.gate, op.params), label: op.gate.toUpperCase() });
+        busy([op.target], t + timing.drive);
       } else {
         const qs = [...controls, op.target];
         const t = at(qs);
-        pulses.push({ kind: 'cross', qubit: controls[0], partner: op.target, start: t, duration: CROSS_NS, amplitude: 1, label: `C${op.gate.toUpperCase()}` });
-        busy(qs, t + CROSS_NS);
+        const d = timing.two(controls[0], op.target);
+        pulses.push({ kind: 'cross', qubit: controls[0], partner: op.target, start: t, duration: d, amplitude: 1, label: `C${op.gate.toUpperCase()}` });
+        busy(qs, t + d);
       }
     } else if (op.kind === 'swap' || op.kind === 'iswap') {
       const qs = [op.a, op.b];
       const t = at(qs);
-      const n = op.kind === 'swap' ? 3 : 2;
+      const n = op.kind === 'swap' ? timing.swapPulses : 2;
+      const d = timing.two(op.a, op.b);
       for (let k = 0; k < n; k++) {
         const [c, tg] = k % 2 === 0 ? [op.a, op.b] : [op.b, op.a];
-        pulses.push({ kind: 'cross', qubit: c, partner: tg, start: t + k * CROSS_NS, duration: CROSS_NS, amplitude: 1, label: op.kind === 'swap' ? 'SWAP' : 'iSWAP', last: op.kind === 'swap' && k === n - 1 });
+        pulses.push({ kind: 'cross', qubit: c, partner: tg, start: t + k * d, duration: d, amplitude: 1, label: op.kind === 'swap' ? 'SWAP' : 'iSWAP', last: op.kind === 'swap' && k === n - 1 });
       }
-      busy(qs, t + n * CROSS_NS);
+      busy(qs, t + n * d);
     } else {
       const t = free[op.qubit];
-      pulses.push({ kind: 'readout', qubit: op.qubit, start: t, duration: READOUT_NS, amplitude: 1, label: op.kind === 'reset' ? 'RESET' : 'M' });
-      busy([op.qubit], t + READOUT_NS + (op.kind === 'reset' ? DRIVE_NS : 0));
+      pulses.push({ kind: 'readout', qubit: op.qubit, start: t, duration: timing.readout, amplitude: 1, label: op.kind === 'reset' ? 'RESET' : 'M' });
+      busy([op.qubit], t + timing.readout + (op.kind === 'reset' ? timing.drive : 0));
     }
   }
   return { pulses, duration: Math.max(0, ...free) };
