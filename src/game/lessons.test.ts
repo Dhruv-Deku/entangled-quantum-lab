@@ -11,7 +11,7 @@ function settle(c: Campaign, seconds = 3): void {
 }
 
 /** The moves a player makes for each lesson, using the same calls as gestures and keys. */
-const SOLUTIONS: Record<string, (lab: Lab) => void> = {
+const SOLUTIONS: Record<string, ((lab: Lab) => void) | ((lab: Lab) => void)[]> = {
   H: (lab) => lab.gate('h', 0),
   X: (lab) => lab.gate('x', 0),
   Y: (lab) => lab.gate('y', 0),
@@ -72,6 +72,12 @@ const SOLUTIONS: Record<string, (lab: Lab) => void> = {
     lab.gate('h', 1);
     lab.gate('h', 2);
   },
+  // the welcome tour: one move per step
+  Tour: [(lab) => lab.gate('ry', 0, [1.0]), (lab) => lab.gate('h', 0), (lab) => lab.measure(0), (lab) => {
+    lab.select(0);
+    lab.gate('h', 0);
+    lab.entangleSelected();
+  }, (lab) => lab.shots(100)],
   GHZ: (lab) => {
     lab.select(0);
     lab.gate('h', 0);
@@ -94,8 +100,11 @@ describe('learn: every lesson', () => {
       expect(lab.n).toBe(lesson.qubits);
       settle(c);
       expect(c.stepDone).toBe(false);
-      SOLUTIONS[lesson.chip!](lab);
-      settle(c);
+      const sol = SOLUTIONS[lesson.chip!];
+      for (const move of Array.isArray(sol) ? sol : [sol]) {
+        move(lab);
+        settle(c);
+      }
       expect(c.chapterDone).toBe(true);
       expect(c.view.learned).toContain(i);
     });

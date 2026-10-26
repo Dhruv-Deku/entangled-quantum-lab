@@ -358,4 +358,64 @@ export const LESSONS: Chapter[] = [
     }],
     outro: 'A uniform superposition is the starting line of most algorithms: then interference picks the winners.',
   },
+  {
+    title: 'Welcome tour',
+    chip: 'Tour',
+    group: 'Start',
+    qubits: 2,
+    steps: [
+      {
+        text: 'Welcome! Each glass orb is a qubit, and its arrow is its state. Pinch q0 and twist your wrist to turn the arrow.',
+        goal: 'Turn q0',
+        keys: 'Press 1, then hold the Right arrow',
+        hint: twist(0),
+        done: ({ state }) => z(state, 0) < 0.9,
+        solve: (lab) => void lab.gate('ry', 0, [1.0]),
+        payoff: 'The arrow tips from 0 toward 1: the odds of each change as it turns.',
+      },
+      {
+        text: 'Spread your fingers over q0: that is H, the Hadamard gate. The arrow lies down on the equator, 0 and 1 at once.',
+        goal: 'H on q0',
+        keys: 'Press 1, then H',
+        enter: (lab) => lab.reset(),
+        hint: spread(0),
+        done: ({ state }) => x(state, 0) > 0.99,
+        solve: (lab) => void lab.gate('h', 0),
+        payoff: 'A superposition: a coin in mid-air.',
+      },
+      {
+        text: 'Close your fist over q0 to measure it. Looking makes it choose: 0 or 1, half the time each.',
+        goal: 'Measure q0',
+        keys: 'Press M',
+        hint: fist(0),
+        done: ({ stepOps }) => has(stepOps, isMeasure),
+        solve: (lab) => void lab.measure(0),
+        payoff: 'It landed. Measuring is the one move that cannot be undone.',
+      },
+      {
+        text: 'Now the magic: H on q0, then touch q0 to q1. A gold thread appears: the two qubits are entangled.',
+        goal: 'Entangle q0 and q1',
+        keys: 'Press 1, H, then C',
+        control: 0,
+        enter: (lab) => lab.reset(),
+        hint: ({ state }) => (x(state, 0) > 0.95 ? touch(0, 1) : spread(0)),
+        done: ({ state }) => pairStrength(state, 0, 1) > 0.95,
+        solve: (lab) => {
+          lab.select(0);
+          lab.gate('h', 0);
+          lab.entangleSelected();
+        },
+        payoff: 'Gold means entanglement. Neither qubit has a state of its own any more.',
+      },
+      {
+        text: 'Run 100 shots: measure the pair a hundred times over. Only 00 and 11 ever come up: the two always agree.',
+        goal: 'Run 100 shots',
+        keys: 'Press Space',
+        done: ({ shots }) => !!shots,
+        solve: (lab) => void lab.shots(100),
+        payoff: 'Your first Bell pair. Next: Chapters for the story, the Play tab for games, the Code Lab for your own programs.',
+      },
+    ],
+    outro: 'That is the whole toolkit: turn, H, measure, entangle, run. Everything else in Entangled is built from these.',
+  },
 ];

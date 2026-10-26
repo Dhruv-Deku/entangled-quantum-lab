@@ -155,7 +155,26 @@ export class SurfaceCodeVisual {
   }
 
   /** The chapter's state, every frame: rebuilds for a new size and replays each new round. */
+  /**
+   * The decoder game: lit checks, the player's flips (mint) and, once
+   * revealed, the real errors (coral; an error the player also flipped is
+   * healed and shows silver). No animation: it shows exactly this.
+   */
+  showPuzzle(d: number, lit: readonly number[], flips: readonly number[], errors: readonly number[] | null): void {
+    if (!this.code || this.code.d !== d) {
+      this.build(d);
+      this.id = -1;
+    }
+    this.puzzle = { lit: new Set(lit), flips: new Set(flips), errors: errors ? new Set(errors) : null };
+    this.name.mesh.visible = false;
+    for (const m of this.chains) m.visible = false;
+  }
+
+  private puzzle: { lit: Set<number>; flips: Set<number>; errors: Set<number> | null } | null = null;
+
   set(v: SurfaceView): void {
+    this.puzzle = null;
+    this.name.mesh.visible = true;
     if (!this.code || this.code.d !== v.d) {
       this.build(v.d);
       this.id = -1;
@@ -228,6 +247,23 @@ export class SurfaceCodeVisual {
     for (const tile of this.tiles) {
       const sweep = Math.max(0, 1 - Math.abs(t * 3.2 - tile.row * 0.45) * 1.6);
       tile.dotMat.emissive.copy(SILVER).multiplyScalar(0.8 * sweep);
+    }
+    if (this.puzzle) {
+      const z = this.puzzle;
+      this.tiles.forEach((tile, i) => {
+        const on = z.lit.has(i) ? 1 : 0;
+        tile.mat.color.copy(tile.base).lerp(LIT, on * 0.7);
+        tile.mat.emissive.copy(LIT).multiplyScalar(on * 0.9);
+      });
+      this.beads.forEach((b, q) => {
+        const err = z.errors?.has(q) ?? false, flip = z.flips.has(q);
+        const c = err && !flip ? BIT : flip && !err ? FIX : SILVER;
+        b.mat.color.copy(c);
+        b.mat.emissive.copy(c === SILVER ? BLACK : c).multiplyScalar(0.6);
+        b.mesh.scale.setScalar(flip || err ? 1.25 : 1);
+      });
+      this.edge.emissive.copy(BLACK);
+      return;
     }
     if (!r) return;
     const healed = smooth((t - this.tDecode - 0.85) / 0.35);

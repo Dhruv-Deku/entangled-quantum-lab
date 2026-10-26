@@ -33,6 +33,8 @@ export interface ProfileData {
   unlocked: Record<string, number>;
   /** The orb finish being worn. */
   skin?: string;
+  /** Today's daily quests and how many were ever finished. */
+  quests?: import('./quests').QuestState;
 }
 
 /** Progress that lives elsewhere (the campaign and the daily record). */
@@ -100,6 +102,9 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'skin', title: 'New look', text: 'Wear a new orb finish.', done: (s) => used(s, 'skin') },
   counter('album', 'Collector', 'Collect 10 states in the State Album.', (s) => s.used.filter((f) => f.startsWith('album:')).length, () => 10),
   { id: 'penny', title: 'Quantum cheat', text: 'Win the penny flip three times.', done: (s) => used(s, 'penny:3') },
+  { id: 'spy', title: 'Spy catcher', text: 'Call Eve right three times in the spy game.', done: (s) => used(s, 'spy:3') },
+  { id: 'decoder', title: 'Human decoder', text: 'Win three rounds of Be the decoder.', done: (s) => used(s, 'decoder:3') },
+  { id: 'quests', title: 'Quest master', text: 'Finish nine daily quests.', done: (s) => used(s, 'quests:9') },
   counter('wonders', 'Explorer', 'Try the dice, the cat, the giant sphere, inside a qubit, the night sky and the history gallery.', (s) => WONDERS.filter((w) => used(s, w)).length, () => WONDERS.length),
 ];
 
@@ -117,7 +122,7 @@ export class Profile {
 
   constructor(data?: ProfileData | null) {
     const e = emptyProfile();
-    this.data = { stats: { ...e.stats, ...(data?.stats ?? {}), used: [...(data?.stats?.used ?? [])], rushTop: [...(data?.stats?.rushTop ?? [])] }, unlocked: { ...(data?.unlocked ?? {}) }, skin: data?.skin };
+    this.data = { stats: { ...e.stats, ...(data?.stats ?? {}), used: [...(data?.stats?.used ?? [])], rushTop: [...(data?.stats?.rushTop ?? [])] }, unlocked: { ...(data?.unlocked ?? {}) }, skin: data?.skin, quests: data?.quests };
   }
 
   /** A feature was tried. */
@@ -179,7 +184,7 @@ export class Profile {
 /** XP from everything done: progress plus achievements. */
 export function xpFor(p: ProfileData, c: ProgressContext): number {
   const stars = c.stars.reduce((a, b) => a + b, 0);
-  return c.chaptersDone.length * 50 + c.lessonsDone * 20 + c.courseDone * 40 + stars * 15 + c.dailyDays * 30 + Object.keys(p.unlocked).length * 25;
+  return c.chaptersDone.length * 50 + c.lessonsDone * 20 + c.courseDone * 40 + stars * 15 + c.dailyDays * 30 + Object.keys(p.unlocked).length * 25 + (p.quests?.total ?? 0) * 15;
 }
 
 export const LEVEL_TITLES = ['Newcomer', 'Tinkerer', 'Apprentice', 'Experimenter', 'Circuit builder', 'Algorithm hunter', 'Researcher', 'Quantum engineer', 'Quantum architect', 'Quantum master'];

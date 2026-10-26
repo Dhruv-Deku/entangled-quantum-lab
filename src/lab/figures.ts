@@ -913,3 +913,81 @@ export function albumFigure(items: { name: string; ket: string; hint: string; qu
     },
   };
 }
+
+// ---------------------------------------------------------------- the spy game (BB84)
+
+export interface SpyView {
+  photons: { bit: number; alice: string; bob: string; bobBit: number; kept: boolean; checked: boolean; error: boolean }[];
+  kept: number;
+  checked: number;
+  errors: number;
+  key: string;
+  /** null until the round is revealed. */
+  eve: boolean | null;
+  record: { right: number; rounds: number };
+}
+
+/** The spy game's board: every photon, which ones were kept, which were checked, and the error rate that gives Eve away. */
+export function spyFigure(v: SpyView): Figure {
+  return {
+    key: `spy:${v.photons.map((p) => `${p.bit}${p.alice}${p.bob}${p.bobBit}`).join('')}:${v.eve}:${v.record.right}/${v.record.rounds}`,
+    draw: (g, w, h) => {
+      panel(g, w, h, 'BB84: a secret key, one photon at a time', `you caught ${v.record.right} of ${v.record.rounds}`);
+      const rows: [string, (p: SpyView['photons'][number]) => string, (p: SpyView['photons'][number]) => string][] = [
+        ['Alice bit', (p) => `${p.bit}`, () => INK],
+        ['Alice basis', (p) => p.alice, () => DIM],
+        ['Bob basis', (p) => p.bob, (p) => (p.kept ? MINT : DIM)],
+        ['Bob reads', (p) => `${p.bobBit}`, (p) => (p.checked && p.error ? CORAL : p.kept ? INK : DIM)],
+        ['', (p) => (p.checked ? (p.error ? 'X' : 'ok') : p.kept ? 'key' : ''), (p) => (p.checked ? (p.error ? CORAL : MINT) : SOFT_BLUE)],
+      ];
+      const x0 = 220, cw = Math.min(80, (w - x0 - 60) / Math.max(1, v.photons.length));
+      rows.forEach(([label, val, col], r) => {
+        const y = 140 + r * 54;
+        text(g, label, 50, y, DIM, '600 22px');
+        v.photons.forEach((p, i) => {
+          if (p.kept && r === 0) {
+            roundRect(g, x0 + i * cw + 4, 108, cw - 8, 54 * 5, 12);
+            g.fillStyle = 'rgba(61,220,151,0.07)';
+            g.fill();
+          }
+          text(g, val(p), x0 + i * cw + cw / 2, y, col(p), '700 24px', 'center');
+        });
+      });
+      const rate = v.checked ? Math.round((v.errors / v.checked) * 100) : 0;
+      text(g, `Same basis: ${v.kept} kept.  Checked in public: ${v.checked}.  Wrong: ${v.errors} (${rate}%).`, 50, h - 90, INK, '600 26px');
+      text(g, v.eve === null ? 'Without Eve the checked bits always agree. With Eve, about 1 in 4 is wrong.' : v.eve ? `Eve was listening: her guesses left ${rate}% errors. Throw the key away.` : `No Eve: every checked bit agreed. The key is safe: ${v.key || '(none this round)'}`, 50, h - 44, v.eve === null ? DIM : v.eve ? CORAL : MINT, '600 24px');
+    },
+  };
+}
+
+// ---------------------------------------------------------------- daily quests
+
+/** Today's three quests on the board, with their progress. */
+export function questsFigure(day: string, quests: { text: string; have: number; goal: number; done: boolean }[], total: number): Figure {
+  return {
+    key: `quests:${day}:${quests.map((q) => `${q.have}/${q.goal}`).join(',')}:${total}`,
+    draw: (g, w, h) => {
+      panel(g, w, h, `Daily quests  /  ${day}`, `${quests.filter((q) => q.done).length} of 3 today  /  ${total} done in all`);
+      quests.forEach((q, i) => {
+        const x = 50 + i * 505, y = 120, cw = 480, ch = 330;
+        roundRect(g, x, y, cw, ch, 26);
+        g.fillStyle = q.done ? 'rgba(61,220,151,0.12)' : '#232428';
+        g.fill();
+        g.lineWidth = 3;
+        g.strokeStyle = q.done ? MINT : LINE;
+        g.stroke();
+        text(g, `Quest ${i + 1}`, x + 30, y + 50, DIM, '600 22px');
+        for (const [k, line] of wrap(g, q.text, '700 34px', cw - 60).entries()) text(g, line, x + 30, y + 110 + k * 44, INK, '700 34px');
+        const frac = Math.min(1, q.have / q.goal);
+        roundRect(g, x + 30, y + 230, cw - 60, 22, 11);
+        g.fillStyle = '#2f3135';
+        g.fill();
+        roundRect(g, x + 30, y + 230, Math.max(22, (cw - 60) * frac), 22, 11);
+        g.fillStyle = q.done ? MINT : BLUE;
+        g.fill();
+        text(g, q.done ? 'Done: +15 XP' : `${Math.min(q.have, q.goal).toLocaleString('en-US')} of ${q.goal.toLocaleString('en-US')}`, x + 30, y + 295, q.done ? MINT : DIM, '600 24px');
+      });
+      text(g, 'Three new quests every day, the same for everyone.', 50, h - 40, DIM, '500 22px');
+    },
+  };
+}

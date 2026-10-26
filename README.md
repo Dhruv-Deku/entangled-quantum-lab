@@ -71,10 +71,10 @@ the Meta Immersive Web SDK (IWSDK), three.js and TypeScript.
 | **Atoms carried into place to entangle** | **Orb finishes you unlock** |
 | ![A neutral atom is carried along the lane to its partner, the pair glow gold while the Rydberg interaction entangles them, and it is carried back](docs/screenshots/anim-atoms.gif) | ![The Looks panel beside the progress board: Glass, Frost, Smoke, Tinted (worn: the two orbs in coral and teal, tied by the gold thread) and Copper, locked until level 5](docs/screenshots/orb-looks.png) |
 
-**By the numbers:** 26 chapters, a 14-module course, 20 lessons, 12 puzzles, a
+**By the numbers:** 26 chapters, a 14-module course, 21 lessons, 12 puzzles, a
 daily challenge and Quantum Rush, a Play tab, 5 big-state views, 3 kinds of quantum computer
-in 3D at full size, a 49-qubit surface code, 31 achievements, 5 orb finishes, 14 Play tab wonders,
-voice control, shared labs and classes, and 322 unit tests.
+in 3D at full size, a 49-qubit surface code, 34 achievements, 5 orb finishes, 21 Play tab items, daily quests,
+voice control, shared labs and classes, and 334 unit tests.
 
 ## Contents
 
@@ -88,7 +88,7 @@ voice control, shared labs and classes, and 322 unit tests.
 - [Part 4: Tools for exploring](#part-4-tools-for-exploring)
   - [Build: circuit builder](#build-circuit-builder), [Code window: tabs, zoom, simplify](#code-window-tabs-zoom-simplify), [Step debugger](#step-debugger), [Big-state views](#big-state-views), [Many worlds](#many-worlds), [Library, import and custom gates](#library-import-and-custom-gates), [Voice commands](#voice-commands), [Listen to a state](#listen-to-a-state), [Snapshot](#snapshot)
 - [Part 5: Together, and every day](#part-5-together-and-every-day)
-  - [Code Lab: write your own programs](#code-lab-write-your-own-programs), [The Play tab: ten wonders](#the-play-tab-ten-wonders), [Quantum Rush](#quantum-rush), [Shared lab](#shared-lab), [Classroom and certificate](#classroom-and-certificate), [Daily challenge, achievements and levels](#daily-challenge-achievements-and-levels), [Trophies and celebrations](#trophies-and-celebrations), [Orb finishes](#orb-finishes), [Puzzles](#puzzles)
+  - [Code Lab: write your own programs](#code-lab-write-your-own-programs), [Games that teach](#games-that-teach-spies-decoders-mazes-and-quests), [The Play tab: ten wonders](#the-play-tab-ten-wonders), [Quantum Rush](#quantum-rush), [Shared lab](#shared-lab), [Classroom and certificate](#classroom-and-certificate), [Daily challenge, achievements and levels](#daily-challenge-achievements-and-levels), [Trophies and celebrations](#trophies-and-celebrations), [Orb finishes](#orb-finishes), [Puzzles](#puzzles)
 - [Under the hood](#under-the-hood)
 
 ## Try it
@@ -96,7 +96,7 @@ voice control, shared labs and classes, and 322 unit tests.
 ```sh
 npm install
 npm run dev        # managed browser with the Quest 3 emulator (IWER)
-npm test           # 322 unit tests: physics, three kinds of quantum computer, gestures, the course, 25 chapters, 15 lessons, puzzles, the daily challenge, achievements, builder, noise, chemistry, import, IBM compiling, Bell tests, error correction, benchmarking, voice, shared rooms and more
+npm test           # 334 unit tests: physics, three kinds of quantum computer, gestures, the course, 25 chapters, 15 lessons, puzzles, the daily challenge, achievements, builder, noise, chemistry, import, IBM compiling, Bell tests, error correction, benchmarking, voice, shared rooms and more
 npm run typecheck
 npm run build
 ```
@@ -834,6 +834,40 @@ tilt-and-twist, and **Link** copies a replay link: whoever opens it watches your
 circuit play back, gate by gate. Unfinished lines show a _ where something is
 missing, and Run points at the first one.
 
+### Games that teach: spies, decoders, mazes and quests
+
+| The spy game (BB84) | Be the decoder |
+| --- | --- |
+| ![The spy game: Alice and Bob's stations joined by a fibre, Eve's station revealed under it, the card reading Right! and the board's table of bits, bases and the errors that gave Eve away](docs/screenshots/spy-game.png) | ![Be the decoder: a distance-3 lattice with a lit check beside the tap pad of nine data qubits, and the card asking to clear the lit checks with as few flips as the computer](docs/screenshots/be-the-decoder.png) |
+| **The Grover maze** | **Daily quests** |
+| ![The Grover maze: eight doors in an arc behind three orbs, amplitude bars above them, after two rounds of oracle and diffusion](docs/screenshots/grover-maze.png) | ![Daily quests on the board: run 2 programs in the Code Lab, run on 2 kinds of quantum computer, win 2 Play tab games, each with a progress bar](docs/screenshots/daily-quests.png) |
+
+- **Spy game (BB84)**: Alice sends Bob sixteen photons, each a random bit in a
+  random basis; they fly along a fibre with their polarisation drawn on them,
+  and Bob's readings stack up at his station. Eve is tapping the line half the
+  time, at random. Alice and Bob keep the bits where their bases matched and
+  compare half of them in public; you call it: was Eve listening? Without Eve
+  every compared bit agrees; with her, about one in four is wrong, because she
+  cannot copy a photon and half her guesses of basis disturb it. Tests check
+  zero errors without Eve and 21 to 29% with her over 400 rounds.
+- **Be the decoder**: bit flips hide on a surface-code lattice and only the
+  checks they light are shown. Tap data qubits on the pad to flip them until
+  every check is dark, ideally with as few flips as the computer's matching
+  decoder; then Check reveals the real errors. If your fix and the errors
+  together cross the grid, the logical qubit flipped. Win three and the code
+  grows to distance 5.
+- **Grover maze**: eight doors, one prize. Bars above the doors show their
+  amplitudes; Oracle flips the prize door's bar below the line and Diffuse
+  reflects every bar about the average, on the orbs with real gates (X, CCZ,
+  H). After two rounds one look finds the prize 95% of the time; classically
+  you would open four doors on average.
+- **Daily quests**: three small tasks a day, the same for everyone, picked by
+  the date from a pool of twelve (apply 30 gates, make two Bell pairs, score
+  1,000 in Rush, run two programs in the Code Lab ...). Each pays 15 XP.
+- **First five minutes**: a guided welcome tour, the first item on the Play tab
+  after the Code Lab (and a Learn lesson): turn a qubit, H, measure, entangle,
+  and 100 shots of your first Bell pair, with the ghost hand showing each move.
+
 ### The Play tab: ten wonders
 
 The navigator's **Play** tab gathers the things to do just for fun. Each one
@@ -969,7 +1003,7 @@ course) the board shows a **certificate**, and the 2D page can save it as a PNG.
   shorter sequence exists. Solving it extends a streak, and on the 2D page the
   result comes as one line to copy and paste: "Entangled daily #25: 2 moves
   (par 2), 3 of 3 stars. Streak: 1 day."
-- **Achievements**: 31 of them, from "First move" and "Spooky action" (your
+- **Achievements**: 34 of them, from "First move" and "Spooky action" (your
   first Bell pair) to "All for one" (a five-qubit GHZ state), "Rainmaker"
   (1,000 shots), "Beyond classical" (the Bell Test), "Below threshold" (the
   surface code), "Many worlds" (watching paths cancel), "Rush hour" and "On

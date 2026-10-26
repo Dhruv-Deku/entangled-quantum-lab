@@ -56,6 +56,11 @@ export default defineAssets({
     type: AssetType.UIKitML,
     name: 'Code Lab',
   },
+  'decoder-panel': {
+    url: publicAssetUrl('ui/decoder.uikitml'),
+    type: AssetType.UIKitML,
+    name: 'Decoder pad',
+  },
   'noise-panel': {
     url: publicAssetUrl('ui/noise.uikitml'),
     type: AssetType.UIKitML,

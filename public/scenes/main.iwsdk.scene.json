@@ -292,6 +292,26 @@
       }
     },
     {
+      "id": "decoder-panel",
+      "name": "Decoder pad",
+      "content": {
+        "type": "asset",
+        "asset": "decoder-panel"
+      },
+      "transform": {
+        "position": [
+          0,
+          -50,
+          0
+        ],
+        "scale": 0.05
+      },
+      "components": {
+        "RayInteractable": {},
+        "PokeInteractable": {}
+      }
+    },
+    {
       "id": "codelab-panel",
       "name": "Code Lab",
       "content": {

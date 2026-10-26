@@ -45,6 +45,8 @@ import { GiantSphere } from './giant-sphere';
 import { TransmonVisual } from './transmon';
 import { NightSky } from './night-sky';
 import { HistoryGallery } from './history';
+import { SpyVisual } from './bb84-3d';
+import { GroverDoors } from './grover-3d';
 import { TrophyShelf, type TrophyItem } from './trophies';
 import { SurfaceCodeVisual } from './surface-3d';
 import type { SurfaceView } from './figures';
@@ -124,6 +126,9 @@ export class LabSystem extends createSystem({
   private sky!: NightSky;
   private history!: HistoryGallery;
   private passthrough = false;
+  /** The spy game's stations and the Grover maze's doors. */
+  spy!: SpyVisual;
+  grover!: GroverDoors;
   private night = false;
   private trophies!: TrophyShelf;
   /** The Surface Code chapter's lattice, floating between the orb and the board. */
@@ -262,6 +267,11 @@ export class LabSystem extends createSystem({
     this.history = new HistoryGallery();
     this.history.env = env;
     ws.add(this.history.root);
+    this.spy = new SpyVisual();
+    ws.add(this.spy.root);
+    this.grover = new GroverDoors();
+    this.grover.env = env;
+    ws.add(this.grover.root);
     this.sky = new NightSky();
     this.scene.add(this.sky.root);
     // the trophy shelf stands upper right, above the navigator, while the progress board is up
@@ -515,6 +525,17 @@ export class LabSystem extends createSystem({
     this.confetti.burst(new Vector3(0, ORB_HEIGHT, -0.03), big);
   }
 
+  /** The decoder game: the lattice, moved left of its tap pad, showing a puzzle (null puts it back). */
+  showSurfacePuzzle(p: { d: number; lit: readonly number[]; flips: readonly number[]; errors: readonly number[] | null } | null): void {
+    if (!p) {
+      this.surface.root.position.x = 0;
+      return;
+    }
+    this.surface.root.visible = true;
+    this.surface.root.position.x = -0.12;
+    this.surface.showPuzzle(p.d, p.lit, p.flips, p.errors);
+  }
+
   /** Play tab: the cat box on the desk (it follows q0). */
   showCat(on: boolean): void {
     this.cat.root.visible = on;
@@ -554,6 +575,7 @@ export class LabSystem extends createSystem({
   /** The Surface Code chapter's lattice (null hides it). */
   showSurface(v: SurfaceView | null): void {
     this.surface.root.visible = !!v;
+    if (v) this.surface.root.position.x = 0;
     if (v) this.surface.set(v);
   }
 
@@ -598,6 +620,8 @@ export class LabSystem extends createSystem({
     if (this.rushFx.root.visible) this.rushFx.update(dt);
     if (this.confetti.root.visible) this.confetti.update(dt);
     if (this.dice.root.visible) this.dice.update(dt);
+    if (this.spy.root.visible) this.spy.update(dt);
+    if (this.grover.root.visible) this.grover.update(dt);
     if (this.cat.root.visible) {
       // the cat follows q0: still in superposition, or measured
       const p1 = lab.history.state.prob1(0);

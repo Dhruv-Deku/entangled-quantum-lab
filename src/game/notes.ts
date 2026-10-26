@@ -249,6 +249,13 @@ export const NOTES: Record<string, string[]> = {
     'It takes n gates to prepare 2^n amplitudes, which is why a uniform superposition starts Grover search, Deutsch-Jozsa and the QFT.',
     'Key idea: holding all answers is not the speed-up by itself; measuring would just pick one at random. The job of an algorithm is to make the right one add up.',
   ],
+  'Welcome tour': [
+    'A qubit is drawn as an arrow in a glass ball (the Bloch sphere). Straight up is 0, straight down is 1, anywhere else is a mix: the higher the arrow, the likelier 0.',
+    'Turning the arrow is a gate. H, the Hadamard, lays it on the equator: an even mix of 0 and 1, a superposition.',
+    'Measuring makes the qubit pick 0 or 1 at random, with those odds, and it stays there. That is the one move you cannot take back.',
+    'Two qubits can be entangled: then neither has a state of its own, only the pair does. H then CNOT makes a Bell pair that always reads 00 or 11.',
+    'Key idea: superposition, measurement and entanglement are the three ideas everything else in quantum computing is built from.',
+  ],
   'Surface Code': [
     'The surface code stores one logical qubit in a d x d grid of data qubits. Between them sit d^2 - 1 measure qubits, each checking the parity of its two or four neighbours, over and over.',
     'Z checks catch bit flips and X checks catch phase flips. An error lights the checks next to it. The checks only see parities, so they reveal where errors are and nothing about the logical state.',

@@ -46,11 +46,14 @@ import { ket, RUSH_QUBITS, RushSession } from './rush';
 import { manyWorlds } from '../quantum/paths';
 import { ALBUM, albumMatches } from './album';
 import { CodeProgram, EXAMPLES, fromOps, type CodeGate } from './code-lab';
+import { bb84Round, groverRounds, type Bb84Round } from './bb84';
+import { bump as questBump, emptyQuests, questsFor, type QuestCounter } from './quests';
+import { SurfaceCode } from '../quantum/surface';
 import { computerFlips, score as pennyScore, type PennyPhase, type PennyRecord } from './penny';
 import { Ambient } from '../lab/ambient';
 import { bestStreak, dayKey, dailyNumber, emptyDaily, recordDaily, shareText, streak, type DailyRecord } from './daily';
 import { loadDaily, loadProfile, saveDaily, saveProfile } from '../lab/profile-store';
-import { albumFigure, profileFigure, rushFigure, type ProfileView, type RushView, type SurfaceView } from '../lab/figures';
+import { albumFigure, questsFigure, spyFigure, profileFigure, rushFigure, type ProfileView, type RushView, type SurfaceView } from '../lab/figures';
 import { listen } from '../lab/sonify';
 import { downloadSnapshot } from '../lab/snapshot';
 import { Banner } from '../lab/banner';
@@ -92,6 +95,8 @@ const PLACEMENT = {
   'under-board': { pos: new Vector3(0, 0.332, -0.17), rot: new Euler(-0.1, 0, 0, 'YXZ') },
   // upper right, opposite the chapter card and above the dock
   'nav-panel': { pos: new Vector3(0.47, 0.26, -0.06), rot: new Euler(-0.12, (-32 * Math.PI) / 180, 0, 'YXZ') },
+  // the decoder game's tap pad, right of the lattice
+  'decoder-pad': { pos: new Vector3(0.17, 0.3, -0.15), rot: new Euler(-0.15, -0.3, 0, 'YXZ') },
 } as const;
 
 const SLOTS = 7;
@@ -105,8 +110,9 @@ const LAB_LINES = 10;
 const LAB_KEYS = ['h', 'x', 'y', 'z', 's', 'sdg', 't', 'tdg', 'rx', 'ry', 'rz', 'cx', 'cz', 'swap', 'ccx', 'measure', 'q0', 'q1', 'q2', 'q3', 'q4', 'pi', 'pi2', 'pi4', 'mpi2', 'up', 'down', 'delete', 'clear', 'link', 'subqubit', 'addqubit', 'example', 'fromorbs'];
 const TABS = ['course', 'campaign', 'learn', 'puzzle', 'build', 'sandbox', 'play'] as const;
 /** The Play tab: arcade and showcase picks. */
-const PLAY = ['Code lab', 'Quantum Rush', 'Zen Rush', 'Daily', 'Surface Code', 'Many worlds', 'Quantum dice', 'Penny flip', 'Schrodinger cat', 'State album', 'Giant sphere', 'Inside a qubit', 'Night sky', 'History', 'Ambient music'] as const;
-const PLAY_TAGS = ['qasm', '60s', 'zen', 'day', '49q', 'H H', 'd8', 'coin', 'box', '15', '1 m', 'JJ', 'sky', '1981', 'hum'];
+const PLAY = ['Code lab', 'First five minutes', 'Daily quests', 'Quantum Rush', 'Zen Rush', 'Daily', 'Spy game', 'Be the decoder', 'Grover maze', 'Surface Code', 'Many worlds', 'Quantum dice', 'Penny flip', 'Schrodinger cat', 'State album', 'Giant sphere', 'Inside a qubit', 'Night sky', 'History', 'Ambient music'] as const;
+const PLAY_TAGS = ['qasm', 'tour', '3/day', '60s', 'zen', 'day', 'BB84', 'd=3', '8',  '49q', 'H H', 'd8', 'coin', 'box', '15', '1 m', 'JJ', 'sky', '1981', 'hum'];
+
 /** Where hidden panels park, out of reach of every pointer. */
 const PARKED = new Vector3(0, -50, 0);
 
@@ -205,6 +211,7 @@ export class UISystem extends createSystem({
   private libAsset: UIKitMLAsset | null = null;
   private looksAsset: UIKitMLAsset | null = null;
   private codelabAsset: UIKitMLAsset | null = null;
+  private decoderAsset: UIKitMLAsset | null = null;
   private dbgAsset: UIKitMLAsset | null = null;
   private classAsset: UIKitMLAsset | null = null;
   /** why the shared lab last refused an op (for the voice reply) */
@@ -310,7 +317,14 @@ export class UISystem extends createSystem({
         if (e.type === 'select' || e.type === 'reset' || e.type === 'seek' || e.type === 'op') this.renderDock();
         if (e.type === 'reset' && campaign.mode === 'sandbox') this.render(campaign.view);
         // achievements count what happens on the orbs
-        if (e.type === 'op') this.profile.onOp(e.op, lab.history.state);
+        if (e.type === 'op') {
+          const bells = this.profile.data.stats.bellPairs;
+          this.profile.onOp(e.op, lab.history.state);
+          if (e.op.kind === 'gate' || e.op.kind === 'swap' || e.op.kind === 'iswap') this.quest('gates');
+          if (e.op.kind === 'measure') this.quest('measure');
+          if (this.profile.data.stats.bellPairs > bells) this.quest('bell');
+        }
+        if (e.type === 'shots') this.quest('shots', e.shots);
         if (e.type === 'shots') this.profile.onShots(e.shots);
         if (e.type === 'seek') this.profile.onRewind();
         if (e.type === 'op' || e.type === 'shots' || e.type === 'seek') this.checkAchievements();
@@ -342,12 +356,13 @@ export class UISystem extends createSystem({
     this.classAsset = this.world.getSceneObject<UIKitMLAsset>('class-panel') ?? null;
     this.looksAsset = this.world.getSceneObject<UIKitMLAsset>('looks-panel') ?? null;
     this.codelabAsset = this.world.getSceneObject<UIKitMLAsset>('codelab-panel') ?? null;
-    if (!this.codelabAsset || !this.looksAsset || !this.classAsset || !this.chapter || !this.dock || !this.code || !this.nav || !this.builderAsset || !this.notesAsset || !this.noiseAsset || !this.libAsset || !this.dbgAsset) return false;
+    this.decoderAsset = this.world.getSceneObject<UIKitMLAsset>('decoder-panel') ?? null;
+    if (!this.decoderAsset || !this.codelabAsset || !this.looksAsset || !this.classAsset || !this.chapter || !this.dock || !this.code || !this.nav || !this.builderAsset || !this.notesAsset || !this.noiseAsset || !this.libAsset || !this.dbgAsset) return false;
     this.code.visible = false;
 
     // panels take poke and ray input but must never capture the grab pointer,
     // or a hand reaching for an orb just above the dock grabs the dock instead
-    for (const panel of [this.chapter, this.dock, this.code, this.nav, this.builderAsset, this.notesAsset, this.noiseAsset, this.libAsset, this.dbgAsset, this.classAsset, this.looksAsset, this.codelabAsset]) {
+    for (const panel of [this.chapter, this.dock, this.code, this.nav, this.builderAsset, this.notesAsset, this.noiseAsset, this.libAsset, this.dbgAsset, this.classAsset, this.looksAsset, this.codelabAsset, this.decoderAsset]) {
       panel.traverse((o) => {
         (o as unknown as { pointerEventsType: unknown }).pointerEventsType = { deny: 'grab' };
       });
@@ -386,6 +401,12 @@ export class UISystem extends createSystem({
     for (let i = 0; i < LAB_LINES; i++) labIds.push(`lab-r-${i}`, `lab-n-${i}`, `lab-t-${i}`);
     for (const k of LAB_KEYS) labIds.push(`lab-k-${k}`);
     for (const id of labIds) this.els.set(id, this.codelabAsset.requireElementById(id));
+    const decIds = ['dec-eyebrow', 'dec-note'];
+    for (let r = 0; r < 5; r++) {
+      decIds.push(`dec-r-${r}`);
+      for (let c = 0; c < 5; c++) decIds.push(`dec-b-${r}-${c}`, `dec-l-${r}-${c}`);
+    }
+    for (const id of decIds) this.els.set(id, this.decoderAsset.requireElementById(id));
     const looksIds = ['looks-eyebrow', 'looks-close', 'looks-note'];
     for (let i = 0; i < ORB_SKINS.length; i++) looksIds.push(`looks-r-${i}`, `looks-sw-${i}`, `looks-n-${i}`, `looks-m-${i}`, `looks-b-${i}`, `looks-bl-${i}`);
     for (const id of looksIds) this.els.set(id, this.looksAsset.requireElementById(id));
@@ -409,7 +430,7 @@ export class UISystem extends createSystem({
       } else campaign.next();
       feedback('select');
     });
-    for (let i = 0; i < 3; i++) on(`choice-${i}`, () => feedback(campaign.answer(i) ? 'success' : 'reject'));
+    for (let i = 0; i < 3; i++) on(`choice-${i}`, () => (this.game === 'spy' ? this.spyAnswer(i) : feedback(campaign.answer(i) ? 'success' : 'reject')));
     on('btn-replay', () => {
       if (this.rush || this.rushOver) return this.endRush(true);
       if (this.game) return this.endGame(true);
@@ -594,6 +615,7 @@ export class UISystem extends createSystem({
     on('lab-run', () => this.runProgram(false));
     on('lab-step', () => this.runProgram(true));
     for (const k of LAB_KEYS) on(`lab-k-${k}`, () => this.labKey(k));
+    for (let r = 0; r < 5; r++) for (let c = 0; c < 5; c++) on(`dec-b-${r}-${c}`, () => this.decoderTap(r, c));
     ORB_SKINS.forEach((skin, i) => on(`looks-b-${i}`, () => this.wearSkin(skin.id)));
     // the finish saved with the profile
     this.world.getSystem(LabSystem)?.setSkin(this.currentSkin());
@@ -1046,6 +1068,7 @@ export class UISystem extends createSystem({
       const mine = top.findIndex((t) => t.score === r.score);
       this.rushOver = { score: r.score, solved: r.solved, bestCombo: r.bestCombo, best: this.profile.data.stats.rushBest, newBest, top: top.map((t, i) => ({ ...t, current: i === mine })) };
       if (newBest) this.world.getSystem(LabSystem)?.celebrate(true);
+      this.quest('rush', r.score);
       this.profileDirty = true;
       this.checkAchievements();
       feedback(newBest ? 'success' : 'select');
@@ -1125,7 +1148,20 @@ export class UISystem extends createSystem({
   private startPlay(k: number): void {
     const item = PLAY[k];
     const lsys = this.world.getSystem(LabSystem);
+    this.quest('wonder');
     if (item === 'Code lab') return this.labOpen ? this.closeCodeLab() : this.openCodeLab(false);
+    if (item === 'First five minutes') {
+      this.endRush(false);
+      this.endGame(false);
+      campaign.startLesson(campaign.lessons.findIndex((l) => l.chip === 'Tour'));
+      return feedback('select');
+    }
+    if (item === 'Daily quests') {
+      this.questsOpen = !this.questsOpen;
+      if (this.questsOpen) this.profileOpen = this.libOpen = this.albumOpen = false;
+      this.renderNav(campaign.view);
+      return feedback('select');
+    }
     if (item === 'Quantum Rush') return this.startRush();
     if (item === 'Zen Rush') return this.startRush(true);
     // the switches: they stay on while you do anything else
@@ -1154,7 +1190,8 @@ export class UISystem extends createSystem({
       return toggle(this.albumOpen, 'album-open', this.albumOpen ? `Your State Album: ${this.albumCount()} of ${ALBUM.length}. Make a state on the orbs to collect it.` : 'Album closed.');
     }
     this.endRush(false);
-    if (item === 'Quantum dice' || item === 'Penny flip' || item === 'Schrodinger cat') return this.startGame(item === 'Quantum dice' ? 'dice' : item === 'Penny flip' ? 'penny' : 'cat');
+    const games: Record<string, 'dice' | 'penny' | 'cat' | 'spy' | 'decoder' | 'grover'> = { 'Quantum dice': 'dice', 'Penny flip': 'penny', 'Schrodinger cat': 'cat', 'Spy game': 'spy', 'Be the decoder': 'decoder', 'Grover maze': 'grover' };
+    if (games[item]) return this.startGame(games[item]);
     this.endGame(false);
     if (item === 'Daily') return this.startDaily();
     if (item === 'Surface Code') {
@@ -1179,7 +1216,7 @@ export class UISystem extends createSystem({
   private albumOpen = false;
   private readonly ambient = new Ambient();
   private ambientTimer = 0;
-  private game: 'dice' | 'penny' | 'cat' | null = null;
+  private game: 'dice' | 'penny' | 'cat' | 'spy' | 'decoder' | 'grover' | null = null;
   private pennyPhase: PennyPhase = 'first';
   private penny: PennyRecord = { you: 0, computer: 0 };
   private pennyLast: { flipped: boolean; outcome: 0 | 1 } | null = null;
@@ -1191,6 +1228,14 @@ export class UISystem extends createSystem({
     switch (item) {
       case 'Code lab':
         return this.labOpen;
+      case 'Daily quests':
+        return this.questsOpen;
+      case 'Spy game':
+        return this.game === 'spy';
+      case 'Be the decoder':
+        return this.game === 'decoder';
+      case 'Grover maze':
+        return this.game === 'grover';
       case 'Quantum Rush':
         return !!(this.rush || this.rushOver) && !this.rushZen;
       case 'Zen Rush':
@@ -1230,11 +1275,12 @@ export class UISystem extends createSystem({
       this.profile.use(key);
       this.banner.show('New in your State Album', e.name, `${e.ket}  /  ${this.albumCount()} of ${ALBUM.length} collected`);
       this.world.getSystem(LabSystem)?.celebrate(false);
+      this.quest('album');
       this.checkAchievements();
     }
   }
 
-  private startGame(g: 'dice' | 'penny' | 'cat'): void {
+  private startGame(g: 'dice' | 'penny' | 'cat' | 'spy' | 'decoder' | 'grover'): void {
     this.profileOpen = this.libOpen = this.albumOpen = false;
     if (this.code) this.code.visible = false;
     this.setView(null);
@@ -1248,9 +1294,19 @@ export class UISystem extends createSystem({
       campaign.enterSandbox(1, []);
       this.pennyPhase = 'first';
       this.pennyLast = null;
-    } else {
+    } else if (g === 'cat') {
       campaign.enterSandbox(1, [{ kind: 'gate', gate: 'h', target: 0 }]);
       this.use('cat');
+    } else if (g === 'spy') {
+      campaign.enterSandbox(1, []);
+      this.spyRound = null;
+      this.spyPhase = 'ready';
+    } else if (g === 'decoder') {
+      campaign.enterSandbox(1, []);
+      this.decoderRound();
+    } else {
+      campaign.enterSandbox(3, []);
+      this.groverNew();
     }
     this.game = g;
     feedback('select');
@@ -1260,13 +1316,20 @@ export class UISystem extends createSystem({
   private endGame(render: boolean): void {
     if (!this.game) return;
     this.game = null;
-    this.world.getSystem(LabSystem)?.dice.hide();
+    const ls = this.world.getSystem(LabSystem);
+    ls?.dice.hide();
+    ls?.spy.hide();
+    if (ls) ls.grover.root.visible = false;
+    ls?.showSurfacePuzzle(null);
     if (render) this.render(campaign.view);
   }
 
   /** The card's main button in a mini-game. */
   private gameNext(): void {
     const lsys = this.world.getSystem(LabSystem);
+    if (this.game === 'spy') return this.spyNext();
+    if (this.game === 'decoder') return this.decoderNext();
+    if (this.game === 'grover') return this.groverNext();
     if (this.game === 'dice') {
       // three Hadamards and three measurements: a fair number from 1 to 8
       lab.reset(3);
@@ -1289,7 +1352,10 @@ export class UISystem extends createSystem({
         this.pennyPhase = 'reveal';
         if (this.penny.you >= 3) this.use('penny:3');
         feedback(outcome === 0 ? 'success' : 'reject');
-        if (outcome === 0) lsys?.celebrate(false);
+        if (outcome === 0) {
+          lsys?.celebrate(false);
+          this.quest('puzzle');
+        }
       } else {
         lab.reset(1);
         this.pennyPhase = 'first';
@@ -1304,6 +1370,13 @@ export class UISystem extends createSystem({
   }
 
   private updateGame(dt: number): void {
+    const ls = this.world.getSystem(LabSystem);
+    if (this.game === 'spy' && this.spyPhase === 'flying' && ls?.spy.arrived) {
+      this.spyPhase = 'guess';
+      this.renderGameCard();
+    }
+    if (this.game === 'grover' && ls) ls.grover.set(Array.from({ length: 8 }, (_, k) => lab.history.state.re[k]), this.groverOpen, this.groverMarked);
+    if (this.game === 'decoder' && ls) ls.showSurfacePuzzle({ d: this.dec.d, lit: this.decoderLit(), flips: [...this.dec.flips], errors: this.dec.revealed ? this.dec.errors : null });
     if (this.diceAt > 0 && performance.now() / 1000 >= this.diceAt && this.game === 'dice') {
       this.diceAt = -1;
       const bits = [0, 1, 2].map((q) => lab.measure(q) ?? 0);
@@ -1322,6 +1395,18 @@ export class UISystem extends createSystem({
 
   private renderGameCard(): void {
     for (let i = 0; i < 5; i++) this.els.get(`pip-${i}`)?.setProperties({ display: 'none' });
+    const asking = this.game === 'spy' && this.spyPhase === 'guess';
+    this.els.get('choices')?.setProperties({ display: asking ? 'flex' : 'none' });
+    if (asking) {
+      ['Eve was listening', 'The line was clean'].forEach((label, i) => {
+        this.els.get(`choice-${i}`)?.setProperties({ display: 'flex' });
+        this.text(`choice-${i}-l`, label);
+        this.bg(`choice-${i}`, '#2d2f33');
+        this.els.get(`choice-${i}-l`)?.setProperties({ color: C.text });
+      });
+      this.els.get('choice-2')?.setProperties({ display: 'none' });
+    }
+    if (this.game === 'spy' || this.game === 'decoder' || this.game === 'grover') return this.renderLearnGame();
     this.els.get('btn-notes')?.setProperties({ display: 'none' });
     this.els.get('btn-lib')?.setProperties({ display: 'none' });
     this.text('btn-replay-label', 'Done');
@@ -1362,6 +1447,257 @@ export class UISystem extends createSystem({
       this.text('chapter-body', opened ? 'Looking made it one or the other. Tap New cat for another superposition, and tilt the orb first to change the odds.' : `The qubit is in superposition, so the cat is both: awake ${Math.round((1 - p1) * 100)}%, asleep ${Math.round(p1 * 100)}%. Tilt the orb to change the odds, then open the box.`);
       this.text('goal-text', opened ? 'Tap New cat' : 'Tap Open, or close your fist');
       this.text('btn-next-label', opened ? 'New cat' : 'Open');
+    }
+  }
+
+  // ---- daily quests
+
+  private questsOpen = false;
+
+  /** Count toward today's quests; a finished quest pays XP and pops a banner. */
+  private quest(counter: QuestCounter, amount = 1): void {
+    const q = (this.profile.data.quests ??= emptyQuests());
+    for (const done of questBump(q, dayKey(), counter, amount)) {
+      this.banner.show('Daily quest done', done.text, `+15 XP  /  ${q.done.length} of 3 today`);
+      this.world.getSystem(LabSystem)?.celebrate(false);
+    }
+    if (q.total >= 9) this.profile.use('quests:9');
+    this.profileDirty = true;
+  }
+
+  private questsFigureNow() {
+    const day = dayKey();
+    const q = this.profile.data.quests ?? emptyQuests();
+    const today = q.day === day;
+    return questsFigure(day, questsFor(day).map((d) => ({ text: d.text, have: today ? (q.progress[d.id] ?? 0) : 0, goal: d.goal, done: today && q.done.includes(d.id) })), q.total);
+  }
+
+  // ---- the spy game (BB84), be the decoder, the Grover maze
+
+  private spyRound: Bb84Round | null = null;
+  private spyPhase: 'ready' | 'flying' | 'guess' | 'result' = 'ready';
+  private spyRecord = { right: 0, rounds: 0 };
+  private spyLastRight = false;
+
+  private spyNext(): void {
+    if (this.spyPhase === 'flying' || this.spyPhase === 'guess') return;
+    // Eve is there half the time, at random
+    this.spyRound = bb84Round(16, Math.random() < 0.5, Math.random);
+    this.spyPhase = 'flying';
+    this.world.getSystem(LabSystem)?.spy.send(this.spyRound);
+    feedback('select');
+    this.renderGameCard();
+  }
+
+  private spyAnswer(i: number): void {
+    if (this.game !== 'spy' || this.spyPhase !== 'guess' || !this.spyRound || i > 1) return;
+    const saidEve = i === 0;
+    this.spyLastRight = saidEve === this.spyRound.eve;
+    this.spyRecord = { right: this.spyRecord.right + (this.spyLastRight ? 1 : 0), rounds: this.spyRecord.rounds + 1 };
+    this.spyPhase = 'result';
+    this.world.getSystem(LabSystem)?.spy.reveal();
+    if (this.spyLastRight) {
+      this.world.getSystem(LabSystem)?.celebrate(false);
+      this.quest('puzzle');
+      if (this.spyRecord.right >= 3) this.use('spy:3');
+    }
+    feedback(this.spyLastRight ? 'success' : 'reject');
+    this.renderGameCard();
+  }
+
+  private readonly dec = { d: 3, errors: [] as number[], flips: new Set<number>(), revealed: false, wins: 0, rounds: 0, won: false, best: 0 };
+  private decCodes = new Map<number, SurfaceCode>();
+  private decCode(): SurfaceCode {
+    let c = this.decCodes.get(this.dec.d);
+    if (!c) this.decCodes.set(this.dec.d, (c = new SurfaceCode(this.dec.d)));
+    return c;
+  }
+
+  /** A fresh lattice with hidden bit flips: only the checks they light are shown. */
+  private decoderRound(): void {
+    const d = (this.dec.d = this.dec.wins >= 3 ? 5 : 3);
+    const code = this.decCode();
+    let errors: number[] = [];
+    while (!errors.length || !code.syndrome(errors, 'X').length) {
+      errors = [];
+      for (let q = 0; q < d * d; q++) if (Math.random() < (d === 3 ? 0.14 : 0.08)) errors.push(q);
+    }
+    this.dec.errors = errors;
+    this.dec.flips = new Set();
+    this.dec.revealed = false;
+    this.dec.best = code.decode(code.syndrome(errors, 'X'), 'X').correction.length;
+    this.renderDecoderPad();
+  }
+
+  /** Checks still lit: the real errors and the player's flips together. */
+  private decoderLit(): number[] {
+    const left = new Set(this.dec.errors);
+    for (const q of this.dec.flips) left.has(q) ? left.delete(q) : left.add(q);
+    return this.decCode().syndrome([...left], 'X');
+  }
+
+  private decoderTap(r: number, c: number): void {
+    if (this.game !== 'decoder' || this.dec.revealed || r >= this.dec.d || c >= this.dec.d) return;
+    const q = r * this.dec.d + c;
+    this.dec.flips.has(q) ? this.dec.flips.delete(q) : this.dec.flips.add(q);
+    feedback('select');
+    this.renderDecoderPad();
+    this.renderGameCard();
+  }
+
+  private decoderNext(): void {
+    if (this.dec.revealed) {
+      this.decoderRound();
+      return this.renderGameCard();
+    }
+    if (this.decoderLit().length) return feedback('reject');
+    // check: did the fix and the real errors together cross the grid?
+    const code = this.decCode();
+    this.dec.won = !code.logicalFlip(this.dec.errors, [...this.dec.flips], 'X');
+    this.dec.revealed = true;
+    this.dec.rounds++;
+    if (this.dec.won) {
+      this.dec.wins++;
+      this.world.getSystem(LabSystem)?.celebrate(false);
+      this.quest('puzzle');
+      if (this.dec.wins >= 3) this.use('decoder:3');
+    }
+    feedback(this.dec.won ? 'success' : 'reject');
+    this.renderDecoderPad();
+    this.renderGameCard();
+  }
+
+  private renderDecoderPad(): void {
+    if (!this.decoderAsset) return;
+    const d = this.dec.d;
+    const err = new Set(this.dec.revealed ? this.dec.errors : []);
+    for (let r = 0; r < 5; r++) {
+      this.els.get(`dec-r-${r}`)?.setProperties({ display: r < d ? 'flex' : 'none' });
+      for (let c = 0; c < 5; c++) {
+        const q = r * d + c, on = c < d && this.dec.flips.has(q), bad = c < d && err.has(q);
+        this.els.get(`dec-b-${r}-${c}`)?.setProperties({ display: c < d ? 'flex' : 'none' });
+        this.bg(`dec-b-${r}-${c}`, on && bad ? '#4a4c52' : on ? '#1f3a30' : bad ? '#3a2523' : '#2f3135');
+        this.text(`dec-l-${r}-${c}`, on && bad ? 'ok' : on ? 'X' : bad ? '!' : '.');
+        this.els.get(`dec-l-${r}-${c}`)?.setProperties({ color: on && !bad ? C.done : bad ? '#ff8a7a' : C.text });
+      }
+    }
+    this.text('dec-eyebrow', `Be the decoder  /  distance ${d}  /  won ${this.dec.wins} of ${this.dec.rounds}`);
+    const lit = this.decoderLit().length;
+    this.text('dec-note', this.dec.revealed ? (this.dec.won ? 'Fixed: the logical qubit is safe.' : 'The fix crossed the grid: a logical error.') : lit ? `${lit} check${lit === 1 ? '' : 's'} still lit` : 'All dark: tap Check.');
+  }
+
+  private groverMarked = 0;
+  private groverOpen: number | null = null;
+  private groverRound = 0;
+  private groverPhase: 'oracle' | 'diffuse' | 'look' | 'opened' = 'oracle';
+  private groverRecord = { found: 0, mazes: 0 };
+
+  private groverNew(): void {
+    lab.load(3, [0, 1, 2].map((q) => ({ kind: 'gate', gate: 'h', target: q }) as Op));
+    this.groverMarked = Math.floor(Math.random() * 8);
+    this.groverOpen = null;
+    this.groverRound = 0;
+    this.groverPhase = 'oracle';
+    const ls = this.world.getSystem(LabSystem);
+    if (ls) ls.grover.root.visible = true;
+  }
+
+  private groverNext(): void {
+    const ccz: Op = { kind: 'gate', gate: 'z', target: 2, controls: [0, 1] };
+    const each = (gate: 'h' | 'x', which: number[]) => which.map((q) => ({ kind: 'gate', gate, target: q }) as Op);
+    if (this.groverPhase === 'opened') {
+      this.groverNew();
+    } else if (this.groverPhase === 'oracle') {
+      // flip the sign of the prize door only: X where its bit is 0, CCZ, and back
+      const zeros = [0, 1, 2].filter((q) => !((this.groverMarked >> q) & 1));
+      for (const op of [...each('x', zeros), ccz, ...each('x', zeros)]) lab.apply(op);
+      this.groverPhase = 'diffuse';
+      feedback('gate');
+    } else if (this.groverPhase === 'diffuse') {
+      // reflect every amplitude about the average
+      const all = [0, 1, 2];
+      for (const op of [...each('h', all), ...each('x', all), ccz, ...each('x', all), ...each('h', all)]) lab.apply(op);
+      this.groverRound++;
+      this.groverPhase = this.groverRound >= groverRounds(8) ? 'look' : 'oracle';
+      feedback('entangle');
+    } else {
+      const bits = [0, 1, 2].map((q) => lab.measure(q) ?? 0);
+      this.groverOpen = bits[0] + 2 * bits[1] + 4 * bits[2];
+      this.groverPhase = 'opened';
+      this.groverRecord = { found: this.groverRecord.found + (this.groverOpen === this.groverMarked ? 1 : 0), mazes: this.groverRecord.mazes + 1 };
+      if (this.groverOpen === this.groverMarked) {
+        this.world.getSystem(LabSystem)?.celebrate(true);
+        this.quest('puzzle');
+      }
+      feedback(this.groverOpen === this.groverMarked ? 'success' : 'reject');
+    }
+    this.renderGameCard();
+  }
+
+  private renderLearnGame(): void {
+    this.els.get('btn-notes')?.setProperties({ display: 'none' });
+    this.els.get('btn-lib')?.setProperties({ display: 'none' });
+    this.text('btn-replay-label', 'Done');
+    this.bg('goal-dot', C.current);
+    this.bg('btn-next', C.primary);
+    if (this.game === 'spy') {
+      const r = this.spyRound;
+      this.text('chapter-eyebrow', `Play  /  Spy game  /  you called it ${this.spyRecord.right} of ${this.spyRecord.rounds}`);
+      if (this.spyPhase === 'ready') {
+        this.text('chapter-title', 'Is anyone listening?');
+        this.text('chapter-body', 'Alice sends Bob a secret key, one photon at a time, each in a random basis. Eve may be tapping the fibre (it is random). A spy cannot copy a qubit, so she leaves errors behind. Watch, then call it.');
+        this.text('goal-text', 'Tap Send');
+        this.text('btn-next-label', 'Send');
+      } else if (this.spyPhase === 'flying') {
+        this.text('chapter-title', 'Photons in flight');
+        this.text('chapter-body', 'Upright and flat bars are the + basis, slanted ones the x basis. Bob guesses a basis for each; only the matches are kept.');
+        this.text('goal-text', 'Watch them cross');
+        this.text('btn-next-label', 'Wait');
+        this.bg('btn-next', C.primaryIdle);
+      } else if (this.spyPhase === 'guess') {
+        this.text('chapter-title', 'Was Eve listening?');
+        this.text('chapter-body', `They kept ${r?.kept} bits where the bases matched, and compared ${r?.checked} of them in public: ${r?.errors} disagreed. Without Eve none would. Make the call.`);
+        this.text('goal-text', 'Pick an answer');
+        this.text('btn-next-label', 'Send');
+        this.bg('btn-next', C.primaryIdle);
+      } else {
+        this.text('chapter-title', this.spyLastRight ? 'Right!' : 'Not this time');
+        this.text('chapter-body', r?.eve ? `Eve was there: her wrong guesses of basis turned ${r.errors} of ${r.checked} checked bits. Alice and Bob throw this key away.` : `The line was clean: every checked bit agreed, so the other ${r?.key.length} bits are a secret key only Alice and Bob share.`);
+        this.text('goal-text', `You called it ${this.spyRecord.right} of ${this.spyRecord.rounds}`);
+        this.bg('goal-dot', this.spyLastRight ? C.done : '#ff8a7a');
+        this.text('btn-next-label', 'Next round');
+      }
+    } else if (this.game === 'decoder') {
+      const lit = this.decoderLit().length;
+      this.text('chapter-eyebrow', `Play  /  Be the decoder  /  won ${this.dec.wins} of ${this.dec.rounds}`);
+      if (!this.dec.revealed) {
+        this.text('chapter-title', lit ? `${lit} check${lit === 1 ? '' : 's'} lit` : 'All dark');
+        this.text('chapter-body', `Bit flips are hiding on the lattice; you only see the checks they light. Tap qubits on the pad to flip them back until every check is dark, with as few flips as you can. The computer's decoder needs ${this.dec.best}.`);
+        this.text('goal-text', lit ? 'Tap qubits to clear the lit checks' : 'Tap Check');
+        this.text('btn-next-label', 'Check');
+        this.bg('btn-next', lit ? C.primaryIdle : C.primary);
+      } else {
+        this.text('chapter-title', this.dec.won ? 'Fixed' : 'Logical error');
+        this.text('chapter-body', this.dec.won ? `Your ${this.dec.flips.size} flip${this.dec.flips.size === 1 ? '' : 's'} and the real errors (coral) close into loops: the logical qubit never noticed. The computer used ${this.dec.best}.` : 'Your fix and the real errors together stretch across the grid: the checks are dark, but the logical qubit flipped. The shortest fix is usually the right one.');
+        this.text('goal-text', this.dec.wins >= 3 ? 'Distance 5 next: 25 qubits' : 'Win three to go bigger');
+        this.bg('goal-dot', this.dec.won ? C.done : '#ff8a7a');
+        this.text('btn-next-label', 'New round');
+      }
+    } else if (this.game === 'grover') {
+      const label = { oracle: 'Oracle', diffuse: 'Diffuse', look: 'Look', opened: 'New maze' }[this.groverPhase];
+      this.text('chapter-eyebrow', `Play  /  Grover maze  /  found ${this.groverRecord.found} of ${this.groverRecord.mazes}`);
+      this.text('btn-next-label', label);
+      if (this.groverPhase === 'opened') {
+        const won = this.groverOpen === this.groverMarked;
+        this.text('chapter-title', won ? `Door ${this.groverOpen! + 1}: the prize!` : `Door ${this.groverOpen! + 1}: empty`);
+        this.text('chapter-body', won ? 'One look after two rounds, and it is the right door. Classically you would open four on average; Grover needs about the square root.' : `The prize was behind door ${this.groverMarked + 1}. Two rounds give it a 95% chance, not 100%: quantum search is a very good bet, not a sure thing.`);
+        this.bg('goal-dot', won ? C.done : '#ff8a7a');
+        this.text('goal-text', 'Tap New maze');
+      } else {
+        this.text('chapter-title', 'Find the prize in one look');
+        this.text('chapter-body', `Eight doors, one prize, all equally likely (the bars). The oracle flips the prize door's bar below the line without telling you which; Diffuse reflects every bar about the average. Round ${Math.min(this.groverRound + 1, 2)} of 2.`);
+        this.text('goal-text', `Tap ${label}`);
+      }
     }
   }
 
@@ -1764,7 +2100,10 @@ export class UISystem extends createSystem({
     this.renderClass();
     // a celebration whenever a chapter, lesson, puzzle, daily or course module is finished
     const doneKey = v.chapterDone ? `${v.mode}:${v.chapterIndex}:${v.lessonIndex}:${v.puzzleIndex}:${v.courseIndex}` : '';
-    if (doneKey && doneKey !== this.lastDoneKey) this.world.getSystem(LabSystem)?.celebrate(true);
+    if (doneKey && doneKey !== this.lastDoneKey) {
+      this.world.getSystem(LabSystem)?.celebrate(true);
+      this.quest('chapter');
+    }
     this.lastDoneKey = doneKey;
   }
 
@@ -1901,6 +2240,7 @@ export class UISystem extends createSystem({
     this.text('a-view-l', this.stateView ? STATE_VIEW_NAMES[this.stateView] : 'View');
     this.bg('a-view', this.stateView ? C.primary : '#2d2f33');
     this.checkWorlds();
+    if (view === 'worlds') this.quest('worlds');
   }
 
   /** The many-worlds achievement: paths seen cancelling. */
@@ -2435,6 +2775,7 @@ export class UISystem extends createSystem({
     this.labMsg = { text: step ? 'Stepping: tap Step for each line.' : `Running ${r.ops.length} line${r.ops.length === 1 ? '' : 's'} on ${this.program.n} qubit${this.program.n === 1 ? '' : 's'}...`, bad: false };
     if (step) this.runNext();
     this.use('codelab:run');
+    this.quest('code');
     this.renderCodeLab();
   }
 
@@ -2631,6 +2972,21 @@ export class UISystem extends createSystem({
       labSys.showWheels(false);
       labSys.showVqe(undefined, H2);
       const fig = profileFigure(this.profileView());
+      labSys.showOverlay(fig.key, (b) => b.draw(fig.draw));
+      return;
+    }
+    // today's quests, or the spy game's photons
+    const questsFig = this.questsOpen ? this.questsFigureNow() : null;
+    const spyFig = this.game === 'spy' && this.spyRound && this.spyPhase !== 'flying' ? spyFigure({ ...this.spyRound, eve: this.spyPhase === 'result' ? this.spyRound.eve : null, record: this.spyRecord }) : null;
+    if (questsFig || spyFig) {
+      labSys.hardwareWanted = false;
+      labSys.showHardware(null);
+      labSys.showMaths(false);
+      labSys.showLandscape(null);
+      labSys.showDensity(false);
+      labSys.showWheels(false);
+      labSys.showVqe(undefined, H2);
+      const fig = (questsFig ?? spyFig)!;
       labSys.showOverlay(fig.key, (b) => b.draw(fig.draw));
       return;
     }
@@ -2842,6 +3198,7 @@ export class UISystem extends createSystem({
 
   /** The chip tab's machine: superconducting chip, trapped ions or neutral atoms. */
   private setMachine(id: PlatformId): void {
+    this.quest('machine');
     this.machine = id;
     this.compared = null;
     this.codeNote = null;
@@ -3073,7 +3430,7 @@ export class UISystem extends createSystem({
     const want = this.pokeOn ? near > 0.14 : near > 0.2;
     if (want === this.pokeOn) return;
     this.pokeOn = want;
-    for (const id of ['chapter-panel', 'gate-dock', 'code-panel', 'nav-panel', 'builder-panel', 'notes-panel', 'noise-panel', 'library-panel', 'debug-panel', 'class-panel', 'looks-panel', 'codelab-panel']) {
+    for (const id of ['chapter-panel', 'gate-dock', 'code-panel', 'nav-panel', 'builder-panel', 'notes-panel', 'noise-panel', 'library-panel', 'debug-panel', 'class-panel', 'looks-panel', 'codelab-panel', 'decoder-panel']) {
       const e = this.world.getSceneEntity(id);
       if (!e) continue;
       if (want && !e.hasComponent(PokeInteractable)) e.addComponent(PokeInteractable);
@@ -3150,6 +3507,13 @@ export class UISystem extends createSystem({
       this.builderAsset!.position.copy(PARKED);
     }
     this.placeBlend(this.code!, 'code-panel', 'code-zoom', this.zoomT, this.codeScale, this.codeOpenT);
+    if (this.game === 'decoder') {
+      this.place(this.decoderAsset!, 'decoder-pad');
+      this.decoderAsset!.visible = true;
+    } else {
+      this.decoderAsset!.visible = false;
+      this.decoderAsset!.position.copy(PARKED);
+    }
     if (this.labOpen) {
       this.place(this.codelabAsset!, 'code-panel');
       this.codelabAsset!.visible = true;
