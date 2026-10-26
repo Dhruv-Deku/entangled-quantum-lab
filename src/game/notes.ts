@@ -229,6 +229,26 @@ export const NOTES: Record<string, string[]> = {
     'If each qubit flips with chance p, the code fails only when two or three flip: 3p^2 - 2p^3. That beats p whenever p < 1/2, the break-even point of this code.',
     'Key idea: measure the errors, never the data. Codes like the surface code catch phase flips too and reach much better thresholds by using many qubits.',
   ],
+  'Minus state': [
+    '|-> = (|0> - |1>)/sqrt(2) sits at the back of the equator, opposite |+>. Both give 0 or 1 half the time when measured.',
+    'The difference is the relative sign, a phase of pi. An H turns |+> into |0> and |-> into |1>, so the sign becomes a definite answer.',
+    'Key idea: phase is invisible to a single measurement but changes what later gates do.',
+  ],
+  'The +i state': [
+    '|+i> = (|0> + i|1>)/sqrt(2) points along the third axis of the sphere. H takes |0> to |+>, and S (a quarter turn about the vertical) takes |+> on to |+i>.',
+    'Phase gates turn the arrow around the vertical axis: Z by a half turn, S by a quarter, T by an eighth.',
+    'Key idea: the six poles 0, 1, +, -, +i and -i are the states the Clifford gates move between.',
+  ],
+  'Phi minus': [
+    'The four Bell states are (|00> +- |11>)/sqrt(2) and (|01> +- |10>)/sqrt(2). Phi minus is the first with a minus sign.',
+    'H then Z on q0 gives |->; a CNOT then copies its 0/1 onto q1, carrying the sign along: |00> - |11>.',
+    'Key idea: shots cannot tell Phi plus from Phi minus; a CNOT then an H on the control maps each Bell state to its own pair of bits, the Bell measurement used in teleportation.',
+  ],
+  'All at once': [
+    'H on each of n qubits gives every n-bit string with amplitude 1/sqrt(2^n): with three qubits, all eight from 000 to 111.',
+    'It takes n gates to prepare 2^n amplitudes, which is why a uniform superposition starts Grover search, Deutsch-Jozsa and the QFT.',
+    'Key idea: holding all answers is not the speed-up by itself; measuring would just pick one at random. The job of an algorithm is to make the right one add up.',
+  ],
   'Surface Code': [
     'The surface code stores one logical qubit in a d x d grid of data qubits. Between them sit d^2 - 1 measure qubits, each checking the parity of its two or four neighbours, over and over.',
     'Z checks catch bit flips and X checks catch phase flips. An error lights the checks next to it. The checks only see parities, so they reveal where errors are and nothing about the logical state.',

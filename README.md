@@ -65,10 +65,10 @@ the Meta Immersive Web SDK (IWSDK), three.js and TypeScript.
 | **Atoms carried into place to entangle** | **Orb finishes you unlock** |
 | ![A neutral atom is carried along the lane to its partner, the pair glow gold while the Rydberg interaction entangles them, and it is carried back](docs/screenshots/anim-atoms.gif) | ![The Looks panel beside the progress board: Glass, Frost, Smoke, Tinted (worn: the two orbs in coral and teal, tied by the gold thread) and Copper, locked until level 5](docs/screenshots/orb-looks.png) |
 
-**By the numbers:** 26 chapters, a 14-module course, 15 lessons, 12 puzzles, a
-daily challenge and Quantum Rush, 5 big-state views, 3 kinds of quantum computer
+**By the numbers:** 26 chapters, a 14-module course, 20 lessons, 12 puzzles, a
+daily challenge and Quantum Rush, a Play tab, 5 big-state views, 3 kinds of quantum computer
 in 3D at full size, a 49-qubit surface code, 28 achievements, 5 orb finishes,
-voice control, shared labs and classes, and 313 unit tests.
+voice control, shared labs and classes, and 318 unit tests.
 
 ## Contents
 
@@ -76,7 +76,7 @@ voice control, shared labs and classes, and 313 unit tests.
 - [Part 1: Your hands are the quantum computer](#part-1-your-hands-are-the-quantum-computer)
   - [Gestures](#gestures), [Gates you can see](#gates-you-can-see), [Circuit board](#circuit-board), [Sandbox](#sandbox), [Share links](#share-links)
 - [Part 2: Learn, from the first qubit to research topics](#part-2-learn-from-the-first-qubit-to-research-topics)
-  - [Course](#course), [Learn](#learn), [Notes](#notes), [The Mystery Qubit](#the-mystery-qubit), [QAOA: a variational algorithm](#qaoa-a-variational-algorithm), [Algorithm chapters](#algorithm-chapters), [Advanced chapters](#advanced-chapters), [The surface code](#the-surface-code), [The maths of every step](#the-maths-of-every-step)
+  - [Course](#course), [Learn](#learn), [Qubiting: five new lessons](#qubiting-five-new-lessons), [Notes](#notes), [The Mystery Qubit](#the-mystery-qubit), [QAOA: a variational algorithm](#qaoa-a-variational-algorithm), [Algorithm chapters](#algorithm-chapters), [Advanced chapters](#advanced-chapters), [The surface code](#the-surface-code), [The maths of every step](#the-maths-of-every-step)
 - [Part 3: Real quantum hardware](#part-3-real-quantum-hardware)
   - [On a real chip](#on-a-real-chip), [Run on a real quantum computer](#run-on-a-real-quantum-computer), [Noise lab](#noise-lab)
 - [Part 4: Tools for exploring](#part-4-tools-for-exploring)
@@ -90,7 +90,7 @@ voice control, shared labs and classes, and 313 unit tests.
 ```sh
 npm install
 npm run dev        # managed browser with the Quest 3 emulator (IWER)
-npm test           # 313 unit tests: physics, three kinds of quantum computer, gestures, the course, 25 chapters, 15 lessons, puzzles, the daily challenge, achievements, builder, noise, chemistry, import, IBM compiling, Bell tests, error correction, benchmarking, voice, shared rooms and more
+npm test           # 318 unit tests: physics, three kinds of quantum computer, gestures, the course, 25 chapters, 15 lessons, puzzles, the daily challenge, achievements, builder, noise, chemistry, import, IBM compiling, Bell tests, error correction, benchmarking, voice, shared rooms and more
 npm run typecheck
 npm run build
 ```
@@ -259,6 +259,14 @@ scripted solution in the tests.
 
 The **navigator** panel (upper right) switches between Chapters, Learn and the
 Sandbox, and shows what you have finished.
+
+### Qubiting: five new lessons
+
+A new shelf on the Learn tab, built around the new tools: **Interference** (H
+twice: the two paths to |1> cancel; open the Many worlds view to watch),
+**Minus state** (the back of the equator), **The +i state** (the third axis),
+**Phi minus** (a Bell pair with a hidden sign) and **All at once** (three Hs,
+all eight answers). Each has notes and is solved end to end in the tests.
 
 ### Notes
 
@@ -808,8 +816,9 @@ the same circuit, ready to post.
 
 ![Quantum Rush in play: the target "Plus plus" on the card, its amplitude bars beside the orbs' own on the board with a 60-second clock and a x3 combo, +493 rising out of the orbs, and sixty ticks around the desk](docs/screenshots/anim-rush.gif)
 
-An arcade round on two qubits, at the top of the Puzzles tab (or say "quantum
-rush"). A target state appears; make it on the orbs any way you like, and the
+An arcade round on two qubits, first on the navigator's new **Play** tab (or
+say "quantum rush"). The Play tab also opens today's daily challenge, the
+Surface Code chapter, and a many-worlds demo where paths cancel in front of you. A target state appears; make it on the orbs any way you like, and the
 moment they match it scores and the next one appears. Targets climb from a
 single gate to Bell pairs with phases, then to generated states three or four
 moves deep, each with a true minimum par found by search.

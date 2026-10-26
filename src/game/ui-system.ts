@@ -94,7 +94,9 @@ const IBM_SHOTS = 1000;
 /** How much bigger a zoomed window is. */
 const ZOOM = 1.3;
 const NAV_SLOTS = 18;
-const TABS = ['course', 'campaign', 'learn', 'puzzle', 'build', 'sandbox'] as const;
+const TABS = ['course', 'campaign', 'learn', 'puzzle', 'build', 'sandbox', 'play'] as const;
+/** The Play tab: arcade and showcase picks. */
+const PLAY = ['Quantum Rush', 'Daily', 'Surface Code', 'Many worlds'] as const;
 /** Where hidden panels park, out of reach of every pointer. */
 const PARKED = new Vector3(0, -50, 0);
 
@@ -224,7 +226,7 @@ export class UISystem extends createSystem({
   private noiseOpen = false;
   private notes: NotesPanel | null = null;
   /** Which tab the navigator shows (it follows the mode, but can be browsed). */
-  private tab: CampaignView['mode'] = 'campaign';
+  private tab: CampaignView['mode'] | 'play' = 'campaign';
   /** Navigator page when a tab has more items than slots (the last slot turns the page). */
   private navPage = 0;
   private navCurrent = '';
@@ -335,7 +337,7 @@ export class UISystem extends createSystem({
     const ids = ['chapter-eyebrow', 'chapter-title', 'chapter-body', 'goal-dot', 'goal-text', 'btn-next', 'btn-next-label', 'btn-replay', 'btn-replay-label', 'btn-notes', 'pip-0', 'pip-1', 'pip-2', 'pip-3', 'pip-4', 'choices'];
     for (let i = 0; i < 3; i++) ids.push(`choice-${i}`, `choice-${i}-k`, `choice-${i}-l`);
     for (const id of ids) this.els.set(id, this.chapter.requireElementById(id));
-    const navIds = ['tab-course', 'tab-course-l', 'tab-campaign', 'tab-campaign-l', 'tab-learn', 'tab-learn-l', 'tab-puzzle', 'tab-puzzle-l', 'tab-build', 'tab-build-l', 'tab-sandbox', 'tab-sandbox-l', 'nav-progress', 'nav-progress-2', 'nav-me'];
+    const navIds = ['tab-course', 'tab-course-l', 'tab-campaign', 'tab-campaign-l', 'tab-learn', 'tab-learn-l', 'tab-puzzle', 'tab-puzzle-l', 'tab-build', 'tab-build-l', 'tab-sandbox', 'tab-sandbox-l', 'tab-play', 'tab-play-l', 'nav-progress', 'nav-progress-2', 'nav-me'];
     for (let i = 0; i < NAV_SLOTS; i++) navIds.push(`n-${i}`, `n-${i}-n`, `n-${i}-l`);
     for (const id of navIds) this.els.set(id, this.nav.requireElementById(id));
     const dockIds = ['g-h', 'g-x', 'g-y', 'g-z', 'g-s', 'g-t', 'g-rl', 'g-rr', 'a-cnot', 'a-swap', 'a-measure', 'a-shots', 'a-export', 't-prev', 't-next', 'dock-status', 'a-voice', 'a-voice-l', 'a-debug', 'a-debug-l', 'a-view', 'a-view-l', 'a-share', 'a-share-l', 'a-listen', 'a-listen-l'];
@@ -411,11 +413,8 @@ export class UISystem extends createSystem({
         if (this.tab === 'course' && k < campaign.course.length) campaign.startCourse(k);
         else if (this.tab === 'campaign' && k < campaign.chapters.length) campaign.startChapter(k);
         else if (this.tab === 'learn' && k < campaign.lessons.length) campaign.startLesson(k);
-        else if (this.tab === 'puzzle' && k === 0) this.startRush();
-        else if (this.tab === 'puzzle' && k - 1 < campaign.puzzles.length) {
-          this.endRush(false);
-          campaign.startPuzzle(k - 1);
-        }
+        else if (this.tab === 'puzzle' && k < campaign.puzzles.length) campaign.startPuzzle(k);
+        else if (this.tab === 'play' && k < PLAY.length) this.startPlay(k);
         else if (this.tab === 'build' && k < BUILDS.length) campaign.enterBuild(k);
         else if (this.tab === 'sandbox' && k < PRESETS.length) campaign.loadPreset(k);
         else return;
@@ -966,7 +965,7 @@ export class UISystem extends createSystem({
     this.rushResetAt = 0;
     this.rush = new RushSession(this.clockNow(), Math.random);
     if (campaign.mode !== 'sandbox' || lab.n !== RUSH_QUBITS || lab.history.length) campaign.enterSandbox(RUSH_QUBITS, []);
-    this.tab = 'puzzle';
+    this.tab = 'play';
     this.use('rush');
     this.flash('Quantum Rush: make each target on the orbs, any way you like. 60 seconds; solves add time.');
     feedback('select');
@@ -1081,6 +1080,24 @@ export class UISystem extends createSystem({
       this.rushCardTimer = 0;
       this.renderRushCard();
     }
+  }
+
+  /** The Play tab: Quantum Rush, today's daily, the surface code, and a many-worlds demo. */
+  private startPlay(k: number): void {
+    if (k === 0) return this.startRush();
+    this.endRush(false);
+    if (k === 1) return this.startDaily();
+    if (k === 2) {
+      campaign.startChapter(campaign.chapters.findIndex((c) => c.title === 'Surface Code'));
+      return feedback('select');
+    }
+    // interference you can see: H twice on q0 cancels its |1> paths, a Bell pair branches q1
+    campaign.enterSandbox(2, [{ kind: 'gate', gate: 'h', target: 0 }, { kind: 'gate', gate: 'h', target: 1 }, { kind: 'gate', gate: 'z', target: 1, controls: [0] }, { kind: 'gate', gate: 'h', target: 0 }, { kind: 'gate', gate: 'h', target: 1 }]);
+    this.setView('worlds');
+    this.tab = 'play';
+    this.renderNav(campaign.view);
+    this.flash('Many worlds: every path through H, H, CZ, H, H. Opposite colours meet at the empty rings and cancel.');
+    feedback('select');
   }
 
   /** Today's daily challenge: the last puzzle on the Puzzles tab. */
@@ -1939,7 +1956,7 @@ export class UISystem extends createSystem({
   /** How many items the current tab lists. */
   private navCount(): number {
     const t = this.tab;
-    return t === 'course' ? campaign.course.length : t === 'campaign' ? campaign.chapters.length : t === 'learn' ? campaign.lessons.length : t === 'puzzle' ? campaign.puzzles.length + 1 : t === 'build' ? BUILDS.length : PRESETS.length;
+    return t === 'course' ? campaign.course.length : t === 'campaign' ? campaign.chapters.length : t === 'learn' ? campaign.lessons.length : t === 'puzzle' ? campaign.puzzles.length : t === 'build' ? BUILDS.length : t === 'play' ? PLAY.length : PRESETS.length;
   }
 
   /** More items than slots: pages of NAV_SLOTS - 1, the last slot turns the page. */
@@ -1984,10 +2001,9 @@ export class UISystem extends createSystem({
         : this.tab === 'learn'
           ? campaign.lessons.map((c, i) => ({ label: c.title, done: v.learned.includes(i), current: v.mode === 'learn' && i === v.lessonIndex }))
           : this.tab === 'puzzle'
-            ? [
-                { label: 'Quantum Rush', done: false, current: !!(this.rush || this.rushOver), rush: true },
-                ...campaign.puzzles.map((c, i) => ({ label: c.chip ?? c.title, done: v.stars[i] === 3, current: v.mode === 'puzzle' && !this.rush && !this.rushOver && i === v.puzzleIndex, stars: v.stars[i] })),
-              ]
+            ? campaign.puzzles.map((c, i) => ({ label: c.chip ?? c.title, done: v.stars[i] === 3, current: v.mode === 'puzzle' && i === v.puzzleIndex, stars: v.stars[i] }))
+            : this.tab === 'play'
+              ? PLAY.map((label, i) => ({ label, done: false, current: i === 0 && !!(this.rush || this.rushOver), play: true }))
             : this.tab === 'build'
               ? BUILDS.map((c, i) => ({ label: c.chip, done: campaign.build.best.get(i) === 3, current: v.mode === 'build' && i === campaign.build.index, stars: campaign.build.best.get(i) ?? 0 }))
               : PRESETS.map((p, i) => ({ label: p.label, done: false, current: v.mode === 'sandbox' && i === campaign.preset }));
@@ -2014,7 +2030,7 @@ export class UISystem extends createSystem({
       this.text(`n-${i}-l`, it.label);
       this.els.get(`n-${i}-l`)?.setProperties({ color: it.current ? '#18191b' : it.done ? C.done : C.text });
       const stars = 'stars' in it ? (it.stars as number) : 0;
-      this.text(`n-${i}-n`, 'rush' in it ? '60s' : stars ? `${stars}/3` : String(this.tab === 'puzzle' ? at : at + 1));
+      this.text(`n-${i}-n`, 'play' in it ? ['60s', 'day', '49q', 'H H'][at] : stars ? `${stars}/3` : String(at + 1));
       this.els.get(`n-${i}-n`)?.setProperties({ color: it.current ? '#18191b' : it.done ? C.done : stars ? '#c9ccd1' : '#6b6e75' });
     }
     this.text('nav-progress', `${v.coursed.length}/${v.courseCount} course   ${v.completed.length}/${v.chapterCount} chapters   ${v.learned.length}/${v.lessonCount} lessons`);

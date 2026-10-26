@@ -6,7 +6,7 @@
 <style>
   .nav {
     flex-direction: column;
-    width: 360;
+    width: 392;
     padding-top: 14;
     padding-bottom: 14;
     padding-left: 14;
@@ -36,10 +36,10 @@
     background-color: #1b1c1f;
     cursor: pointer;
   }
-  .tl { font-size: 11; font-weight: 700; color: #8a8d93; }
+  .tl { font-size: 10; font-weight: 700; color: #8a8d93; }
   .grid { flex-direction: row; flex-wrap: wrap; gap: 6; }
   .item {
-    width: 106;
+    width: 116;
     height: 38;
     flex-direction: row;
     align-items: center;
@@ -73,6 +73,7 @@
     <div id="tab-puzzle" class="tab"><div id="tab-puzzle-l" class="tl">Puzzles</div></div>
     <div id="tab-build" class="tab"><div id="tab-build-l" class="tl">Build</div></div>
     <div id="tab-sandbox" class="tab"><div id="tab-sandbox-l" class="tl">Sandbox</div></div>
+    <div id="tab-play" class="tab"><div id="tab-play-l" class="tl">Play</div></div>
   </div>
   <div class="grid">
     <div id="n-0" class="item"><div id="n-0-n" class="num">1</div><div id="n-0-l" class="il">-</div></div>

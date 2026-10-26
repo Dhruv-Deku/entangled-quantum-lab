@@ -49,6 +49,29 @@ const SOLUTIONS: Record<string, (lab: Lab) => void> = {
     lab.gate('h', 0);
     lab.entangleSelected();
   },
+  Interfere: (lab) => {
+    lab.gate('h', 0);
+    lab.gate('h', 0);
+  },
+  Minus: (lab) => {
+    lab.gate('x', 0);
+    lab.gate('h', 0);
+  },
+  '+i': (lab) => {
+    lab.gate('h', 0);
+    lab.gate('s', 0);
+  },
+  'Phi-': (lab) => {
+    lab.select(0);
+    lab.gate('h', 0);
+    lab.gate('z', 0);
+    lab.entangleSelected();
+  },
+  'H x3': (lab) => {
+    lab.gate('h', 0);
+    lab.gate('h', 1);
+    lab.gate('h', 2);
+  },
   GHZ: (lab) => {
     lab.select(0);
     lab.gate('h', 0);
