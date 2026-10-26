@@ -696,3 +696,181 @@ export function compareFigure(n: number, ideal: ArrayLike<number>, results: Mach
     },
   };
 }
+
+// ---------------------------------------------------------------- Quantum Rush
+
+export interface RushView {
+  /** The target and where the orbs are now, as amplitudes [re, im] per basis state. */
+  target: { name: string; ket: string; par: number; tier: number; amps: [number, number][] };
+  now: [number, number][];
+  secondsLeft: number;
+  score: number;
+  solved: number;
+  combo: number;
+  /** The last solve, for a moment after it happens. */
+  last: { points: number; combo: number } | null;
+  /** The round is over: the summary. */
+  over: { best: number; newBest: boolean; bestCombo: number } | null;
+}
+
+const phaseOf = (re: number, im: number) => `hsl(${Math.round((((Math.atan2(im, re) * 180) / Math.PI) + 360) % 360)}, 58%, 64%)`;
+
+/** The Rush board: the target's amplitudes beside the orbs' own, the clock, the score and the combo. */
+export function rushFigure(v: RushView): Figure {
+  const secs = Math.ceil(v.secondsLeft);
+  return {
+    key: `rush:${secs}:${v.score}:${v.solved}:${v.combo}:${v.target.name}:${v.now.map(([a, b]) => `${a.toFixed(2)},${b.toFixed(2)}`).join(';')}:${v.last?.points ?? ''}:${v.over ? 'over' : ''}`,
+    draw: (g, w, h) => {
+      panel(g, w, h, v.over ? 'Quantum Rush  /  round over' : `Quantum Rush  /  target ${v.solved + 1}  /  par ${v.target.par}`, `Score ${v.score.toLocaleString('en-US')}`);
+      if (v.over) {
+        text(g, `${v.score.toLocaleString('en-US')}`, w / 2, 250, INK, '700 120px', 'center');
+        text(g, 'points', w / 2, 300, DIM, '600 30px', 'center');
+        text(g, `${v.solved} target${v.solved === 1 ? '' : 's'} made   /   best combo x${v.over.bestCombo}   /   best ever ${v.over.best.toLocaleString('en-US')}`, w / 2, 390, INK, '600 30px', 'center');
+        if (v.over.newBest) {
+          roundRect(g, w / 2 - 150, 430, 300, 60, 30);
+          g.fillStyle = 'rgba(61,220,151,0.18)';
+          g.fill();
+          text(g, 'New best!', w / 2, 470, MINT, '700 32px', 'center');
+        }
+        text(g, 'Again plays another round. Faster solves score more; solving in a row multiplies.', w / 2, h - 50, DIM, '500 24px', 'center');
+        return;
+      }
+      // the target, large
+      text(g, v.target.name, 44, 128, INK, '700 40px');
+      text(g, v.target.ket, 44, 180, SOFT_BLUE, '600 32px');
+      // amplitude bars: target (solid) and the orbs now (outline), one pair per basis state
+      const x0 = 60, base = 520, maxH = 270, colW = 230;
+      text(g, 'target', x0, 236, DIM, '600 20px');
+      text(g, 'your orbs', x0 + 70, 236, DIM, '600 20px');
+      v.target.amps.forEach(([re, im], k) => {
+        const x = x0 + k * colW;
+        const ht = Math.hypot(re, im) * maxH;
+        roundRect(g, x, base - ht, 70, Math.max(2, ht), 10);
+        g.fillStyle = ht > 1 ? phaseOf(re, im) : LINE;
+        g.fill();
+        const [nr, ni] = v.now[k] ?? [0, 0];
+        const hn = Math.hypot(nr, ni) * maxH;
+        roundRect(g, x + 82, base - hn, 70, Math.max(2, hn), 10);
+        g.lineWidth = 4;
+        g.strokeStyle = hn > 1 ? phaseOf(nr, ni) : LINE;
+        g.stroke();
+        text(g, `|${k.toString(2).padStart(2, '0')}>`, x + 76, base + 42, INK, '600 28px', 'center');
+      });
+      text(g, 'Bar height: amplitude. Colour: phase. Match both.', x0, h - 40, DIM, '500 22px');
+      // the clock
+      const cx = 1330, cy = 330, r = 130;
+      g.lineWidth = 18;
+      g.strokeStyle = GRID;
+      g.beginPath();
+      g.arc(cx, cy, r, 0, Math.PI * 2);
+      g.stroke();
+      const frac = Math.max(0, Math.min(1, v.secondsLeft / 60));
+      g.strokeStyle = v.secondsLeft <= 10 ? CORAL : BLUE;
+      g.lineCap = 'round';
+      g.beginPath();
+      g.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2);
+      g.stroke();
+      g.lineCap = 'butt';
+      text(g, `${secs}`, cx, cy + 30, INK, '700 92px', 'center');
+      text(g, 'seconds', cx, cy + 70, DIM, '600 22px', 'center');
+      // combo and solved
+      roundRect(g, cx - 110, cy + r + 34, 220, 56, 28);
+      g.fillStyle = v.combo > 1 ? 'rgba(61,220,151,0.18)' : '#26272b';
+      g.fill();
+      text(g, v.combo > 1 ? `combo x${v.combo}` : 'no combo', cx, cy + r + 72, v.combo > 1 ? MINT : DIM, '700 28px', 'center');
+      text(g, `${v.solved} made`, cx - r - 90, cy - r + 10, DIM, '600 24px', 'center');
+      if (v.last) text(g, `+${v.last.points}`, cx + r + 70, cy - r + 10, MINT, '700 34px', 'center');
+    },
+  };
+}
+
+// ---------------------------------------------------------------- the surface code
+
+/** The Surface Code chapter's state, shared by the board, the 3D lattice and the chapter. */
+export interface SurfaceView {
+  d: number;
+  p: number;
+  round: import('../quantum/surface').SurfaceRound | null;
+  /** Goes up with every new round (the lattice replays its animation). */
+  id: number;
+  /** The decoder's fix is shown for this round. */
+  decoded: boolean;
+  /** Cycling by itself. */
+  auto: boolean;
+  timer: number;
+  cycles: number;
+  /** Errors corrected, and corrections that went wrong (logical errors), so far. */
+  fixed: number;
+  logical: number;
+  /** The threshold plot, and how much of it has been drawn (0..1). */
+  curve: { d: number; points: [number, number][] }[] | null;
+  curveT: number;
+}
+
+const D_COLOR: Record<number, string> = { 3: DIM, 5: SOFT_BLUE, 7: INK };
+
+/** The board for the Surface Code chapter: what the lattice shows, the counters, and the threshold plot. */
+export function surfaceFigure(v: SurfaceView): Figure {
+  const data = v.d * v.d;
+  return {
+    key: `surface:${v.d}:${v.id}:${v.decoded}:${v.cycles}:${v.fixed}:${v.logical}:${v.p}:${v.curve ? Math.round(v.curveT * 40) : -1}`,
+    draw: (g, w, h) => {
+      panel(g, w, h, `Surface code  /  distance ${v.d}: ${data} data qubits + ${data - 1} measure qubits = ${2 * data - 1}`, `error rate ${Math.round(v.p * 100)}%`);
+      // legend
+      const items: [string, string, string][] = [
+        ['#d5d9e0', 'data qubit', 'holds a share of the one logical qubit'],
+        ['#ff5a4f', 'bit flip', 'an X error from noise'],
+        ['#9b87f5', 'phase flip', 'a Z error from noise'],
+        [BLUE, 'lit check', 'a measure qubit saw odd parity'],
+        [MINT, 'correction', 'the decoder\'s shortest fix'],
+      ];
+      items.forEach(([c, name, what], i) => {
+        const y = 124 + i * 50;
+        dot(g, 60, y - 8, 12, c);
+        text(g, name, 86, y, INK, '600 24px');
+        text(g, what, 250, y, DIM, '500 22px');
+      });
+      // counters
+      const cy = 400;
+      const stat = (x: number, value: string, label: string, color = INK) => {
+        text(g, value, x, cy, color, '700 52px');
+        text(g, label, x, cy + 34, DIM, '500 22px');
+      };
+      stat(60, `${v.cycles}`, 'cycles');
+      stat(230, `${v.fixed}`, 'errors fixed', MINT);
+      stat(450, `${v.logical}`, 'logical errors', v.logical ? CORAL : INK);
+      text(g, v.auto ? 'Running: a new cycle every three seconds (slowed down a million times).' : v.round && !v.decoded ? 'Waiting for the decoder.' : '', 60, h - 44, DIM, '500 22px');
+      // the threshold plot, drawn in as it arrives
+      if (!v.curve) {
+        const lines = [
+          'Every few microseconds each measure qubit checks the parity of its',
+          'neighbours. An error lights the checks around it; the decoder pairs',
+          'the lit checks along the shortest paths and flips those qubits back.',
+          'It fails only when the real errors and its guess together stretch',
+          'right across the grid: then the logical qubit flips.',
+        ];
+        lines.forEach((l, i) => text(g, l, 820, 150 + i * 40, INK, '500 25px'));
+        return;
+      }
+      const a = axes(g, 880, 110, 620, 380, [0, 0.15], [0, 0.3], [0, 0.03, 0.06, 0.09, 0.12, 0.15], [0, 0.1, 0.2, 0.3], 'physical error rate p', 'logical error rate', (n) => `${Math.round(n * 100)}%`);
+      polyline(g, a, [[0, 0], [0.15, 0.15]], LINE, 2, [8, 8]);
+      for (const c of v.curve) {
+        const shown = c.points.slice(0, Math.max(1, Math.ceil(c.points.length * v.curveT)));
+        polyline(g, a, shown, D_COLOR[c.d] ?? INK, 4);
+        for (const [p, f] of shown) dot(g, a.sx(p), a.sy(f), 6, D_COLOR[c.d] ?? INK);
+        const [lp, lf] = shown[shown.length - 1];
+        text(g, `d = ${c.d}`, a.sx(lp) + 12, a.sy(lf) + 8, D_COLOR[c.d] ?? INK, '700 22px');
+      }
+      if (v.curveT >= 1) {
+        g.strokeStyle = LINE;
+        g.lineWidth = 2;
+        g.beginPath();
+        g.moveTo(a.sx(0.095), a.y0);
+        g.lineTo(a.sx(0.095), a.y0 + a.h);
+        g.stroke();
+        text(g, 'threshold', a.sx(0.095) - 8, a.y0 + 26, DIM, '600 20px', 'right');
+        text(g, 'bigger is better', a.sx(0.045), a.y0 + a.h - 30, MINT, '600 20px', 'center');
+      }
+    },
+  };
+}

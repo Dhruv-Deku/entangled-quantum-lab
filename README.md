@@ -33,31 +33,40 @@ the Meta Immersive Web SDK (IWSDK), three.js and TypeScript.
   Full size and the machine stands beside your desk at its real size: a 2.4 m
   cryostat whose vacuum cans slide away while it cools to 15 mK. Then compare
   all three on the same circuit.
+- **See what no textbook can show.** The many-worlds view draws every path a
+  computation takes through its basis states, so interference is something you
+  watch: strands of opposite colour meet and cancel. And the surface code from
+  Google's Willow chip runs live on a 49-qubit lattice above your desk.
 - **From the first qubit to research topics.** A 14-module course with quizzes,
-  25 chapters from superposition to Shor's algorithm, VQE for the H2 molecule, a
-  Bell test, error correction, quantum walks and randomized benchmarking.
+  26 chapters from superposition to Shor's algorithm, VQE for the H2 molecule, a
+  Bell test, error correction, quantum walks, randomized benchmarking and the
+  surface code.
 - **Learn together.** Shared labs where two people each hold half of a Bell
   pair, and classes where a teacher assigns modules, watches progress and
   students earn certificates.
-- **A reason to come back.** A daily challenge whose par is provably optimal,
-  streaks, 23 achievements and levels.
+- **A reason to come back.** Quantum Rush, an arcade round where you build
+  target states against the clock with combos; a daily challenge whose par is
+  provably optimal; streaks, 28 achievements, levels, and orb finishes you
+  unlock as you level up.
 
 ## Highlights
 
-| A quantum computer opens and cools to 15 mK | Atoms carried into place to entangle |
+| Quantum Rush: build the target before the clock runs out | The surface code, live, on 49 qubits |
 | --- | --- |
-| ![The dilution refrigerator at full size: its vacuum cans slide away to reveal the copper stages and coaxial lines, and the thermometers cool from 300 K down to 15 mK](docs/screenshots/anim-fridge.gif) | ![A neutral atom is carried along the lane to its partner, the pair glow gold while the Rydberg interaction entangles them, and it is carried back](docs/screenshots/anim-atoms.gif) |
+| ![Quantum Rush: targets appear on the card and the board, the orbs are set to match, +493 combo x3 rises out of them, and sixty ticks count down around the desk](docs/screenshots/anim-rush.gif) | ![A distance-5 surface code: a sweep runs over the measure qubits, a bit flip and a phase flip appear, the checks around them light up, and mint corrections grow along the shortest paths before the errors heal](docs/screenshots/anim-surface.gif) |
+| **A quantum computer opens and cools to 15 mK** | **Every path at once: interference you can see** |
+| ![The dilution refrigerator at full size: its vacuum cans slide away to reveal the copper stages and coaxial lines, and the thermometers cool from 300 K down to 15 mK](docs/screenshots/anim-fridge.gif) | ![The many-worlds view of H, H, CZ, H, H on two qubits: strands branch from |00> through four basis states, red and cyan strands meet at two empty rings where the paths cancel](docs/screenshots/many-worlds.png) |
 | **The same circuit on three machines** | **Beat the classical limit** |
 | ![Superconducting 89.4%, trapped ions 97.3%, neutral atoms 93.8%, with shot times and wiring costs](docs/screenshots/machines-compare.png) | ![The Bell test: S = 2.93 +- 0.09 with entanglement, 1.45 without, against the classical limit 2](docs/screenshots/ch19-bell-test.png) |
 | **Life-size, beside your desk** | **On your real desk, in mixed reality** |
 | ![A 2.4 m dilution refrigerator standing at full size beside the desk, its copper chandelier inside a cut-away can, next to the orbs, the pulse schedule and the code window](docs/screenshots/machine-fridge-full.png) | ![Panels and orbs on a real desk with hand tracking](docs/screenshots/ar-passthrough-hands.png) |
-| **See a whole state at once** | **Your progress** |
-| ![The Q-sphere of a four-qubit state](docs/screenshots/qsphere.png) | ![Level, daily streak and achievements](docs/screenshots/profile-board.png) |
+| **Atoms carried into place to entangle** | **Orb finishes you unlock** |
+| ![A neutral atom is carried along the lane to its partner, the pair glow gold while the Rydberg interaction entangles them, and it is carried back](docs/screenshots/anim-atoms.gif) | ![The Looks panel beside the progress board: Glass, Frost, Smoke, Tinted (worn: the two orbs in coral and teal, tied by the gold thread) and Copper, locked until level 5](docs/screenshots/orb-looks.png) |
 
-**By the numbers:** 25 chapters, a 14-module course, 15 lessons, 12 puzzles and
-a daily challenge, 4 big-state views, 3 kinds of quantum computer in 3D at
-full size, 23 achievements, voice control, shared labs and classes, and 297 unit
-tests.
+**By the numbers:** 26 chapters, a 14-module course, 15 lessons, 12 puzzles, a
+daily challenge and Quantum Rush, 5 big-state views, 3 kinds of quantum computer
+in 3D at full size, a 49-qubit surface code, 28 achievements, 5 orb finishes,
+voice control, shared labs and classes, and 312 unit tests.
 
 ## Contents
 
@@ -65,13 +74,13 @@ tests.
 - [Part 1: Your hands are the quantum computer](#part-1-your-hands-are-the-quantum-computer)
   - [Gestures](#gestures), [Gates you can see](#gates-you-can-see), [Circuit board](#circuit-board), [Sandbox](#sandbox), [Share links](#share-links)
 - [Part 2: Learn, from the first qubit to research topics](#part-2-learn-from-the-first-qubit-to-research-topics)
-  - [Course](#course), [Learn](#learn), [Notes](#notes), [The Mystery Qubit](#the-mystery-qubit), [QAOA: a variational algorithm](#qaoa-a-variational-algorithm), [Algorithm chapters](#algorithm-chapters), [Advanced chapters](#advanced-chapters), [The maths of every step](#the-maths-of-every-step)
+  - [Course](#course), [Learn](#learn), [Notes](#notes), [The Mystery Qubit](#the-mystery-qubit), [QAOA: a variational algorithm](#qaoa-a-variational-algorithm), [Algorithm chapters](#algorithm-chapters), [Advanced chapters](#advanced-chapters), [The surface code](#the-surface-code), [The maths of every step](#the-maths-of-every-step)
 - [Part 3: Real quantum hardware](#part-3-real-quantum-hardware)
   - [On a real chip](#on-a-real-chip), [Run on a real quantum computer](#run-on-a-real-quantum-computer), [Noise lab](#noise-lab)
 - [Part 4: Tools for exploring](#part-4-tools-for-exploring)
-  - [Build: circuit builder](#build-circuit-builder), [Code window: tabs, zoom, simplify](#code-window-tabs-zoom-simplify), [Step debugger](#step-debugger), [Big-state views](#big-state-views), [Library, import and custom gates](#library-import-and-custom-gates), [Voice commands](#voice-commands), [Listen to a state](#listen-to-a-state), [Snapshot](#snapshot)
+  - [Build: circuit builder](#build-circuit-builder), [Code window: tabs, zoom, simplify](#code-window-tabs-zoom-simplify), [Step debugger](#step-debugger), [Big-state views](#big-state-views), [Many worlds](#many-worlds), [Library, import and custom gates](#library-import-and-custom-gates), [Voice commands](#voice-commands), [Listen to a state](#listen-to-a-state), [Snapshot](#snapshot)
 - [Part 5: Together, and every day](#part-5-together-and-every-day)
-  - [Shared lab](#shared-lab), [Classroom and certificate](#classroom-and-certificate), [Daily challenge, achievements and levels](#daily-challenge-achievements-and-levels), [Puzzles](#puzzles)
+  - [Quantum Rush](#quantum-rush), [Shared lab](#shared-lab), [Classroom and certificate](#classroom-and-certificate), [Daily challenge, achievements and levels](#daily-challenge-achievements-and-levels), [Orb finishes](#orb-finishes), [Puzzles](#puzzles)
 - [Under the hood](#under-the-hood)
 
 ## Try it
@@ -79,7 +88,7 @@ tests.
 ```sh
 npm install
 npm run dev        # managed browser with the Quest 3 emulator (IWER)
-npm test           # 297 unit tests: physics, three kinds of quantum computer, gestures, the course, 25 chapters, 15 lessons, puzzles, the daily challenge, achievements, builder, noise, chemistry, import, IBM compiling, Bell tests, error correction, benchmarking, voice, shared rooms and more
+npm test           # 312 unit tests: physics, three kinds of quantum computer, gestures, the course, 25 chapters, 15 lessons, puzzles, the daily challenge, achievements, builder, noise, chemistry, import, IBM compiling, Bell tests, error correction, benchmarking, voice, shared rooms and more
 npm run typecheck
 npm run build
 ```
@@ -312,8 +321,9 @@ period and factors, Grover's 94.5%, and Simon's secret.
 
 ### Advanced chapters
 
-Chapters 19 to 25 go past textbook algorithms into the physics that real
-quantum computers are built and judged on. Each one draws its own figure on the
+Chapters 19 to 26 go past textbook algorithms into the physics that real
+quantum computers are built and judged on (the last, the surface code, has its
+own section below). Each one draws its own figure on the
 board while you play, and each is played through end to end in the unit tests
 with the numbers checked.
 
@@ -365,6 +375,38 @@ with the numbers checked.
   gives the error per gate. Tests check the 24-element Clifford group, an exact
   formula under depolarizing noise, and that the fit recovers the error it was
   given.
+
+### The surface code
+
+![Chapter 26: the 49-qubit lattice floating above the orb, a phase flip with its checks lit, the threshold plot on the board with distance 3, 5 and 7 crossing near 9%, and the chapter card explaining Willow](docs/screenshots/surface-code.png)
+
+Chapter 26 runs the error correction Google demonstrated on its Willow chip in
+2024. A chip floats above the desk: a grid of data qubits (silver beads) and a
+measure qubit on every tile between them, wired by couplers, with half-discs
+along the edges. The single orb on the desk is now the logical qubit they hold
+together.
+
+- **Cycle**: noise flips a few qubits (coral for a bit flip, violet for a phase
+  flip), a sweep runs over the measure qubits, and the tiles around each error
+  light up blue. That pattern, the syndrome, says where errors are and nothing
+  about the logical state, so the orb does not move.
+- **Decode**: a minimum-weight matching decoder pairs the lit tiles along the
+  shortest paths, and the fixes grow in mint before the errors heal. If the
+  real errors and the fix together stretch across the grid, the frame flashes
+  coral and the orb really flips: a logical error.
+- **Grow**: distance 5, 25 data and 24 measure qubits, now cycling by itself
+  with live counters for cycles, errors fixed and logical errors.
+- **Stress test**: thousands of cycles at each error rate for distance 3, 5
+  and 7 draw the threshold plot: below about 9% every step up in size cuts the
+  logical error rate, above it bigger is worse. **Storm** then pushes the noise
+  to 12% and the orb starts to flip.
+
+The decoder is exact minimum-weight matching (a bitmask search) for up to 16
+lit checks. Tests check the lattice (d^2 - 1 checks, every pair of an X and a Z
+check overlapping on an even number of qubits), that any single error and any
+(d - 1)/2 errors are always corrected, that a chain across the grid is a
+logical error with no syndrome, and that bigger codes win below threshold and
+lose above it.
 
 ### The maths of every step
 
@@ -647,8 +689,27 @@ because the entanglement spread to a third qubit, it says that rather than
 
 ### Big-state views
 
-**View** (Shift+V, or say "next view") cycles four ways to see a state that is
+**View** (Shift+V, or say "next view") cycles five ways to see a state that is
 too big for one Bloch sphere each, or the whole circuit at once.
+
+#### Many worlds
+
+![The many-worlds view of H, H, CZ, H, H on two qubits: time runs left to right, one row per basis state; strands branch, CZ turns the |11> strand cyan, and the last two Hadamards bring paths back together, cancelling at two empty rings](docs/screenshots/many-worlds.png)
+
+The first view (or say "many worlds") draws every path the computation takes.
+Time runs left to right, one row per basis state. Each gate sends a basis state
+to a few others, each with a complex weight from its matrix; every one of those
+moves is a strand, as thick as the weight it carries and coloured by its phase,
+and every state that holds weight is a bead sized by its probability. Where
+strands meet, their weights add as complex numbers: in phase they reinforce,
+out of phase they cancel, and an empty ring marks a state that paths reached
+but where nothing is left. That is destructive interference, the trick behind
+every quantum speed-up, and here it is a thing you can point at: put H on a
+qubit twice and the two paths to |1> wipe each other out. A measurement keeps
+the worlds that agree with its outcome and ends the others in faded stubs. The
+tree grows layer by layer whenever the circuit changes; tests check H H, a Bell
+pair and a measurement path by path.
+
 
 | Q-sphere | State city |
 | --- | --- |
@@ -739,6 +800,26 @@ the same circuit, ready to post.
 
 ## Part 5: Together, and every day
 
+### Quantum Rush
+
+![Quantum Rush in play: the target "Plus plus" on the card, its amplitude bars beside the orbs' own on the board with a 60-second clock and a x3 combo, +493 rising out of the orbs, and sixty ticks around the desk](docs/screenshots/anim-rush.gif)
+
+An arcade round on two qubits, at the top of the Puzzles tab (or say "quantum
+rush"). A target state appears; make it on the orbs any way you like, and the
+moment they match it scores and the next one appears. Targets climb from a
+single gate to Bell pairs with phases, then to generated states three or four
+moves deep, each with a true minimum par found by search.
+
+- **Points**: 100 per par move, up to as much again for speed, times a combo
+  that grows with every solve within 15 seconds of the last (up to x5).
+- **The clock**: 60 seconds, shown as sixty ticks around the desk that go out
+  one by one (coral for the last ten). Each solve adds 3 seconds; a skip costs
+  3 and breaks the combo.
+- **The board** shows the target's amplitudes beside the orbs' own, bar for
+  bar, coloured by phase, so you can see what is still missing.
+- Your best score and best combo are kept, and two achievements wait at 5,000
+  points and a x5 combo.
+
 ### Shared lab
 
 ![A shared lab: a Bell pair where q0 belongs to Ana and q1 to you, with the room code on the Share button](docs/screenshots/shared-lab.png)
@@ -802,17 +883,30 @@ course) the board shows a **certificate**, and the 2D page can save it as a PNG.
   shorter sequence exists. Solving it extends a streak, and on the 2D page the
   result comes as one line to copy and paste: "Entangled daily #25: 2 moves
   (par 2), 3 of 3 stars. Streak: 1 day."
-- **Achievements**: 23 of them, from "First move" and "Spooky action" (your
+- **Achievements**: 28 of them, from "First move" and "Spooky action" (your
   first Bell pair) to "All for one" (a five-qubit GHZ state), "Rainmaker"
-  (1,000 shots), "Beyond classical" (the Bell Test), daily streaks of three and
-  seven days, and trying the debugger, every big-state view, voice, the
-  shared lab and all three kinds of quantum computer. Each one pops up above the dock with a chime.
+  (1,000 shots), "Beyond classical" (the Bell Test), "Below threshold" (the
+  surface code), "Many worlds" (watching paths cancel), "Rush hour" and "On
+  fire" in Quantum Rush, daily streaks of three and seven days, and trying the
+  debugger, every big-state view, voice, the shared lab and all three kinds of
+  quantum computer. Each one pops up above the dock with a chime.
 - **Levels**: XP comes from chapters, lessons, course modules, puzzle stars,
   daily challenges and achievements; levels go from Newcomer to Quantum master.
   The navigator's footer shows your level; tap it (or Shift+P, "show my
   achievements") for the board above.
 
 ![An achievement banner above the gate dock: Look! Measure a qubit.](docs/screenshots/achievement-banner.png)
+
+### Orb finishes
+
+![The five orb finishes side by side: Glass, Frost, Smoke, Tinted and Copper](docs/screenshots/orb-skins.png)
+
+The orbs are glass that reflects a soft studio, so highlights and edges read
+like the real thing while the arrow inside stays clear. Levelling up unlocks
+new finishes: Frost at level 2, Smoke at 3, Tinted (each orb in its qubit's
+colour) at 4 and Copper rings at 5. The **Looks** panel opens beside the
+progress board with a Wear button for each; say "next skin" to cycle. The
+physics never changes, only the look.
 
 ### Puzzles
 

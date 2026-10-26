@@ -138,7 +138,7 @@ export function entanglementSummary(m: EntanglementMap): string[] {
 }
 
 /** The order the View button steps through. */
-export const STATE_VIEWS = ['qsphere', 'city', 'heatmap', 'unitary'] as const;
+export const STATE_VIEWS = ['worlds', 'qsphere', 'city', 'heatmap', 'unitary'] as const;
 export type StateView = (typeof STATE_VIEWS)[number];
-export const STATE_VIEW_NAMES: Record<StateView, string> = { qsphere: 'Q-sphere', city: 'State city', heatmap: 'Entanglement map', unitary: 'Circuit unitary' };
+export const STATE_VIEW_NAMES: Record<StateView, string> = { worlds: 'Many worlds', qsphere: 'Q-sphere', city: 'State city', heatmap: 'Entanglement map', unitary: 'Circuit unitary' };
 export const nextView = (v: StateView | null): StateView | null => (v === null ? STATE_VIEWS[0] : (STATE_VIEWS[STATE_VIEWS.indexOf(v) + 1] ?? null));

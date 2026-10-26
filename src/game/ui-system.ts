@@ -17,7 +17,7 @@ import { loadSave, writeSave } from '../lab/save';
 import type { Op } from '../quantum/circuit';
 import { simplify } from '../quantum/optimize';
 import { decodeCircuit, encodeCircuit, SHARE_PREFIX } from '../quantum/share';
-import { qubitColor } from '../lab/visuals';
+import { ORB_SKINS, qubitColor, type OrbSkinId } from '../lab/visuals';
 import type { GateName } from '../quantum/gates';
 import type { CampaignView } from './campaign';
 import { campaign } from './instance';
@@ -39,9 +39,11 @@ import { assignmentProgress, kindOf, makeCode, parseCode, SharedRoom, type Progr
 import { AutoTransport } from '../net/transport';
 import { openDailyDialog, openShareDialog, savedName } from '../lab/share-dialog';
 import { ACHIEVEMENTS, levelFor, Profile, xpFor, type ProgressContext } from './profile';
+import { ket, RUSH_QUBITS, RushSession } from './rush';
+import { manyWorlds } from '../quantum/paths';
 import { bestStreak, dayKey, dailyNumber, emptyDaily, recordDaily, shareText, streak, type DailyRecord } from './daily';
 import { loadDaily, loadProfile, saveDaily, saveProfile } from '../lab/profile-store';
-import { profileFigure, type ProfileView } from '../lab/figures';
+import { profileFigure, rushFigure, type ProfileView, type RushView, type SurfaceView } from '../lab/figures';
 import { listen } from '../lab/sonify';
 import { downloadSnapshot } from '../lab/snapshot';
 import { Banner } from '../lab/banner';
@@ -189,6 +191,7 @@ export class UISystem extends createSystem({
   private notesAsset: UIKitMLAsset | null = null;
   private noiseAsset: UIKitMLAsset | null = null;
   private libAsset: UIKitMLAsset | null = null;
+  private looksAsset: UIKitMLAsset | null = null;
   private dbgAsset: UIKitMLAsset | null = null;
   private classAsset: UIKitMLAsset | null = null;
   /** why the shared lab last refused an op (for the voice reply) */
@@ -268,7 +271,14 @@ export class UISystem extends createSystem({
     this.cleanupFuncs.push(() => window.removeEventListener('hashchange', onHash));
 
     this.cleanupFuncs.push(
-      campaign.on((v) => (this.render(v), this.afterCampaign(v), this.afterDaily(), this.checkAchievements())),
+      campaign.on((v) => {
+        // Quantum Rush lives in the sandbox: going anywhere else ends the round
+        if ((this.rush || this.rushOver) && v.mode !== 'sandbox') this.endRush(false);
+        this.render(v);
+        this.afterCampaign(v);
+        this.afterDaily();
+        this.checkAchievements();
+      }),
       lab.on((e) => {
         this.dirty = true;
         if (this.room) {
@@ -288,6 +298,8 @@ export class UISystem extends createSystem({
         if (e.type === 'shots') this.profile.onShots(e.shots);
         if (e.type === 'seek') this.profile.onRewind();
         if (e.type === 'op' || e.type === 'shots' || e.type === 'seek') this.checkAchievements();
+        if (this.rush && (e.type === 'op' || e.type === 'seek')) this.checkRush();
+        if (e.type === 'op' || e.type === 'seek') this.checkWorlds();
       }),
       this.visibilityState.subscribe((v) => {
         this.immersive = v !== VisibilityState.NonImmersive;
@@ -308,12 +320,13 @@ export class UISystem extends createSystem({
     this.libAsset = this.world.getSceneObject<UIKitMLAsset>('library-panel') ?? null;
     this.dbgAsset = this.world.getSceneObject<UIKitMLAsset>('debug-panel') ?? null;
     this.classAsset = this.world.getSceneObject<UIKitMLAsset>('class-panel') ?? null;
-    if (!this.classAsset || !this.chapter || !this.dock || !this.code || !this.nav || !this.builderAsset || !this.notesAsset || !this.noiseAsset || !this.libAsset || !this.dbgAsset) return false;
+    this.looksAsset = this.world.getSceneObject<UIKitMLAsset>('looks-panel') ?? null;
+    if (!this.looksAsset || !this.classAsset || !this.chapter || !this.dock || !this.code || !this.nav || !this.builderAsset || !this.notesAsset || !this.noiseAsset || !this.libAsset || !this.dbgAsset) return false;
     this.code.visible = false;
 
     // panels take poke and ray input but must never capture the grab pointer,
     // or a hand reaching for an orb just above the dock grabs the dock instead
-    for (const panel of [this.chapter, this.dock, this.code, this.nav, this.builderAsset, this.notesAsset, this.noiseAsset, this.libAsset, this.dbgAsset, this.classAsset]) {
+    for (const panel of [this.chapter, this.dock, this.code, this.nav, this.builderAsset, this.notesAsset, this.noiseAsset, this.libAsset, this.dbgAsset, this.classAsset, this.looksAsset]) {
       panel.traverse((o) => {
         (o as unknown as { pointerEventsType: unknown }).pointerEventsType = { deny: 'grab' };
       });
@@ -346,6 +359,11 @@ export class UISystem extends createSystem({
     const classIds = ['cl-eyebrow', 'cl-title', 'cl-close', 'cl-pick', 'cl-prev', 'cl-mod', 'cl-next', 'cl-assign', 'cl-assign-l', 'cl-line', 'cl-list', 'cl-go', 'cl-go-l', 'cl-cert'];
     for (let i = 0; i < 6; i++) classIds.push(`cl-r-${i}`, `cl-n-${i}`, `cl-f-${i}`, `cl-s-${i}`);
     for (const id of classIds) this.els.set(id, this.classAsset.requireElementById(id));
+    // development: the UI and the lab model, for driving scenes from the managed browser
+    if (import.meta.env.DEV) Object.assign(globalThis as object, { __entangledUI: this, __entangledQ: { lab, campaign } });
+    const looksIds = ['looks-eyebrow', 'looks-close', 'looks-note'];
+    for (let i = 0; i < ORB_SKINS.length; i++) looksIds.push(`looks-r-${i}`, `looks-sw-${i}`, `looks-n-${i}`, `looks-m-${i}`, `looks-b-${i}`, `looks-bl-${i}`);
+    for (const id of looksIds) this.els.set(id, this.looksAsset.requireElementById(id));
     this.codeScale = this.code.scale.x;
     this.notesScale = this.notesAsset.scale.x;
     for (const [id, el] of this.els) el.name = id;
@@ -357,6 +375,9 @@ export class UISystem extends createSystem({
       this.cleanupFuncs.push(() => el.removeEventListener('click', handler));
     };
     on('btn-next', () => {
+      // Quantum Rush: Skip during a round, Again after it
+      if (this.rush) return this.skipRush();
+      if (this.rushOver) return this.startRush();
       if (campaign.mode === 'sandbox') {
         if (lab.n < MAX_ORBS) lab.reset(lab.n + 1);
       } else campaign.next();
@@ -364,6 +385,7 @@ export class UISystem extends createSystem({
     });
     for (let i = 0; i < 3; i++) on(`choice-${i}`, () => feedback(campaign.answer(i) ? 'success' : 'reject'));
     on('btn-replay', () => {
+      if (this.rush || this.rushOver) return this.endRush(true);
       // in the course the second button is Show me while a task is open
       if (campaign.mode === 'course' && campaign.showMe()) return feedback('select');
       campaign.replay();
@@ -389,7 +411,11 @@ export class UISystem extends createSystem({
         if (this.tab === 'course' && k < campaign.course.length) campaign.startCourse(k);
         else if (this.tab === 'campaign' && k < campaign.chapters.length) campaign.startChapter(k);
         else if (this.tab === 'learn' && k < campaign.lessons.length) campaign.startLesson(k);
-        else if (this.tab === 'puzzle' && k < campaign.puzzles.length) campaign.startPuzzle(k);
+        else if (this.tab === 'puzzle' && k === 0) this.startRush();
+        else if (this.tab === 'puzzle' && k - 1 < campaign.puzzles.length) {
+          this.endRush(false);
+          campaign.startPuzzle(k - 1);
+        }
         else if (this.tab === 'build' && k < BUILDS.length) campaign.enterBuild(k);
         else if (this.tab === 'sandbox' && k < PRESETS.length) campaign.loadPreset(k);
         else return;
@@ -538,6 +564,10 @@ export class UISystem extends createSystem({
     on('btn-notes', () => (campaign.mode === 'sandbox' ? this.toggleNoise() : this.toggleNotes()));
     on('btn-lib', () => this.toggleLibrary());
     on('lib-close', () => this.toggleLibrary());
+    on('looks-close', () => this.toggleProfile(false));
+    ORB_SKINS.forEach((skin, i) => on(`looks-b-${i}`, () => this.wearSkin(skin.id)));
+    // the finish saved with the profile
+    this.world.getSystem(LabSystem)?.setSkin(this.currentSkin());
     on('lib-tab-circuits', () => this.libShow('circuit'));
     on('lib-tab-gates', () => this.libShow('gate'));
     on('lib-prev', () => this.libTurn(-1));
@@ -649,10 +679,15 @@ export class UISystem extends createSystem({
     }
     if (v.mode !== 'sandbox' || v.preset >= 0) this.sharedOpen = false;
     if (v.intro || v.mode === 'sandbox') this.els.get('choices')?.setProperties({ display: 'none' });
+    if (this.rush || this.rushOver) {
+      this.renderRushCard();
+      this.renderNav(v);
+      return;
+    }
     if (v.intro) {
       this.text('chapter-eyebrow', 'Welcome');
       this.text('chapter-title', 'Entangled');
-      this.text('chapter-body', 'Hold a qubit in your hand. Eighteen chapters, from one qubit to Shor and VQE. A ghost hand shows every move, and every move has a button too.');
+      this.text('chapter-body', 'Hold a qubit in your hand. Twenty-six chapters, from one qubit to Shor, VQE and the surface code, plus Quantum Rush. A ghost hand shows every move, and every move has a button too.');
       this.text('goal-text', this.immersive ? 'Tap Start, or pinch the orb and turn it' : 'Press Enter, or hold an arrow key');
       this.bg('goal-dot', C.current);
       for (let i = 0; i < 5; i++) this.els.get(`pip-${i}`)?.setProperties({ display: 'none' });
@@ -849,8 +884,198 @@ export class UISystem extends createSystem({
       if (this.notes?.open) this.notes.close();
       this.noiseOpen = false;
       this.renderLibrary();
+      this.renderLooks();
     }
     feedback('select');
+  }
+
+  // ---- orb finishes, unlocked by level
+
+  private level(): number {
+    return levelFor(xpFor(this.profile.data, this.progressContext())).level;
+  }
+
+  private currentSkin(): OrbSkinId {
+    const id = this.profile.data.skin as OrbSkinId | undefined;
+    const skin = ORB_SKINS.find((s) => s.id === id);
+    return skin && skin.level <= this.level() ? skin.id : 'glass';
+  }
+
+  /** Wear a finish (if the level allows it). */
+  private wearSkin(id: OrbSkinId): void {
+    const skin = ORB_SKINS.find((s) => s.id === id)!;
+    if (skin.level > this.level()) {
+      this.flash(`${skin.name} unlocks at level ${skin.level}.`);
+      return feedback('reject');
+    }
+    this.profile.data.skin = id;
+    this.world.getSystem(LabSystem)?.setSkin(id);
+    if (id !== 'glass') this.use('skin');
+    this.profileDirty = true;
+    this.flash(`${skin.name}: ${skin.note.toLowerCase()}.`);
+    this.renderLooks();
+    feedback('select');
+  }
+
+  /** The next unlocked finish (voice: "next skin"). */
+  private nextSkin(): void {
+    const open = ORB_SKINS.filter((s) => s.level <= this.level());
+    const i = open.findIndex((s) => s.id === this.currentSkin());
+    this.wearSkin(open[(i + 1) % open.length].id);
+  }
+
+  private renderLooks(): void {
+    if (!this.looksAsset) return;
+    const lvl = this.level();
+    const now = this.currentSkin();
+    const swatch: Record<OrbSkinId, string> = { glass: '#d9e2ef', frost: '#f4f7fb', smoke: '#2a2d33', tinted: qubitColor(0), copper: '#c47c4e' };
+    this.text('looks-eyebrow', `Level ${lvl}  /  ${ORB_SKINS.filter((s) => s.level <= lvl).length} of ${ORB_SKINS.length} unlocked`);
+    ORB_SKINS.forEach((skin, i) => {
+      const open = skin.level <= lvl, on = skin.id === now;
+      this.text(`looks-n-${i}`, skin.name);
+      this.els.get(`looks-n-${i}`)?.setProperties({ color: open ? C.text : C.textDim });
+      this.text(`looks-m-${i}`, open ? skin.note : `Unlocks at level ${skin.level}`);
+      this.els.get(`looks-sw-${i}`)?.setProperties({ backgroundColor: open ? swatch[skin.id] : '#2d2f33', borderColor: on ? C.done : '#55585e' });
+      this.text(`looks-bl-${i}`, on ? 'Wearing' : open ? 'Wear' : `Level ${skin.level}`);
+      this.bg(`looks-b-${i}`, on ? '#1f3a30' : open ? C.primary : C.primaryIdle);
+      this.els.get(`looks-bl-${i}`)?.setProperties({ color: on ? C.done : open ? '#ffffff' : C.textDim });
+    });
+    this.dirty = true;
+  }
+
+  // ---- Quantum Rush: build target states against the clock
+
+  private rush: RushSession | null = null;
+  /** The last round's summary, shown until Again or Done. */
+  private rushOver: { score: number; solved: number; bestCombo: number; best: number; newBest: boolean } | null = null;
+  private rushLast: { points: number; combo: number; until: number } | null = null;
+  /** After a solve the orbs show the match for a moment, then reset for the next target. */
+  private rushResetAt = 0;
+  private rushCardTimer = 0;
+  private readonly clockNow = () => performance.now() / 1000;
+
+  private startRush(): void {
+    this.profileOpen = this.libOpen = this.dbgOpen = this.classOpen = false;
+    this.noiseOpen = false;
+    if (this.code) this.code.visible = false;
+    if (this.notes?.open) this.notes.close();
+    this.setView(null);
+    this.rushOver = null;
+    this.rushLast = null;
+    this.rushResetAt = 0;
+    this.rush = new RushSession(this.clockNow(), Math.random);
+    if (campaign.mode !== 'sandbox' || lab.n !== RUSH_QUBITS || lab.history.length) campaign.enterSandbox(RUSH_QUBITS, []);
+    this.tab = 'puzzle';
+    this.use('rush');
+    this.flash('Quantum Rush: make each target on the orbs, any way you like. 60 seconds; solves add time.');
+    feedback('select');
+    this.render(campaign.view);
+  }
+
+  /** The orbs changed: did they make the target? */
+  private checkRush(): void {
+    const r = this.rush;
+    if (!r || this.rushResetAt) return;
+    const now = this.clockNow();
+    if (r.over(now) || !r.matches(lab.history.state)) return;
+    const res = r.solve(now);
+    this.rushLast = { points: res.points, combo: res.combo, until: now + 1.6 };
+    this.rushResetAt = now + 0.7;
+    feedback('success');
+    this.world.getSystem(LabSystem)?.rushFx.pop(`+${res.points}`, res.combo > 1 ? `combo x${res.combo}` : `${res.seconds.toFixed(1)} s`);
+    this.renderRushCard();
+  }
+
+  private skipRush(): void {
+    if (!this.rush) return;
+    this.rush.skip(this.clockNow());
+    lab.reset(RUSH_QUBITS);
+    this.world.getSystem(LabSystem)?.rushFx.pop('Skip', '-3 s', '#8a8d93');
+    feedback('select');
+    this.renderRushCard();
+  }
+
+  /** The round ends: on time (summary), or Quit/Done (back to the plain sandbox), or because the player went elsewhere. */
+  private endRush(toSandbox: boolean, timeUp = false): void {
+    const r = this.rush;
+    this.rush = null;
+    this.world.getSystem(LabSystem)?.rushFx.clock(null);
+    if (timeUp && r) {
+      const newBest = this.profile.onRush(r.score, r.bestCombo);
+      this.rushOver = { score: r.score, solved: r.solved, bestCombo: r.bestCombo, best: this.profile.data.stats.rushBest, newBest };
+      this.profileDirty = true;
+      this.checkAchievements();
+      feedback(newBest ? 'success' : 'select');
+      this.banner.show(newBest ? 'New best' : 'Quantum Rush', `${r.score.toLocaleString('en-US')} points`, `${r.solved} made, best combo x${r.bestCombo}`);
+      this.render(campaign.view);
+      return;
+    }
+    this.rushOver = null;
+    if (toSandbox) this.render(campaign.view);
+  }
+
+  private rushView(): RushView {
+    const r = this.rush;
+    const amps = (st: { dim: number; re: ArrayLike<number>; im: ArrayLike<number> }): [number, number][] => Array.from({ length: st.dim }, (_, k) => [st.re[k], st.im[k]]);
+    const now = this.clockNow();
+    const t = r?.target;
+    return {
+      target: t ? { name: t.name, ket: ket(t.state), par: t.par, tier: t.tier, amps: amps(t.state) } : { name: '', ket: '', par: 0, tier: 0, amps: [] },
+      now: lab.n === RUSH_QUBITS ? amps(lab.history.state) : [],
+      secondsLeft: r ? r.timeLeft(now) : 0,
+      score: r?.score ?? this.rushOver?.score ?? 0,
+      solved: r?.solved ?? this.rushOver?.solved ?? 0,
+      combo: r?.combo ?? 1,
+      last: this.rushLast && now < this.rushLast.until ? { points: this.rushLast.points, combo: this.rushLast.combo } : null,
+      over: this.rushOver ? { best: this.rushOver.best, newBest: this.rushOver.newBest, bestCombo: this.rushOver.bestCombo } : null,
+    };
+  }
+
+  /** The card during a round (and its summary after). */
+  private renderRushCard(): void {
+    for (let i = 0; i < 5; i++) this.els.get(`pip-${i}`)?.setProperties({ display: 'none' });
+    this.els.get('btn-notes')?.setProperties({ display: 'none' });
+    this.els.get('btn-lib')?.setProperties({ display: 'none' });
+    const over = this.rushOver;
+    if (over) {
+      this.text('chapter-eyebrow', 'Quantum Rush  /  round over');
+      this.text('chapter-title', `${over.score.toLocaleString('en-US')} points`);
+      this.text('chapter-body', `${over.solved} target${over.solved === 1 ? '' : 's'} made, best combo x${over.bestCombo}. ${over.newBest ? 'A new best score!' : `Your best: ${over.best.toLocaleString('en-US')}.`}`);
+      this.text('goal-text', over.newBest ? 'New best' : 'Try for more');
+      this.bg('goal-dot', C.done);
+      this.text('btn-next-label', 'Again');
+      this.text('btn-replay-label', 'Done');
+      this.bg('btn-next', C.primary);
+      return;
+    }
+    const r = this.rush!;
+    const left = r.timeLeft(this.clockNow());
+    this.text('chapter-eyebrow', `Quantum Rush  /  ${Math.ceil(left)} s left${r.combo > 1 ? `  /  combo x${r.combo}` : ''}`);
+    this.text('chapter-title', r.target.name);
+    this.text('chapter-body', `Make ${ket(r.target.state)} on the orbs, any way you like: par ${r.target.par}. It counts the moment they match.`);
+    this.text('goal-text', `Score ${r.score.toLocaleString('en-US')}   /   ${r.solved} made`);
+    this.bg('goal-dot', left <= 10 ? '#ff8a7a' : C.current);
+    this.text('btn-next-label', 'Skip');
+    this.text('btn-replay-label', 'Quit');
+    this.bg('btn-next', C.primaryIdle);
+  }
+
+  /** Every frame during a round: the clock, the reset after a solve, and time running out. */
+  private updateRush(dt: number): void {
+    const r = this.rush;
+    if (!r) return;
+    const now = this.clockNow();
+    if (this.rushResetAt && now >= this.rushResetAt) {
+      this.rushResetAt = 0;
+      lab.reset(RUSH_QUBITS);
+    }
+    this.world.getSystem(LabSystem)?.rushFx.clock(r.timeLeft(now));
+    if (r.over(now)) return this.endRush(false, true);
+    this.rushCardTimer += dt;
+    if (this.rushCardTimer > 0.25) {
+      this.rushCardTimer = 0;
+      this.renderRushCard();
+    }
   }
 
   /** Today's daily challenge: the last puzzle on the Puzzles tab. */
@@ -996,7 +1221,10 @@ export class UISystem extends createSystem({
         window.dispatchEvent(new Event('entangled:debug'));
         return true;
       case 'view':
-        window.dispatchEvent(new Event('entangled:view'));
+        if (c.worlds) {
+          this.setView('worlds');
+          this.flash('Many worlds: every path the computation takes. Opposite colours cancel.');
+        } else window.dispatchEvent(new Event('entangled:view'));
         return true;
       case 'claim':
         if (!this.room || this.room.kind !== 'lab') return false;
@@ -1052,6 +1280,12 @@ export class UISystem extends createSystem({
           this.showCode(false);
         }
         this.compareMachines();
+        return true;
+      case 'rush':
+        this.startRush();
+        return true;
+      case 'skin':
+        this.nextSkin();
         return true;
       case 'fullsize':
         if (!this.code?.visible || this.codeFormat !== 'chip') {
@@ -1367,6 +1601,13 @@ export class UISystem extends createSystem({
     if (view) this.dbgOpen = this.classOpen = false;
     this.text('a-view-l', this.stateView ? STATE_VIEW_NAMES[this.stateView] : 'View');
     this.bg('a-view', this.stateView ? C.primary : '#2d2f33');
+    this.checkWorlds();
+  }
+
+  /** The many-worlds achievement: paths seen cancelling. */
+  private checkWorlds(): void {
+    if (this.stateView !== 'worlds' || this.profile.data.stats.used.includes('worlds:cancel')) return;
+    if (manyWorlds(lab.n, lab.history.ops).cancellations > 0) this.use('worlds:cancel');
   }
 
   /** Open or close the step debugger. */
@@ -1687,7 +1928,7 @@ export class UISystem extends createSystem({
   /** How many items the current tab lists. */
   private navCount(): number {
     const t = this.tab;
-    return t === 'course' ? campaign.course.length : t === 'campaign' ? campaign.chapters.length : t === 'learn' ? campaign.lessons.length : t === 'puzzle' ? campaign.puzzles.length : t === 'build' ? BUILDS.length : PRESETS.length;
+    return t === 'course' ? campaign.course.length : t === 'campaign' ? campaign.chapters.length : t === 'learn' ? campaign.lessons.length : t === 'puzzle' ? campaign.puzzles.length + 1 : t === 'build' ? BUILDS.length : PRESETS.length;
   }
 
   /** More items than slots: pages of NAV_SLOTS - 1, the last slot turns the page. */
@@ -1732,7 +1973,10 @@ export class UISystem extends createSystem({
         : this.tab === 'learn'
           ? campaign.lessons.map((c, i) => ({ label: c.title, done: v.learned.includes(i), current: v.mode === 'learn' && i === v.lessonIndex }))
           : this.tab === 'puzzle'
-            ? campaign.puzzles.map((c, i) => ({ label: c.chip ?? c.title, done: v.stars[i] === 3, current: v.mode === 'puzzle' && i === v.puzzleIndex, stars: v.stars[i] }))
+            ? [
+                { label: 'Quantum Rush', done: false, current: !!(this.rush || this.rushOver), rush: true },
+                ...campaign.puzzles.map((c, i) => ({ label: c.chip ?? c.title, done: v.stars[i] === 3, current: v.mode === 'puzzle' && !this.rush && !this.rushOver && i === v.puzzleIndex, stars: v.stars[i] })),
+              ]
             : this.tab === 'build'
               ? BUILDS.map((c, i) => ({ label: c.chip, done: campaign.build.best.get(i) === 3, current: v.mode === 'build' && i === campaign.build.index, stars: campaign.build.best.get(i) ?? 0 }))
               : PRESETS.map((p, i) => ({ label: p.label, done: false, current: v.mode === 'sandbox' && i === campaign.preset }));
@@ -1759,7 +2003,7 @@ export class UISystem extends createSystem({
       this.text(`n-${i}-l`, it.label);
       this.els.get(`n-${i}-l`)?.setProperties({ color: it.current ? '#18191b' : it.done ? C.done : C.text });
       const stars = 'stars' in it ? (it.stars as number) : 0;
-      this.text(`n-${i}-n`, stars ? `${stars}/3` : String(at + 1));
+      this.text(`n-${i}-n`, 'rush' in it ? '60s' : stars ? `${stars}/3` : String(this.tab === 'puzzle' ? at : at + 1));
       this.els.get(`n-${i}-n`)?.setProperties({ color: it.current ? '#18191b' : it.done ? C.done : stars ? '#c9ccd1' : '#6b6e75' });
     }
     this.text('nav-progress', `${v.coursed.length}/${v.courseCount} course   ${v.completed.length}/${v.chapterCount} chapters   ${v.learned.length}/${v.lessonCount} lessons`);
@@ -1926,6 +2170,19 @@ export class UISystem extends createSystem({
       labSys.showWheels(false);
       labSys.showVqe(undefined, H2);
       const fig = profileFigure(this.profileView());
+      labSys.showOverlay(fig.key, (b) => b.draw(fig.draw));
+      return;
+    }
+    // Quantum Rush: the target, the clock and the score
+    if (this.rush || this.rushOver) {
+      labSys.hardwareWanted = false;
+      labSys.showHardware(null);
+      labSys.showMaths(false);
+      labSys.showLandscape(null);
+      labSys.showDensity(false);
+      labSys.showWheels(false);
+      labSys.showVqe(undefined, H2);
+      const fig = rushFigure(this.rushView());
       labSys.showOverlay(fig.key, (b) => b.draw(fig.draw));
       return;
     }
@@ -2342,7 +2599,7 @@ export class UISystem extends createSystem({
     const want = this.pokeOn ? near > 0.14 : near > 0.2;
     if (want === this.pokeOn) return;
     this.pokeOn = want;
-    for (const id of ['chapter-panel', 'gate-dock', 'code-panel', 'nav-panel', 'builder-panel', 'notes-panel', 'noise-panel', 'library-panel', 'debug-panel', 'class-panel']) {
+    for (const id of ['chapter-panel', 'gate-dock', 'code-panel', 'nav-panel', 'builder-panel', 'notes-panel', 'noise-panel', 'library-panel', 'debug-panel', 'class-panel', 'looks-panel']) {
       const e = this.world.getSceneEntity(id);
       if (!e) continue;
       if (want && !e.hasComponent(PokeInteractable)) e.addComponent(PokeInteractable);
@@ -2423,7 +2680,11 @@ export class UISystem extends createSystem({
     const lsys = this.world.getSystem(LabSystem);
     if (lsys) {
       lsys.boardRaised = this.dbgOpen || this.classOpen;
-      lsys.showStateView(this.libOpen ? null : this.stateView);
+      // the Surface Code chapter's lattice takes the space the big-state views use
+      const cv = campaign.view;
+      const lattice = cv.mode === 'campaign' && !cv.intro && !this.profileOpen && !this.libOpen && cv.chapter?.title === 'Surface Code' ? ((campaign.memoryValue('surface') as SurfaceView | undefined) ?? null) : null;
+      lsys.showSurface(lattice);
+      lsys.showStateView(this.libOpen || lattice ? null : this.stateView);
     }
     // notes sit where the code panel does; only one of the two is open at a time
     if (this.notes!.open) {
@@ -2454,6 +2715,14 @@ export class UISystem extends createSystem({
       this.libAsset!.visible = false;
       this.libAsset!.position.copy(PARKED);
     }
+    // the finishes stand in front of the board while the progress board is up
+    if (this.profileOpen) {
+      this.place(this.looksAsset!, 'notes-panel');
+      this.looksAsset!.visible = true;
+    } else {
+      this.looksAsset!.visible = false;
+      this.looksAsset!.position.copy(PARKED);
+    }
     if (this.noiseOpen) {
       this.place(this.noiseAsset!, 'notes-panel');
       this.noiseAsset!.visible = true;
@@ -2462,7 +2731,10 @@ export class UISystem extends createSystem({
       this.noiseAsset!.position.copy(PARKED);
     }
     this.place(this.nav!, 'nav-panel');
-    campaign.update(Math.min(delta, 0.05));
+    // development: slow motion (window.__entangledSlowmo) slows the chapters' own clocks too, as it does the 3D
+    const slow = import.meta.env.DEV ? ((globalThis as { __entangledSlowmo?: number }).__entangledSlowmo ?? 1) : 1;
+    campaign.update(Math.min(delta, 0.05) * slow);
+    this.updateRush(Math.min(delta, 0.05));
     this.pollIbm(Math.min(delta, 0.05));
     this.updateDebugger(Math.min(delta, 0.05));
     if (this.dockFlash && performance.now() >= this.dockFlash.until) {

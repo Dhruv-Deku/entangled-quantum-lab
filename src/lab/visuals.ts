@@ -1,11 +1,12 @@
 import {
-  AdditiveBlending,
+  AddEquation,
   BufferAttribute,
   BufferGeometry,
   CanvasTexture,
   CatmullRomCurve3,
   Color,
   ConeGeometry,
+  CustomBlending,
   CylinderGeometry,
   Group,
   Line,
@@ -13,6 +14,8 @@ import {
   Mesh,
   MeshBasicMaterial,
   MeshPhysicalMaterial,
+  MeshStandardMaterial,
+  OneFactor,
   PlaneGeometry,
   QuadraticBezierCurve3,
   ShaderMaterial,
@@ -20,10 +23,13 @@ import {
   SphereGeometry,
   Sprite,
   SpriteMaterial,
+  SrcAlphaFactor,
   SRGBColorSpace,
   TorusGeometry,
   TubeGeometry,
   Vector3,
+  ZeroFactor,
+  type Texture,
 } from '@iwsdk/core';
 import type { Vec3 } from '../quantum/gates';
 
@@ -33,11 +39,28 @@ export const GOLD = new Color('#E2B04A');
 export const MINT = new Color('#3DDC97');
 
 /**
+ * Blending for glows and highlights: add light, but leave the framebuffer's
+ * alpha alone. Plain additive blending also adds alpha, and in passthrough
+ * that makes even a dark glow an opaque patch over the real room.
+ */
+export const GLOW = { blending: CustomBlending, blendEquation: AddEquation, blendSrc: SrcAlphaFactor, blendDst: OneFactor, blendSrcAlpha: ZeroFactor, blendDstAlpha: OneFactor } as const;
+
+/**
  * Each qubit keeps one colour everywhere: its arrow, trail, desk label, and its
  * steps on the timeline. Gold is never used here; it only means entanglement.
  */
 export const QUBIT_COLORS = ['#FF7759', '#3FC6C9', '#9B87F5', '#7BCB6A', '#FF8FB6'];
 export const qubitColor = (i: number) => QUBIT_COLORS[i % QUBIT_COLORS.length];
+
+/** Orb finishes, unlocked by level: the same physics, a different look. */
+export type OrbSkinId = 'glass' | 'frost' | 'smoke' | 'tinted' | 'copper';
+export const ORB_SKINS: { id: OrbSkinId; name: string; level: number; note: string }[] = [
+  { id: 'glass', name: 'Glass', level: 1, note: 'Clear glass, the classic' },
+  { id: 'frost', name: 'Frost', level: 2, note: 'Frosted glass with a cool rim' },
+  { id: 'smoke', name: 'Smoke', level: 3, note: 'Dark smoked glass, arrows glow through' },
+  { id: 'tinted', name: 'Tinted', level: 4, note: 'Each orb in its qubit colour' },
+  { id: 'copper', name: 'Copper', level: 5, note: 'Glass on copper rings, like the fridge' },
+];
 
 /** Small text on a transparent canvas, for labels that live in the 3D scene. */
 export function textTexture(parts: { text: string; color: string }[], weight = 600): CanvasTexture {
@@ -89,7 +112,7 @@ const glassMat = new MeshPhysicalMaterial({
 const rimMat = new ShaderMaterial({
   transparent: true,
   depthWrite: false,
-  blending: AdditiveBlending,
+  ...GLOW,
   uniforms: { uColor: { value: new Color('#cfe0ff') }, uStrength: { value: 0.55 } },
   vertexShader: /* glsl */ `
     varying vec3 vN; varying vec3 vV;
@@ -106,6 +129,23 @@ const rimMat = new ShaderMaterial({
       gl_FragColor = vec4(uColor * f * uStrength, f * uStrength);
     }`,
 });
+/**
+ * Reflections: a black, glossy shell added on top of the glass. A dielectric
+ * reflects about 4% head-on and nearly everything at grazing angles, so the
+ * studio's light panels show as crisp highlights and the edge brightens,
+ * while the middle stays clear.
+ */
+const reflectMat = new MeshStandardMaterial({ color: '#000000', roughness: 0.05, metalness: 0, transparent: true, depthWrite: false, ...GLOW, envMapIntensity: 0.5 });
+const copperRingMat = new MeshStandardMaterial({ color: '#c47c4e', roughness: 0.25, metalness: 1 });
+const copperRingGeo = new TorusGeometry(1, 0.022, 10, 96);
+
+/** Give the orbs a studio to reflect (shared by every orb). */
+export function setOrbEnvironment(env: Texture): void {
+  reflectMat.envMap = env;
+  reflectMat.needsUpdate = true;
+  copperRingMat.envMap = env;
+  copperRingMat.needsUpdate = true;
+}
 const ringGeo = new TorusGeometry(1, 0.004, 6, 96);
 const ringMat = new MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.2, depthWrite: false });
 const meridianMat = new MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.08, depthWrite: false });
@@ -113,7 +153,7 @@ const shaftGeo = new CylinderGeometry(1, 1, 1, 10).translate(0, 0.5, 0);
 const headGeo = new ConeGeometry(1, 1, 16).translate(0, 0.5, 0);
 const tipMat = new MeshBasicMaterial({ color: '#ffffff' });
 const coreMat = new MeshBasicMaterial({ color: GOLD.clone().multiplyScalar(1.6), toneMapped: false });
-const haloMat = new MeshBasicMaterial({ color: GOLD, transparent: true, opacity: 0.18, depthWrite: false, blending: AdditiveBlending });
+const haloMat = new MeshBasicMaterial({ color: GOLD, transparent: true, opacity: 0.18, depthWrite: false, ...GLOW });
 const axisMat = new MeshBasicMaterial({ color: '#9fd8ff', transparent: true, opacity: 0, depthWrite: false });
 const selectMat = new MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0, depthWrite: false });
 const shadowGeo = new PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
@@ -219,6 +259,10 @@ export class OrbVisual {
   private readonly tmp = new Vector3();
   private readonly lastTip = new Vector3(0, 1, 0);
   private readonly tint: Color;
+  private readonly glass: MeshPhysicalMaterial;
+  private readonly rim: ShaderMaterial;
+  private readonly equator: Mesh;
+  private readonly copperRings: Mesh[];
   private readonly label: Mesh;
   private readonly shadow: Mesh;
   private readonly ground: number;
@@ -228,12 +272,26 @@ export class OrbVisual {
     this.ground = groundOffset;
     this.tint = new Color(qubitColor(index));
     const arrowMat = new MeshPhysicalMaterial({ color: this.tint, roughness: 0.35, metalness: 0.1, clearcoat: 0.6, emissive: this.tint, emissiveIntensity: 0.35 });
-    this.root = new Mesh(orbGeometry(r), glassMat);
+    this.glass = glassMat.clone();
+    this.root = new Mesh(orbGeometry(r), this.glass);
     this.root.renderOrder = 1;
-    const rim = new Mesh(sphereGeo, rimMat);
+    this.rim = rimMat.clone();
+    this.rim.uniforms = { uColor: { value: new Color('#cfe0ff') }, uStrength: { value: 0.35 } };
+    const rim = new Mesh(sphereGeo, this.rim);
     rim.scale.setScalar(r * 1.002);
     rim.renderOrder = 3;
+    const reflect = new Mesh(sphereGeo, reflectMat);
+    reflect.scale.setScalar(r * 1.004);
+    reflect.renderOrder = 4;
     const equator = new Mesh(ringGeo, ringMat.clone());
+    this.equator = equator;
+    this.copperRings = [0, 1].map((k) => {
+      const m = new Mesh(copperRingGeo, copperRingMat);
+      m.scale.setScalar(r * 1.01);
+      if (k === 0) m.rotation.x = Math.PI / 2;
+      m.visible = false;
+      return m;
+    });
     (equator.material as MeshBasicMaterial).color.copy(this.tint).lerp(new Color('#ffffff'), 0.35);
     (equator.material as MeshBasicMaterial).opacity = 0.45;
     equator.scale.set(r, r, r * 0.25);
@@ -267,7 +325,7 @@ export class OrbVisual {
     this.shadow.scale.setScalar(r * 1.9);
     this.label = new Mesh(labelGeo, new MeshBasicMaterial({ map: textTexture([{ text: `q${index}`, color: qubitColor(index) }], 700), transparent: true, depthWrite: false }));
     this.label.position.set(0, -groundOffset + 0.002, r * 0.15);
-    this.flashMat = new MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0, depthWrite: false, blending: AdditiveBlending });
+    this.flashMat = new MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0, depthWrite: false, ...GLOW });
     this.flashMesh = new Mesh(sphereGeo, this.flashMat);
     this.flashMesh.scale.setScalar(r * 1.05);
 
@@ -279,7 +337,7 @@ export class OrbVisual {
     this.trail = new Line(g, new LineBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false }));
     this.trail.frustumCulled = false;
 
-    this.root.add(equator, meridian, pole, this.arrow, this.trail, this.core, this.halo, this.axis, this.select, this.shadow, this.label, this.flashMesh, rim);
+    this.root.add(equator, meridian, pole, this.arrow, this.trail, this.core, this.halo, this.axis, this.select, this.shadow, this.label, this.flashMesh, rim, reflect, ...this.copperRings);
     // only the glass body takes pointer input; decorations must not steal grabs or rays
     this.root.traverse((o) => {
       if (o !== this.root) (o as unknown as { pointerEvents: string }).pointerEvents = 'none';
@@ -376,6 +434,28 @@ export class OrbVisual {
     if (!v) return;
     blochToLocal(v, this.targetDir).normalize();
     this.target.quaternion.setFromUnitVectors(UP, this.targetDir);
+  }
+
+  /** Change the orb's finish (the arrow, rings and labels stay as they are). */
+  applySkin(id: OrbSkinId): void {
+    const g = this.glass, u = this.rim.uniforms;
+    const set = (color: string | Color, opacity: number, roughness: number, rim: string | Color, strength: number) => {
+      g.color.set(color);
+      g.opacity = opacity;
+      g.roughness = roughness;
+      g.clearcoatRoughness = Math.min(1, roughness + 0.05);
+      (u.uColor.value as Color).set(rim);
+      u.uStrength.value = strength;
+    };
+    const white = new Color('#ffffff');
+    if (id === 'frost') set('#eef3fa', 0.3, 0.55, '#bfe3ff', 0.3);
+    else if (id === 'smoke') set('#16181c', 0.42, 0.08, '#e8ecf2', 0.55);
+    else if (id === 'tinted') set(this.tint.clone().lerp(white, 0.1), 0.3, 0.06, this.tint.clone().lerp(white, 0.2), 0.6);
+    else if (id === 'copper') set('#f3e6dc', 0.1, 0.06, '#ffd2b0', 0.3);
+    else set('#d9e2ef', 0.12, 0.06, '#cfe0ff', 0.35);
+    const copper = id === 'copper';
+    for (const m of this.copperRings) m.visible = copper;
+    this.equator.visible = !copper;
   }
 
   clearTrail(): void {

@@ -317,6 +317,7 @@ export class Campaign {
     if (!this.playing || this.chapterDone) return;
     const step = this.view.step;
     if (!step) return;
+    if (!this.intro) step.tick?.(this.lab, this.memory, dt);
     if (!this.stepDone) {
       const ctx = this.context();
       if (step.done(ctx)) {

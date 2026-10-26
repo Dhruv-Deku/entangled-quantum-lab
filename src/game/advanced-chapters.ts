@@ -11,11 +11,13 @@ import { pairStrength } from '../quantum/entanglement';
 import { entanglementMap } from '../quantum/state-views';
 import type { QState } from '../quantum/state';
 import type { Chapter, GoalContext, Step } from './chapters';
+import { SURFACE_CHAPTER } from './surface-chapter';
 
 /**
- * Chapters 19 to 25: the CHSH Bell test, the bit-flip code, entanglement
+ * Chapters 19 to 26: the CHSH Bell test, the bit-flip code, entanglement
  * swapping, a quantum walk, simulating an Ising chain in Trotter steps, the
- * quantum Zeno effect, and randomized benchmarking.
+ * quantum Zeno effect, randomized benchmarking, and the surface code
+ * (surface-chapter.ts).
  * Each puts its own figure on the board. (Self-contained helpers, like
  * algorithm-chapters.ts: chapters.ts imports this file.)
  */
@@ -559,6 +561,7 @@ export const ADVANCED_CHAPTERS: Chapter[] = [
     ],
     outro: 'Hardware makers report gate quality measured this way. The best single-qubit gates today go wrong less than once in a thousand times.',
   },
+  SURFACE_CHAPTER,
 ];
 
 /** For tests: what a figure would draw for this step right now. */

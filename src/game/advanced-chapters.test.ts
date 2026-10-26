@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Lab } from '../lab/lab';
-import { unitaryFigure, type ChshRun, type Figure, type QecView, type ZenoView } from '../lab/figures';
+import { unitaryFigure, type ChshRun, type Figure, type QecView, type SurfaceView, type ZenoView } from '../lab/figures';
 import { circuitUnitary, describeUnitary, exactMagnetization, TROTTER_STEPS, WALK_MAX_STEPS, type RbResult } from '../quantum/advanced';
 import { blochVector } from '../quantum/bloch';
 import { pairStrength } from '../quantum/entanglement';
@@ -57,9 +57,24 @@ function play(title: string, seed = 1): { c: Campaign; lab: Lab; payoffs: string
 }
 
 describe('advanced chapters', () => {
-  it('seven more chapters close the list', () => {
-    expect(CHAPTERS).toHaveLength(25);
-    expect(CHAPTERS.slice(18).map((c) => c.title)).toEqual(['Bell Test', 'Error Correction', 'Entanglement Swapping', 'Quantum Walk', 'Time Evolution', 'Quantum Zeno', 'Benchmarking']);
+  it('eight more chapters close the list', () => {
+    expect(CHAPTERS).toHaveLength(26);
+    expect(CHAPTERS.slice(18).map((c) => c.title)).toEqual(['Bell Test', 'Error Correction', 'Entanglement Swapping', 'Quantum Walk', 'Time Evolution', 'Quantum Zeno', 'Benchmarking', 'Surface Code']);
+  });
+
+  it('Surface Code: noise lights the checks, the decoder fixes it, the code grows, and the threshold appears', () => {
+    const { c } = play('Surface Code', 3);
+    const v = c.memoryValue('surface') as SurfaceView;
+    expect(v.d).toBe(5);
+    expect(v.cycles).toBeGreaterThanOrEqual(3);
+    expect(v.fixed).toBeGreaterThanOrEqual(2);
+    expect(v.round!.defects.length).toBeGreaterThan(0);
+    // the threshold plot: three sizes; below threshold bigger is better, above it worse
+    expect(v.curve!.map((x) => x.d)).toEqual([3, 5, 7]);
+    const at = (d: number, p: number) => v.curve!.find((x) => x.d === d)!.points.find(([q]) => q === p)![1];
+    expect(at(7, 0.04)).toBeLessThan(at(3, 0.04));
+    expect(at(7, 0.14)).toBeGreaterThan(at(3, 0.14));
+    expect(v.p).toBeGreaterThan(0.1);
   });
 
   it('Quantum Zeno: unwatched it reaches |1>; watched often, it stays', () => {

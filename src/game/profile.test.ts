@@ -55,7 +55,7 @@ describe('achievements', () => {
     p.use('view:qsphere');
     p.use('view:qsphere');
     p.use('view:city');
-    expect(views.progress!(p.data.stats, ctx())).toEqual([2, 4]);
+    expect(views.progress!(p.data.stats, ctx())).toEqual([2, 5]);
   });
 
   it('progress elsewhere counts too: chapters, puzzles, daily streaks', () => {

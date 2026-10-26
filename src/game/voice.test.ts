@@ -88,3 +88,12 @@ group('voice: machines at full size', () => {
     expect(parseVoice('compare the machines')).toEqual({ type: 'compare' });
   });
 });
+
+group('voice: new powers', () => {
+  it('opens many worlds, starts Quantum Rush, and changes the orb finish', () => {
+    for (const s of ['many worlds', 'show me every path', 'all the paths']) expect(parseVoice(s), s).toEqual({ type: 'view', worlds: true });
+    for (const s of ['quantum rush', 'start the rush', 'arcade']) expect(parseVoice(s), s).toEqual({ type: 'rush' });
+    for (const s of ['next skin', 'change look', 'skins']) expect(parseVoice(s), s).toEqual({ type: 'skin' });
+    expect(parseVoice('next view')).toEqual({ type: 'view' });
+  });
+});

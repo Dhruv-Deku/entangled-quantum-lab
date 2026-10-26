@@ -229,6 +229,14 @@ export const NOTES: Record<string, string[]> = {
     'If each qubit flips with chance p, the code fails only when two or three flip: 3p^2 - 2p^3. That beats p whenever p < 1/2, the break-even point of this code.',
     'Key idea: measure the errors, never the data. Codes like the surface code catch phase flips too and reach much better thresholds by using many qubits.',
   ],
+  'Surface Code': [
+    'The surface code stores one logical qubit in a d x d grid of data qubits. Between them sit d^2 - 1 measure qubits, each checking the parity of its two or four neighbours, over and over.',
+    'Z checks catch bit flips and X checks catch phase flips. An error lights the checks next to it. The checks only see parities, so they reveal where errors are and nothing about the logical state.',
+    'A decoder pairs the lit checks along the shortest paths (minimum-weight matching) and flips those qubits back. It fails only when the real errors and its guess together stretch right across the grid: a logical error.',
+    'Below a threshold error rate, a bigger grid makes logical errors exponentially rarer; above it, bigger is worse. With noise only on the data qubits the threshold is about 10%; counting errors in the measurements too, about 1%.',
+    'In 2024 Google ran distance 3, 5 and 7 codes on its Willow chip (up to 101 qubits) and each step halved the logical error rate: the first logical qubit that gets better as it grows.',
+    'Key idea: many noisy qubits, checked continuously, make one qubit that is better than any of them.',
+  ],
   'Entanglement Swapping': [
     'Start with two Bell pairs: q0-q1 and q2-q3. Alice holds q1 and q2; q0 and q3 are far apart and have never met.',
     'Alice measures her two qubits in the Bell basis: a CNOT, an H, and two measurements. This is the same move as in teleportation.',

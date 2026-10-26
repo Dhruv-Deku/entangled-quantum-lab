@@ -1,5 +1,4 @@
 import {
-  AdditiveBlending,
   Color,
   CylinderGeometry,
   DynamicDrawUsage,
@@ -12,6 +11,7 @@ import {
   Vector3,
 } from '@iwsdk/core';
 import type { JointPositions } from '../gestures/hand';
+import { GLOW } from './visuals';
 
 /** Bones as joint index pairs (WebXR hand order): thumb, four fingers, and the knuckle line. */
 const BONES: [number, number][] = [
@@ -25,7 +25,7 @@ const TIPS = new Set([4, 9, 14, 19, 24]);
 const ghostMat = new ShaderMaterial({
   transparent: true,
   depthWrite: false,
-  blending: AdditiveBlending,
+  ...GLOW,
   uniforms: { uColor: { value: new Color('#dfe9ff') }, uOpacity: { value: 0 } },
   vertexShader: /* glsl */ `
     varying vec3 vN; varying vec3 vV;

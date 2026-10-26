@@ -67,8 +67,9 @@ describe('big-state views', () => {
     }
   });
 
-  it('the View button cycles Q-sphere, city, map, off', () => {
-    expect(nextView(null)).toBe('qsphere');
+  it('the View button cycles many worlds, Q-sphere, city, map, unitary, off', () => {
+    expect(nextView(null)).toBe('worlds');
+    expect(nextView('worlds')).toBe('qsphere');
     expect(nextView('qsphere')).toBe('city');
     expect(nextView('city')).toBe('heatmap');
     expect(nextView('heatmap')).toBe('unitary');

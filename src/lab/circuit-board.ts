@@ -8,6 +8,7 @@ import { bestCut, BETA_MAX, GAMMA_MAX, type Graph } from '../quantum/qaoa';
 import { dirac, factor, gateFormula, gateName, ket, kronLabel, localMatrix, qubitsOf, zyz } from '../quantum/matrix';
 import { angleText } from '../quantum/exact';
 import type { QState } from '../quantum/state';
+import type { Worlds } from '../quantum/paths';
 import { blochVector as blochVectorOf } from '../quantum/bloch';
 import { qubitColor } from './visuals';
 import { cityHighlights, entanglementMap, entanglementSummary, phaseColor, qsphere, STATE_VIEW_NAMES, type DensityLike, type StateView } from '../quantum/state-views';
@@ -546,7 +547,7 @@ export class CircuitBoard {
    * The big-state views' board: the entanglement map itself, or the legend
    * and the leading numbers beside the 3D Q-sphere or state city.
    */
-  renderStateView(view: StateView, state: QState, rho: DensityLike, noisy: boolean): void {
+  renderStateView(view: StateView, state: QState, rho: DensityLike, noisy: boolean, worlds?: Worlds): void {
     const g = this.g;
     g.clearRect(0, 0, W, H);
     roundRect(g, 4, 4, W - 8, H - 8, 40);
@@ -599,6 +600,43 @@ export class CircuitBoard {
           yy += 34;
         }
       text(g, 'Pairs use the negativity; "with the rest" is 1 - |Bloch arrow|^2.', 44, H - 40, '#6b6e75', '500 20px');
+    } else if (view === 'worlds') {
+      text(g, 'Every path the computation takes. Time runs left to right; one row per basis state.', 44, 120, INK, '500 26px');
+      text(g, 'Strand thickness: the weight a path carries.   Colour: its phase.   Bead size: probability.', 44, 160, INK, '500 24px');
+      const w = worlds;
+      const lines = !w
+        ? []
+        : [
+            `${w.paths} path${w.paths === 1 ? '' : 's'} through ${w.layers.length - 1} step${w.layers.length === 2 ? '' : 's'}${w.skipped ? ` (the last ${w.layers.length - 1} of ${w.skipped + w.layers.length - 1})` : ''}.`,
+            w.cancellations
+              ? `Paths cancelled at ${w.cancellations} place${w.cancellations === 1 ? '' : 's'} (the empty rings): they arrived with opposite phases and wiped each other out. That is destructive interference, the trick behind every quantum speed-up.`
+              : 'No paths cancel yet. Put H on a qubit twice and watch the paths to |1> wipe each other out.',
+            w.layers.some((l) => l.pruned.length) ? 'A measurement kept the worlds that agree with its outcome; the faded stubs are the worlds it ended.' : '',
+          ].filter(Boolean);
+      let yy = 230;
+      for (const para of lines)
+        for (const line of wrap(g, para, '500 26px', 900)) {
+          text(g, line, 44, yy, INK, '500 26px');
+          yy += 38;
+        }
+      // the colour wheel, as on the Q-sphere
+      const cx = 1400, cy = 380, r = 100;
+      for (let i = 0; i < 72; i++) {
+        const a0 = (i / 72) * Math.PI * 2, a1 = ((i + 1.2) / 72) * Math.PI * 2;
+        g.beginPath();
+        g.moveTo(cx, cy);
+        g.arc(cx, cy, r, -a1, -a0);
+        g.closePath();
+        g.fillStyle = phaseColor(a0);
+        g.fill();
+      }
+      circle(g, cx, cy, r * 0.55);
+      g.fillStyle = '#1d1e21';
+      g.fill();
+      text(g, 'phase', cx, cy + 8, DIM, '600 22px', 'center');
+      text(g, '0', cx + r + 14, cy + 8, DIM, '600 22px');
+      text(g, 'pi', cx - r - 14, cy + 8, DIM, '600 22px', 'right');
+      text(g, 'Opposite colours cancel.', cx, cy + r + 40, DIM, '500 22px', 'center');
     } else if (view === 'qsphere') {
       text(g, 'One dot per basis state. Top: all 0s. Bottom: all 1s. Same number of 1s, same latitude.', 44, 120, INK, '500 26px');
       text(g, 'Dot size: probability.   Dot colour: phase (relative to the biggest dot).', 44, 160, INK, '500 26px');

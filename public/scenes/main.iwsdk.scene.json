@@ -292,6 +292,26 @@
       }
     },
     {
+      "id": "looks-panel",
+      "name": "Looks",
+      "content": {
+        "type": "asset",
+        "asset": "looks-panel"
+      },
+      "transform": {
+        "position": [
+          0,
+          -50,
+          0
+        ],
+        "scale": 0.052
+      },
+      "components": {
+        "RayInteractable": {},
+        "PokeInteractable": {}
+      }
+    },
+    {
       "id": "debug-panel",
       "name": "Debugger",
       "content": {

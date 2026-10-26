@@ -1,5 +1,4 @@
 import {
-  AdditiveBlending,
   BoxGeometry,
   CanvasTexture,
   Color,
@@ -20,7 +19,7 @@ import {
 } from '@iwsdk/core';
 import type { Op } from '../quantum/circuit';
 import { Beam, ease, finishes, Kit, LabelCard } from './machine-kit';
-import { GOLD, qubitColor, textTexture } from './visuals';
+import { GLOW, GOLD, qubitColor, textTexture } from './visuals';
 
 /** Metres between tweezer sites. */
 const SP = 0.022;
@@ -131,7 +130,7 @@ export class AtomArrayVisual {
     this.root.add(glass);
     // spare atoms waiting in the back row
     const spareMat = new MeshBasicMaterial({ color: '#7c8088' });
-    const spareTweezer = new MeshBasicMaterial({ color: TWEEZER, transparent: true, opacity: 0.14, depthWrite: false, blending: AdditiveBlending });
+    const spareTweezer = new MeshBasicMaterial({ color: TWEEZER, transparent: true, opacity: 0.14, depthWrite: false, ...GLOW });
     for (let i = 0; i < SITES; i++) {
       const p = new Vector3((i - (SITES - 1) / 2) * SP, AXIS, BACK);
       const a = new Mesh(new SphereGeometry(0.0022, 10, 8), spareMat);
@@ -161,11 +160,11 @@ export class AtomArrayVisual {
       const home = new Vector3((q - (n - 1) / 2) * SP, AXIS, 0);
       const mat = new MeshBasicMaterial({ color: qubitColor(q) });
       const body = new Mesh(new SphereGeometry(0.0034, 14, 10), mat);
-      const haloMat = new SpriteMaterial({ map: this.glow, color: qubitColor(q), transparent: true, opacity: 0.45, depthWrite: false, blending: AdditiveBlending });
+      const haloMat = new SpriteMaterial({ map: this.glow, color: qubitColor(q), transparent: true, opacity: 0.45, depthWrite: false, ...GLOW });
       const halo = new Sprite(haloMat);
       halo.scale.setScalar(0.022);
-      const tweezer = new Mesh(new CylinderGeometry(0.0014, 0.0014, 1, 8), new MeshBasicMaterial({ color: TWEEZER, transparent: true, opacity: 0.3, depthWrite: false, blending: AdditiveBlending }));
-      const ramanMat = new MeshBasicMaterial({ color: qubitColor(q), transparent: true, opacity: 0, depthWrite: false, blending: AdditiveBlending });
+      const tweezer = new Mesh(new CylinderGeometry(0.0014, 0.0014, 1, 8), new MeshBasicMaterial({ color: TWEEZER, transparent: true, opacity: 0.3, depthWrite: false, ...GLOW }));
+      const ramanMat = new MeshBasicMaterial({ color: qubitColor(q), transparent: true, opacity: 0, depthWrite: false, ...GLOW });
       const raman = new Mesh(ramanGeo, ramanMat);
       this.root.add(body, halo, tweezer, raman);
       this.atoms.push({ body, mat, halo, haloMat, tweezer, raman, ramanMat, home, pos: home.clone(), flash: 0, read: 0 });
@@ -415,7 +414,7 @@ export class OpticsTableVisual {
     const pitch = 0.005;
     for (let i = 0; i < 25; i++) {
       const body = new Mesh(new SphereGeometry(0.0014, 10, 8), new MeshBasicMaterial({ color: '#ffd2d9', toneMapped: false }));
-      const halo = new Sprite(new SpriteMaterial({ map: this.glow, color: '#ff8aa0', transparent: true, opacity: 0.7, depthWrite: false, blending: AdditiveBlending }));
+      const halo = new Sprite(new SpriteMaterial({ map: this.glow, color: '#ff8aa0', transparent: true, opacity: 0.7, depthWrite: false, ...GLOW }));
       halo.scale.setScalar(0.0095);
       const from = C.clone().add(P(((i % 5) - 2) * pitch, (Math.floor(i / 5) - 2) * pitch * 0.9, 0.004));
       this.root.add(body, halo);

@@ -20,12 +20,17 @@ export interface Stats {
   ghz: number;
   /** Features tried: 'debugger', 'voice', 'listen', 'snapshot', 'shared', 'view:qsphere', ... */
   used: string[];
+  /** Quantum Rush: best score and best combo. */
+  rushBest: number;
+  rushCombo: number;
 }
 
 export interface ProfileData {
   stats: Stats;
   /** Achievement id -> when it was unlocked (ms). */
   unlocked: Record<string, number>;
+  /** The orb finish being worn. */
+  skin?: string;
 }
 
 /** Progress that lives elsewhere (the campaign and the daily record). */
@@ -52,7 +57,7 @@ export interface Achievement {
 }
 
 const used = (s: Stats, f: string) => s.used.includes(f);
-const VIEWS = ['qsphere', 'city', 'heatmap', 'unitary'];
+const VIEWS = ['worlds', 'qsphere', 'city', 'heatmap', 'unitary'];
 const counter = (id: string, title: string, text: string, have: (s: Stats, c: ProgressContext) => number, need: (c: ProgressContext) => number): Achievement => ({
   id,
   title,
@@ -79,15 +84,20 @@ export const ACHIEVEMENTS: Achievement[] = [
   counter('streak7', 'Devoted', 'A seven-day daily streak.', (_s, c) => c.streak, () => 7),
   { id: 'bell-test', title: 'Beyond classical', text: 'Win the Bell Test chapter.', done: (_s, c) => c.chaptersDone.includes('Bell Test') },
   { id: 'qec', title: 'Error free', text: 'Finish Error Correction.', done: (_s, c) => c.chaptersDone.includes('Error Correction') },
-  counter('views', 'Big picture', 'Try all four big-state views.', (s) => VIEWS.filter((v) => used(s, `view:${v}`)).length, () => VIEWS.length),
+  counter('views', 'Big picture', 'Try all five big-state views.', (s) => VIEWS.filter((v) => used(s, `view:${v}`)).length, () => VIEWS.length),
   { id: 'debugger', title: 'Inspector', text: 'Open the step debugger.', done: (s) => used(s, 'debugger') },
   { id: 'voice', title: 'Say it', text: 'Give a voice command.', done: (s) => used(s, 'voice') },
   { id: 'listen', title: 'Hear it', text: 'Listen to a quantum state.', done: (s) => used(s, 'listen') },
   { id: 'shared', title: 'Together', text: 'Join a shared lab or a class.', done: (s) => used(s, 'shared') },
   counter('machines', 'Hardware tour', 'Try all three machines.', (s) => ['superconducting', 'ions', 'atoms'].filter((m) => used(s, `machine:${m}`)).length, () => 3),
+  counter('rush', 'Rush hour', 'Score 5,000 in one Quantum Rush.', (s) => s.rushBest, () => 5000),
+  { id: 'combo', title: 'On fire', text: 'Reach a x5 combo in Quantum Rush.', done: (s) => s.rushCombo >= 5 },
+  { id: 'worlds', title: 'Many worlds', text: 'Watch paths cancel in the many-worlds view.', done: (s) => used(s, 'worlds:cancel') },
+  { id: 'surface', title: 'Below threshold', text: 'Finish the Surface Code chapter.', done: (_s, c) => c.chaptersDone.includes('Surface Code') },
+  { id: 'skin', title: 'New look', text: 'Wear a new orb finish.', done: (s) => used(s, 'skin') },
 ];
 
-export const emptyProfile = (): ProfileData => ({ stats: { gates: 0, measures: 0, shots: 0, rewinds: 0, bellPairs: 0, ghz: 0, used: [] }, unlocked: {} });
+export const emptyProfile = (): ProfileData => ({ stats: { gates: 0, measures: 0, shots: 0, rewinds: 0, bellPairs: 0, ghz: 0, used: [], rushBest: 0, rushCombo: 0 }, unlocked: {} });
 
 /** A GHZ state on all n >= 3 qubits: half |0...0>, half |1...1>. */
 function ghzSize(s: QState): number {
@@ -101,7 +111,7 @@ export class Profile {
 
   constructor(data?: ProfileData | null) {
     const e = emptyProfile();
-    this.data = { stats: { ...e.stats, ...(data?.stats ?? {}), used: [...(data?.stats?.used ?? [])] }, unlocked: { ...(data?.unlocked ?? {}) } };
+    this.data = { stats: { ...e.stats, ...(data?.stats ?? {}), used: [...(data?.stats?.used ?? [])] }, unlocked: { ...(data?.unlocked ?? {}) }, skin: data?.skin };
   }
 
   /** A feature was tried. */
@@ -130,6 +140,15 @@ export class Profile {
 
   onRewind(): void {
     this.data.stats.rewinds++;
+  }
+
+  /** A Quantum Rush round ended; true when it set a new best score. */
+  onRush(score: number, combo: number): boolean {
+    const s = this.data.stats;
+    const best = score > s.rushBest;
+    s.rushBest = Math.max(s.rushBest, score);
+    s.rushCombo = Math.max(s.rushCombo, combo);
+    return best;
   }
 
   /** Unlock whatever is now earned; returns the new ones (for the toasts). */

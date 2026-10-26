@@ -1,5 +1,4 @@
 import {
-  AdditiveBlending,
   BoxGeometry,
   CanvasTexture,
   Color,
@@ -18,7 +17,7 @@ import {
 } from '@iwsdk/core';
 import type { Op } from '../quantum/circuit';
 import { Beam, ease, finishes, Kit, LabelCard } from './machine-kit';
-import { GOLD, qubitColor, textTexture } from './visuals';
+import { GLOW, GOLD, qubitColor, textTexture } from './visuals';
 
 /** Metres between ions along the chain. */
 const SPACING = 0.022;
@@ -147,12 +146,12 @@ export class IonTrapVisual {
       const mat = new MeshBasicMaterial({ color: qubitColor(q) });
       const body = new Mesh(new SphereGeometry(0.0034, 16, 12), mat);
       body.position.set(x, AXIS, 0);
-      const haloMat = new SpriteMaterial({ map: this.glow, color: qubitColor(q), transparent: true, opacity: 0.5, depthWrite: false, blending: AdditiveBlending });
+      const haloMat = new SpriteMaterial({ map: this.glow, color: qubitColor(q), transparent: true, opacity: 0.5, depthWrite: false, ...GLOW });
       const halo = new Sprite(haloMat);
       halo.scale.setScalar(0.024);
       halo.position.copy(body.position);
       // a laser comes in from the front, one per ion
-      const beamMat = new MeshBasicMaterial({ color: qubitColor(q), transparent: true, opacity: 0, depthWrite: false, blending: AdditiveBlending });
+      const beamMat = new MeshBasicMaterial({ color: qubitColor(q), transparent: true, opacity: 0, depthWrite: false, ...GLOW });
       const beam = new Mesh(beamGeo, beamMat);
       beam.rotation.x = -TILT;
       beam.position.set(x, AXIS + Math.sin(TILT) * 0.035, Math.cos(TILT) * 0.035);
@@ -341,7 +340,7 @@ export class IonChamberVisual {
       const mat = new MeshBasicMaterial({ color: '#8fb7ff', toneMapped: false });
       const ion = new Mesh(new SphereGeometry(0.0022, 10, 8), mat);
       ion.position.set((k - 2) * 0.009, H, 0);
-      const halo = new SpriteMaterial({ map: this.glow, color: '#8fb7ff', transparent: true, opacity: 0, depthWrite: false, blending: AdditiveBlending });
+      const halo = new SpriteMaterial({ map: this.glow, color: '#8fb7ff', transparent: true, opacity: 0, depthWrite: false, ...GLOW });
       // the glow shows through the steel, as the fluorescence does through the windows
       halo.depthTest = false;
       const s = new Sprite(halo);

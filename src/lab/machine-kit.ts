@@ -1,5 +1,4 @@
 import {
-  AdditiveBlending,
   BoxGeometry,
   BufferGeometry,
   CanvasTexture,
@@ -26,6 +25,7 @@ import {
 } from '@iwsdk/core';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+import { GLOW } from './visuals';
 
 /**
  * Shared parts for the 3D quantum computers: a studio light the metal can
@@ -263,7 +263,7 @@ export class Beam {
     const len = a.distanceTo(b);
     const geo = new CylinderGeometry(r, r, len, 8, 1, true);
     geo.translate(0, len / 2, 0);
-    this.mat = new MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false, blending: AdditiveBlending, toneMapped: false });
+    this.mat = new MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false, ...GLOW, toneMapped: false });
     this.mesh = new Mesh(geo, this.mat);
     this.mesh.position.copy(a);
     this.mesh.quaternion.setFromUnitVectors(up, b.clone().sub(a).normalize());

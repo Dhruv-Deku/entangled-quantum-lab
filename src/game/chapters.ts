@@ -64,6 +64,8 @@ export interface Step {
   figure?: (memory: Record<string, unknown>, state: QState) => Figure | null;
   /** Show the chip, the fridge and the pulse schedule during this step. */
   hardware?: boolean;
+  /** Every frame while the step is open (and its payoff is up): for steps that animate their own state. */
+  tick?: (lab: Lab, memory: Record<string, unknown>, dt: number) => void;
   /** Show me: do the task for the player, with the same actions the gestures make. */
   solve?: (lab: Lab) => void;
   /** Keep the payoff up until Continue instead of moving on by itself (long explanations). */

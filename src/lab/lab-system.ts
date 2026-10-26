@@ -36,10 +36,15 @@ import { drawCertificate, type CertificateInfo } from './certificate';
 import { unitaryFigure } from './figures';
 import { circuitUnitary, describeUnitary } from '../quantum/advanced';
 import { QSphereVisual, StateCityVisual } from './state-views-3d';
+import { ManyWorldsVisual } from './worlds-3d';
+import { RushFx } from './rush-fx';
+import { SurfaceCodeVisual } from './surface-3d';
+import type { SurfaceView } from './figures';
+import { manyWorlds } from '../quantum/paths';
 import { pureDensity, type StateView } from '../quantum/state-views';
 import { T5 } from '../quantum/routing';
 import { feedback } from './feedback';
-import { GOLD, GroupVisual, ORB_RADIUS, OrbVisual, StrikeVisual, ThreadVisual } from './visuals';
+import { GOLD, GroupVisual, ORB_RADIUS, OrbVisual, setOrbEnvironment, StrikeVisual, ThreadVisual, type OrbSkinId } from './visuals';
 
 /** Desk-top workspace origin when there is no head pose to place it from (desktop view). */
 const DESK = new Vector3(0, 0.74, -0.42);
@@ -91,12 +96,19 @@ export class LabSystem extends createSystem({
   hardwareWanted = false;
   /** Full size: the machine around the qubits (fridge, vacuum chamber, optics table) stands 1:1 on the floor beside the desk. */
   fullSize = false;
+  /** The orbs' finish (unlocked by level). */
+  private orbSkin: OrbSkinId = 'glass';
   /** 0 on the desk .. 1 full size, eased. */
   private grow = 0;
   private roomShown: object | null = null;
   /** Big-state views: the Q-sphere and the state city float where the board was; the board shows their legend. */
   private qsphere!: QSphereVisual;
   private city!: StateCityVisual;
+  private worlds!: ManyWorldsVisual;
+  /** Quantum Rush on the desk: the sixty-tick clock and the score pop-ups. */
+  rushFx!: RushFx;
+  /** The Surface Code chapter's lattice, floating between the orb and the board. */
+  private surface!: SurfaceCodeVisual;
   private stateView: StateView | null = null;
   /** Chip tab: the board shows the pulse schedule instead of the circuit. */
   private pulseView: PulseView | null = null;
@@ -184,6 +196,7 @@ export class LabSystem extends createSystem({
     }
     // every machine reflects a soft studio, so steel, copper and glass read as real materials
     const env = studioEnvironment(this.renderer);
+    setOrbEnvironment(env);
     for (const m of [this.chip.root, this.fridge.root, this.ionTrap.root, this.ionChamber.root, this.atomArray.root, this.opticsTable.root]) useStudio(m, env);
     this.qsphere = new QSphereVisual();
     this.qsphere.root.position.set(0, 0.25, -0.27);
@@ -194,6 +207,23 @@ export class LabSystem extends createSystem({
     this.city.root.rotation.x = 0.18;
     this.city.root.visible = false;
     ws.add(this.city.root);
+    // many worlds: the paths stand where the board was, leaning back a little
+    this.worlds = new ManyWorldsVisual();
+    this.worlds.root.position.set(0, 0.19, -0.34);
+    this.worlds.root.rotation.x = -0.12;
+    this.worlds.root.visible = false;
+    ws.add(this.worlds.root);
+    this.surface = new SurfaceCodeVisual();
+    this.surface.env = env;
+    this.surface.root.position.set(0, 0.3, -0.2);
+    // held up toward the player like a chip in a display case
+    this.surface.root.rotation.x = 1.15;
+    this.surface.root.scale.setScalar(1.35);
+    this.surface.root.visible = false;
+    ws.add(this.surface.root);
+    this.rushFx = new RushFx();
+    this.rushFx.root.position.set(0, 0.003, -0.03);
+    ws.add(this.rushFx.root);
 
     // development: the lab system, for probing scenes from the managed browser
     if (import.meta.env.DEV) (globalThis as { __entangledLab?: LabSystem }).__entangledLab = this;
@@ -338,6 +368,7 @@ export class LabSystem extends createSystem({
     while (this.orbs.length < n) {
       const i = this.orbs.length;
       const visual = new OrbVisual(i, ORB_RADIUS, ORB_HEIGHT);
+      visual.applySkin(this.orbSkin);
       visual.root.name = `Qubit${i}`;
       if (this.owners[i]) visual.setOwner(this.owners[i]);
       const entity = this.world.createTransformEntity(visual.root, { parent: this.workspace });
@@ -428,6 +459,18 @@ export class LabSystem extends createSystem({
     if (shown.stand) shown.stand.visible = g > 0.02;
   }
 
+  /** The Surface Code chapter's lattice (null hides it). */
+  showSurface(v: SurfaceView | null): void {
+    this.surface.root.visible = !!v;
+    if (v) this.surface.set(v);
+  }
+
+  /** Dress every orb in a finish. */
+  setSkin(id: OrbSkinId): void {
+    this.orbSkin = id;
+    for (const o of this.orbs) o.visual.applySkin(id);
+  }
+
   /** Recentre the desk in front of the player (also used by the recenter button). */
   recenter(): void {
     this.placePending = true;
@@ -459,6 +502,9 @@ export class LabSystem extends createSystem({
     if (this.opticsTable.root.visible) this.opticsTable.update(dt);
     if (this.qsphere.root.visible) this.qsphere.update(dt);
     if (this.city.root.visible) this.city.update(dt);
+    if (this.worlds.root.visible) this.worlds.update(dt);
+    if (this.rushFx.root.visible) this.rushFx.update(dt);
+    if (this.surface.root.visible) this.surface.update(dt);
     // on the chip tab the board rises above the code window so the pulse schedule shows
     const boardY = this.boardRaised || (this.stateView && this.stateView !== 'heatmap' && this.stateView !== 'unitary') || this.pulseView || this.mathsOn || this.landscapeView || this.densityOn || this.wheelsOn || this.vqeView !== undefined || this.overlayKey ? 0.5 : 0.27;
     this.board.root.position.y += (boardY - this.board.root.position.y) * (1 - Math.exp(-dt * 8));
@@ -562,7 +608,9 @@ export class LabSystem extends createSystem({
         this.board.draw(fig.draw);
       } else if (this.stateView) {
         const rho = noiseLab.on ? noiseLab.rho(lab.n, lab.history.ops) : pureDensity(lab.history.state);
-        this.board.renderStateView(this.stateView, lab.history.state, rho, noiseLab.on);
+        const worlds = this.stateView === 'worlds' ? manyWorlds(lab.n, lab.history.ops) : undefined;
+        this.board.renderStateView(this.stateView, lab.history.state, rho, noiseLab.on, worlds);
+        if (worlds) this.worlds.set(worlds);
         if (this.stateView === 'qsphere') this.qsphere.set(lab.history.state);
         if (this.stateView === 'city') this.city.set(rho);
       } else if (this.wheelsOn) {
@@ -645,6 +693,7 @@ export class LabSystem extends createSystem({
     this.stateView = view;
     this.qsphere.root.visible = view === 'qsphere';
     this.city.root.visible = view === 'city';
+    this.worlds.root.visible = view === 'worlds';
     this.boardVersion = -1;
   }
 

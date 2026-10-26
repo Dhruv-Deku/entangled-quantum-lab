@@ -24,7 +24,9 @@ export type VoiceCommand =
   | { type: 'machine'; id: 'superconducting' | 'ions' | 'atoms' }
   | { type: 'compare' }
   | { type: 'fullsize'; on: boolean }
-  | { type: 'undo' | 'redo' | 'reset' | 'add' | 'remove' | 'next' | 'showme' | 'notes' | 'code' | 'simplify' | 'zoom' | 'noise' | 'library' | 'close' | 'debug' | 'view' };
+  | { type: 'view'; worlds?: boolean }
+  | { type: 'rush' | 'skin' }
+  | { type: 'undo' | 'redo' | 'reset' | 'add' | 'remove' | 'next' | 'showme' | 'notes' | 'code' | 'simplify' | 'zoom' | 'noise' | 'library' | 'close' | 'debug' };
 
 const NUMBERS: Record<string, number> = {
   zero: 0, oh: 0, one: 1, won: 1, two: 2, three: 3, tree: 3, free: 3, four: 4, for: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12, thirteen: 13, fourteen: 14,
@@ -130,6 +132,9 @@ export function parseVoice(text: string): VoiceCommand | null {
   if (/(add|new) (a )?qubit/.test(s)) return { type: 'add' };
   if (/remove (a )?qubit/.test(s)) return { type: 'remove' };
   // before Show me and Continue: "next view", "show me the matrix"
+  if (/many worlds|every path|all the paths|feynman/.test(s)) return { type: 'view', worlds: true };
+  if (/\brush\b|arcade|time attack/.test(s)) return { type: 'rush' };
+  if (/(next|change|new|switch) (skin|look|finish)|skins?$/.test(s)) return { type: 'skin' };
   if (/(change|switch|next) view|state city|q sphere|cue sphere|heat ?map|unitary|the matrix/.test(s)) return { type: 'view' };
   if (/show me/.test(s)) return { type: 'showme' };
   if (/^(next|continue|go on|okay next)/.test(s)) return { type: 'next' };
@@ -220,6 +225,12 @@ export function describe(c: VoiceCommand): string {
       return c.id === 'ions' ? 'the trapped-ion computer' : c.id === 'atoms' ? 'the neutral-atom computer' : 'the superconducting chip';
     case 'compare':
       return 'run on all three machines';
+    case 'rush':
+      return 'Quantum Rush';
+    case 'skin':
+      return 'the next orb finish';
+    case 'view':
+      return c.worlds ? 'the many-worlds view' : 'the next view';
     case 'fullsize':
       return c.on ? 'the machine at full size' : 'the machine back on the desk';
     default:

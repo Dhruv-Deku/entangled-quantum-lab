@@ -46,6 +46,11 @@ export default defineAssets({
     type: AssetType.UIKitML,
     name: 'Library',
   },
+  'looks-panel': {
+    url: publicAssetUrl('ui/looks.uikitml'),
+    type: AssetType.UIKitML,
+    name: 'Looks',
+  },
   'noise-panel': {
     url: publicAssetUrl('ui/noise.uikitml'),
     type: AssetType.UIKitML,
