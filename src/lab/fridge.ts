@@ -10,6 +10,7 @@ import {
   Mesh,
   MeshBasicMaterial,
   MeshStandardMaterial,
+  PlaneGeometry,
   SphereGeometry,
   Vector3,
 } from '@iwsdk/core';
@@ -65,7 +66,8 @@ export class FridgeVisual {
   readonly root = new Group();
   /** Built at real size: a fifth of it on the desk, 1:1 at full size, standing on its own frame. */
   readonly size = { deskScale: 0.2, fullScale: 1, lift: 0 };
-  readonly stand: Group | null = null;
+  /** At full size it stands in a glass display case, like IBM's Quantum System One. */
+  readonly stand = new Group();
   private drive: CatmullRomCurve3[] = [];
   private readIn!: CatmullRomCurve3;
   private readOut!: CatmullRomCurve3;
@@ -240,6 +242,26 @@ export class FridgeVisual {
     this.cans.add(STAGES[2].r - 0.004, STAGES[2].y - 0.007, 0.47, can50, cans, false, 0.75);
     cans.build(this.root);
     this.root.add(this.cans.root);
+
+    // ---- the display case (full size only): a black plinth and cap, glass walls in a slim frame ----
+    const C = 0.66, TOP = 2.5;
+    const caseKit = new Kit();
+    const black = new MeshStandardMaterial({ color: '#111214', roughness: 0.35, metalness: 0.7 });
+    caseKit.box(2 * C + 0.06, 0.08, 2 * C + 0.06, black, P(0, 0.04, 0));
+    caseKit.box(2 * C + 0.06, 0.05, 2 * C + 0.06, black, P(0, TOP + 0.025, 0));
+    for (const [x, z] of [[-C, -C], [C, -C], [C, C], [-C, C]]) caseKit.box(0.028, TOP - 0.08, 0.028, black, P(x, (TOP + 0.08) / 2, z));
+    caseKit.box(0.008, TOP - 0.1, 0.012, black, P(0, (TOP + 0.08) / 2, C + 0.002)); // the door seam
+    caseKit.build(this.stand);
+    const glassMat = new MeshStandardMaterial({ color: '#dfe8f2', roughness: 0.04, metalness: 0, transparent: true, opacity: 0.1, side: DoubleSide, depthWrite: false });
+    for (let k = 0; k < 4; k++) {
+      const pane = new Mesh(new PlaneGeometry(2 * C, TOP - 0.08), glassMat);
+      const a = (k * Math.PI) / 2;
+      pane.position.set(Math.sin(a) * C, (TOP + 0.08) / 2, Math.cos(a) * C);
+      pane.rotation.y = a;
+      this.stand.add(pane);
+    }
+    this.stand.visible = false;
+    this.root.add(this.stand);
 
     // ---- status light, thermometers and names ----
     this.led = new MeshBasicMaterial({ color: '#2d7ff9' });

@@ -23,6 +23,8 @@ export interface Stats {
   /** Quantum Rush: best score and best combo. */
   rushBest: number;
   rushCombo: number;
+  /** The five best rounds. */
+  rushTop: { score: number; day: string }[];
 }
 
 export interface ProfileData {
@@ -97,7 +99,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'skin', title: 'New look', text: 'Wear a new orb finish.', done: (s) => used(s, 'skin') },
 ];
 
-export const emptyProfile = (): ProfileData => ({ stats: { gates: 0, measures: 0, shots: 0, rewinds: 0, bellPairs: 0, ghz: 0, used: [], rushBest: 0, rushCombo: 0 }, unlocked: {} });
+export const emptyProfile = (): ProfileData => ({ stats: { gates: 0, measures: 0, shots: 0, rewinds: 0, bellPairs: 0, ghz: 0, used: [], rushBest: 0, rushCombo: 0, rushTop: [] }, unlocked: {} });
 
 /** A GHZ state on all n >= 3 qubits: half |0...0>, half |1...1>. */
 function ghzSize(s: QState): number {
@@ -111,7 +113,7 @@ export class Profile {
 
   constructor(data?: ProfileData | null) {
     const e = emptyProfile();
-    this.data = { stats: { ...e.stats, ...(data?.stats ?? {}), used: [...(data?.stats?.used ?? [])] }, unlocked: { ...(data?.unlocked ?? {}) }, skin: data?.skin };
+    this.data = { stats: { ...e.stats, ...(data?.stats ?? {}), used: [...(data?.stats?.used ?? [])], rushTop: [...(data?.stats?.rushTop ?? [])] }, unlocked: { ...(data?.unlocked ?? {}) }, skin: data?.skin };
   }
 
   /** A feature was tried. */
@@ -143,9 +145,10 @@ export class Profile {
   }
 
   /** A Quantum Rush round ended; true when it set a new best score. */
-  onRush(score: number, combo: number): boolean {
+  onRush(score: number, combo: number, day = new Date().toISOString().slice(0, 10)): boolean {
     const s = this.data.stats;
     const best = score > s.rushBest;
+    s.rushTop = [...(s.rushTop ?? []), { score, day }].sort((a, b) => b.score - a.score).slice(0, 5);
     s.rushBest = Math.max(s.rushBest, score);
     s.rushCombo = Math.max(s.rushCombo, combo);
     return best;

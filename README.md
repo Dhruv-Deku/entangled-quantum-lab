@@ -60,13 +60,15 @@ the Meta Immersive Web SDK (IWSDK), three.js and TypeScript.
 | ![Superconducting 89.4%, trapped ions 97.3%, neutral atoms 93.8%, with shot times and wiring costs](docs/screenshots/machines-compare.png) | ![The Bell test: S = 2.93 +- 0.09 with entanglement, 1.45 without, against the classical limit 2](docs/screenshots/ch19-bell-test.png) |
 | **Life-size, beside your desk** | **On your real desk, in mixed reality** |
 | ![A 2.4 m dilution refrigerator standing at full size beside the desk, its copper chandelier inside a cut-away can, next to the orbs, the pulse schedule and the code window](docs/screenshots/machine-fridge-full.png) | ![Panels and orbs on a real desk with hand tracking](docs/screenshots/ar-passthrough-hands.png) |
+| **Every achievement is a 3D trophy** | **Life-size, in a glass case** |
+| ![The trophy shelf beside the progress board: silver cups, copper stars and mint glass gems for 15 of 28 achievements, dim silhouettes for the rest, and a burst of confetti in the qubit colours](docs/screenshots/trophies.png) | ![The full-size dilution refrigerator standing in a glass display case with a black plinth, slim corner posts and a door seam, beside the desk](docs/screenshots/machine-case.png) |
 | **Atoms carried into place to entangle** | **Orb finishes you unlock** |
 | ![A neutral atom is carried along the lane to its partner, the pair glow gold while the Rydberg interaction entangles them, and it is carried back](docs/screenshots/anim-atoms.gif) | ![The Looks panel beside the progress board: Glass, Frost, Smoke, Tinted (worn: the two orbs in coral and teal, tied by the gold thread) and Copper, locked until level 5](docs/screenshots/orb-looks.png) |
 
 **By the numbers:** 26 chapters, a 14-module course, 15 lessons, 12 puzzles, a
 daily challenge and Quantum Rush, 5 big-state views, 3 kinds of quantum computer
 in 3D at full size, a 49-qubit surface code, 28 achievements, 5 orb finishes,
-voice control, shared labs and classes, and 312 unit tests.
+voice control, shared labs and classes, and 313 unit tests.
 
 ## Contents
 
@@ -80,7 +82,7 @@ voice control, shared labs and classes, and 312 unit tests.
 - [Part 4: Tools for exploring](#part-4-tools-for-exploring)
   - [Build: circuit builder](#build-circuit-builder), [Code window: tabs, zoom, simplify](#code-window-tabs-zoom-simplify), [Step debugger](#step-debugger), [Big-state views](#big-state-views), [Many worlds](#many-worlds), [Library, import and custom gates](#library-import-and-custom-gates), [Voice commands](#voice-commands), [Listen to a state](#listen-to-a-state), [Snapshot](#snapshot)
 - [Part 5: Together, and every day](#part-5-together-and-every-day)
-  - [Quantum Rush](#quantum-rush), [Shared lab](#shared-lab), [Classroom and certificate](#classroom-and-certificate), [Daily challenge, achievements and levels](#daily-challenge-achievements-and-levels), [Orb finishes](#orb-finishes), [Puzzles](#puzzles)
+  - [Quantum Rush](#quantum-rush), [Shared lab](#shared-lab), [Classroom and certificate](#classroom-and-certificate), [Daily challenge, achievements and levels](#daily-challenge-achievements-and-levels), [Trophies and celebrations](#trophies-and-celebrations), [Orb finishes](#orb-finishes), [Puzzles](#puzzles)
 - [Under the hood](#under-the-hood)
 
 ## Try it
@@ -88,7 +90,7 @@ voice control, shared labs and classes, and 312 unit tests.
 ```sh
 npm install
 npm run dev        # managed browser with the Quest 3 emulator (IWER)
-npm test           # 312 unit tests: physics, three kinds of quantum computer, gestures, the course, 25 chapters, 15 lessons, puzzles, the daily challenge, achievements, builder, noise, chemistry, import, IBM compiling, Bell tests, error correction, benchmarking, voice, shared rooms and more
+npm test           # 313 unit tests: physics, three kinds of quantum computer, gestures, the course, 25 chapters, 15 lessons, puzzles, the daily challenge, achievements, builder, noise, chemistry, import, IBM compiling, Bell tests, error correction, benchmarking, voice, shared rooms and more
 npm run typecheck
 npm run build
 ```
@@ -556,7 +558,9 @@ the qubits from its desk model to its real size and stands it on the floor
 beside the desk, turned to face you: a 2.4 m dilution refrigerator in its
 frame, a vacuum chamber on an optical table, or a 1.2 m optics table on its
 legs. Walk around it, lean in to read the thermometers, and run your circuit to
-watch the pulses go down the lines at full scale. "Back on the desk" shrinks it
+watch the pulses go down the lines at full scale. The fridge stands in a glass
+display case with a black plinth and cap, the way IBM shows its Quantum System
+One. "Back on the desk" shrinks it
 again.
 
 | Opening and cooling down | Inside, 50 K to 15 mK |
@@ -817,8 +821,10 @@ moves deep, each with a true minimum par found by search.
   3 and breaks the combo.
 - **The board** shows the target's amplitudes beside the orbs' own, bar for
   bar, coloured by phase, so you can see what is still missing.
-- Your best score and best combo are kept, and two achievements wait at 5,000
-  points and a x5 combo.
+- Your best score and best combo are kept; the summary on the board shows your
+  five best rounds, with this one highlighted. A new best (and every x4 combo)
+  sets off a burst of confetti, and two achievements wait at 5,000 points and a
+  x5 combo.
 
 ### Shared lab
 
@@ -896,6 +902,18 @@ course) the board shows a **certificate**, and the 2D page can save it as a PNG.
   achievements") for the board above.
 
 ![An achievement banner above the gate dock: Look! Measure a qubit.](docs/screenshots/achievement-banner.png)
+
+### Trophies and celebrations
+
+![The trophy shelf: one 3D trophy per achievement, earned ones in silver, copper and mint glass turning slowly, and confetti bursting out of the orbs](docs/screenshots/trophies.png)
+
+Every achievement is a 3D trophy on a shelf that stands beside the progress
+board: cups, stars, gems, medals and obelisks in polished silver, copper or
+mint glass once earned, turning slowly; dim silhouettes until then. Trophies
+earned since you last looked pop up when the shelf opens. Finishing a chapter,
+lesson, puzzle, daily challenge or course module throws a burst of confetti in
+the qubit colours out of the orbs; the pieces tumble, land and bounce on the
+desk, then shrink away (a smaller burst for each achievement).
 
 ### Orb finishes
 

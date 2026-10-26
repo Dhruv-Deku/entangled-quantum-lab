@@ -59,3 +59,15 @@ describe('Quantum Rush', () => {
     expect(ket(new QState(2))).toBe('|00>');
   });
 });
+
+describe('Quantum Rush leaderboard', () => {
+  it('keeps the five best rounds, best first, and reports a new best', async () => {
+    const { Profile } = await import('./profile');
+    const p = new Profile();
+    const scores = [800, 2400, 300, 1500, 5100, 900, 1200];
+    const bests = scores.map((s, i) => p.onRush(s, 2, `2026-10-${10 + i}`));
+    expect(bests).toEqual([true, true, false, false, true, false, false]);
+    expect(p.data.stats.rushTop.map((t) => t.score)).toEqual([5100, 2400, 1500, 1200, 900]);
+    expect(p.data.stats.rushBest).toBe(5100);
+  });
+});

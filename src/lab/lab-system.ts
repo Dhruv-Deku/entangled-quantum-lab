@@ -38,6 +38,8 @@ import { circuitUnitary, describeUnitary } from '../quantum/advanced';
 import { QSphereVisual, StateCityVisual } from './state-views-3d';
 import { ManyWorldsVisual } from './worlds-3d';
 import { RushFx } from './rush-fx';
+import { Confetti } from './confetti';
+import { TrophyShelf, type TrophyItem } from './trophies';
 import { SurfaceCodeVisual } from './surface-3d';
 import type { SurfaceView } from './figures';
 import { manyWorlds } from '../quantum/paths';
@@ -107,6 +109,8 @@ export class LabSystem extends createSystem({
   private worlds!: ManyWorldsVisual;
   /** Quantum Rush on the desk: the sixty-tick clock and the score pop-ups. */
   rushFx!: RushFx;
+  private confetti!: Confetti;
+  private trophies!: TrophyShelf;
   /** The Surface Code chapter's lattice, floating between the orb and the board. */
   private surface!: SurfaceCodeVisual;
   private stateView: StateView | null = null;
@@ -221,6 +225,15 @@ export class LabSystem extends createSystem({
     this.surface.root.scale.setScalar(1.35);
     this.surface.root.visible = false;
     ws.add(this.surface.root);
+    this.confetti = new Confetti();
+    ws.add(this.confetti.root);
+    // the trophy shelf stands upper right, above the navigator, while the progress board is up
+    this.trophies = new TrophyShelf();
+    this.trophies.env = env;
+    this.trophies.root.position.set(0.5, 0.42, -0.2);
+    this.trophies.root.rotation.y = -0.55;
+    this.trophies.root.visible = false;
+    ws.add(this.trophies.root);
     this.rushFx = new RushFx();
     this.rushFx.root.position.set(0, 0.003, -0.03);
     ws.add(this.rushFx.root);
@@ -459,6 +472,17 @@ export class LabSystem extends createSystem({
     if (shown.stand) shown.stand.visible = g > 0.02;
   }
 
+  /** A celebration bursting out of the orbs (smaller for an achievement). */
+  celebrate(big = true): void {
+    this.confetti.burst(new Vector3(0, ORB_HEIGHT, -0.03), big);
+  }
+
+  /** The trophy shelf (null hides it). */
+  showTrophies(items: readonly TrophyItem[] | null): void {
+    this.trophies.root.visible = !!items;
+    if (items) this.trophies.set(items);
+  }
+
   /** The Surface Code chapter's lattice (null hides it). */
   showSurface(v: SurfaceView | null): void {
     this.surface.root.visible = !!v;
@@ -504,6 +528,8 @@ export class LabSystem extends createSystem({
     if (this.city.root.visible) this.city.update(dt);
     if (this.worlds.root.visible) this.worlds.update(dt);
     if (this.rushFx.root.visible) this.rushFx.update(dt);
+    if (this.confetti.root.visible) this.confetti.update(dt);
+    if (this.trophies.root.visible) this.trophies.update(dt);
     if (this.surface.root.visible) this.surface.update(dt);
     // on the chip tab the board rises above the code window so the pulse schedule shows
     const boardY = this.boardRaised || (this.stateView && this.stateView !== 'heatmap' && this.stateView !== 'unitary') || this.pulseView || this.mathsOn || this.landscapeView || this.densityOn || this.wheelsOn || this.vqeView !== undefined || this.overlayKey ? 0.5 : 0.27;

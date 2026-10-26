@@ -710,7 +710,7 @@ export interface RushView {
   /** The last solve, for a moment after it happens. */
   last: { points: number; combo: number } | null;
   /** The round is over: the summary. */
-  over: { best: number; newBest: boolean; bestCombo: number } | null;
+  over: { best: number; newBest: boolean; bestCombo: number; top: { score: number; day: string; current: boolean }[] } | null;
 }
 
 const phaseOf = (re: number, im: number) => `hsl(${Math.round((((Math.atan2(im, re) * 180) / Math.PI) + 360) % 360)}, 58%, 64%)`;
@@ -723,15 +723,27 @@ export function rushFigure(v: RushView): Figure {
     draw: (g, w, h) => {
       panel(g, w, h, v.over ? 'Quantum Rush  /  round over' : `Quantum Rush  /  target ${v.solved + 1}  /  par ${v.target.par}`, `Score ${v.score.toLocaleString('en-US')}`);
       if (v.over) {
-        text(g, `${v.score.toLocaleString('en-US')}`, w / 2, 250, INK, '700 120px', 'center');
-        text(g, 'points', w / 2, 300, DIM, '600 30px', 'center');
-        text(g, `${v.solved} target${v.solved === 1 ? '' : 's'} made   /   best combo x${v.over.bestCombo}   /   best ever ${v.over.best.toLocaleString('en-US')}`, w / 2, 390, INK, '600 30px', 'center');
+        const cx = 520;
+        text(g, `${v.score.toLocaleString('en-US')}`, cx, 250, INK, '700 120px', 'center');
+        text(g, 'points', cx, 300, DIM, '600 30px', 'center');
+        text(g, `${v.solved} target${v.solved === 1 ? '' : 's'} made   /   best combo x${v.over.bestCombo}`, cx, 390, INK, '600 30px', 'center');
         if (v.over.newBest) {
-          roundRect(g, w / 2 - 150, 430, 300, 60, 30);
+          roundRect(g, cx - 150, 430, 300, 60, 30);
           g.fillStyle = 'rgba(61,220,151,0.18)';
           g.fill();
-          text(g, 'New best!', w / 2, 470, MINT, '700 32px', 'center');
+          text(g, 'New best!', cx, 470, MINT, '700 32px', 'center');
         }
+        // the leaderboard: your five best rounds
+        text(g, 'Your best rounds', 1040, 140, DIM, '600 26px');
+        v.over.top.forEach((t, i) => {
+          const y = 200 + i * 62;
+          roundRect(g, 1030, y - 40, 480, 52, 16);
+          g.fillStyle = t.current ? 'rgba(61,220,151,0.16)' : '#232428';
+          g.fill();
+          text(g, `${i + 1}`, 1060, y - 4, t.current ? MINT : DIM, '700 28px', 'center');
+          text(g, t.score.toLocaleString('en-US'), 1100, y - 4, t.current ? MINT : INK, '700 28px');
+          text(g, t.day, 1490, y - 4, DIM, '500 22px', 'right');
+        });
         text(g, 'Again plays another round. Faster solves score more; solving in a row multiplies.', w / 2, h - 50, DIM, '500 24px', 'center');
         return;
       }

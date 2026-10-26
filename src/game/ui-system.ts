@@ -847,6 +847,7 @@ export class UISystem extends createSystem({
     const fresh = this.profile.check(this.progressContext());
     if (!fresh.length) return;
     for (const a of fresh) this.banner.show('Achievement unlocked', a.title, a.text);
+    this.world.getSystem(LabSystem)?.celebrate(false);
     feedback('success');
     this.renderNav(campaign.view);
     if (this.profileOpen) this.updateBoardMode();
@@ -947,7 +948,7 @@ export class UISystem extends createSystem({
 
   private rush: RushSession | null = null;
   /** The last round's summary, shown until Again or Done. */
-  private rushOver: { score: number; solved: number; bestCombo: number; best: number; newBest: boolean } | null = null;
+  private rushOver: { score: number; solved: number; bestCombo: number; best: number; newBest: boolean; top: { score: number; day: string; current: boolean }[] } | null = null;
   private rushLast: { points: number; combo: number; until: number } | null = null;
   /** After a solve the orbs show the match for a moment, then reset for the next target. */
   private rushResetAt = 0;
@@ -980,6 +981,7 @@ export class UISystem extends createSystem({
     if (r.over(now) || !r.matches(lab.history.state)) return;
     const res = r.solve(now);
     this.rushLast = { points: res.points, combo: res.combo, until: now + 1.6 };
+    if (res.combo >= 4) this.world.getSystem(LabSystem)?.celebrate(false);
     this.rushResetAt = now + 0.7;
     feedback('success');
     this.world.getSystem(LabSystem)?.rushFx.pop(`+${res.points}`, res.combo > 1 ? `combo x${res.combo}` : `${res.seconds.toFixed(1)} s`);
@@ -1002,7 +1004,10 @@ export class UISystem extends createSystem({
     this.world.getSystem(LabSystem)?.rushFx.clock(null);
     if (timeUp && r) {
       const newBest = this.profile.onRush(r.score, r.bestCombo);
-      this.rushOver = { score: r.score, solved: r.solved, bestCombo: r.bestCombo, best: this.profile.data.stats.rushBest, newBest };
+      const top = this.profile.data.stats.rushTop;
+      const mine = top.findIndex((t) => t.score === r.score);
+      this.rushOver = { score: r.score, solved: r.solved, bestCombo: r.bestCombo, best: this.profile.data.stats.rushBest, newBest, top: top.map((t, i) => ({ ...t, current: i === mine })) };
+      if (newBest) this.world.getSystem(LabSystem)?.celebrate(true);
       this.profileDirty = true;
       this.checkAchievements();
       feedback(newBest ? 'success' : 'select');
@@ -1027,7 +1032,7 @@ export class UISystem extends createSystem({
       solved: r?.solved ?? this.rushOver?.solved ?? 0,
       combo: r?.combo ?? 1,
       last: this.rushLast && now < this.rushLast.until ? { points: this.rushLast.points, combo: this.rushLast.combo } : null,
-      over: this.rushOver ? { best: this.rushOver.best, newBest: this.rushOver.newBest, bestCombo: this.rushOver.bestCombo } : null,
+      over: this.rushOver ? { best: this.rushOver.best, newBest: this.rushOver.newBest, bestCombo: this.rushOver.bestCombo, top: this.rushOver.top } : null,
     };
   }
 
@@ -1469,7 +1474,13 @@ export class UISystem extends createSystem({
       feedback('success');
     }
     this.renderClass();
+    // a celebration whenever a chapter, lesson, puzzle, daily or course module is finished
+    const doneKey = v.chapterDone ? `${v.mode}:${v.chapterIndex}:${v.lessonIndex}:${v.puzzleIndex}:${v.courseIndex}` : '';
+    if (doneKey && doneKey !== this.lastDoneKey) this.world.getSystem(LabSystem)?.celebrate(true);
+    this.lastDoneKey = doneKey;
   }
+
+  private lastDoneKey = '';
 
   private certificateInfo(): CertificateInfo | null {
     const r = this.room;
@@ -2685,6 +2696,7 @@ export class UISystem extends createSystem({
       const lattice = cv.mode === 'campaign' && !cv.intro && !this.profileOpen && !this.libOpen && cv.chapter?.title === 'Surface Code' ? ((campaign.memoryValue('surface') as SurfaceView | undefined) ?? null) : null;
       lsys.showSurface(lattice);
       lsys.showStateView(this.libOpen || lattice ? null : this.stateView);
+      lsys.showTrophies(this.profileOpen ? ACHIEVEMENTS.map((a) => ({ id: a.id, title: a.title, unlocked: !!this.profile.data.unlocked[a.id] })) : null);
     }
     // notes sit where the code panel does; only one of the two is open at a time
     if (this.notes!.open) {
