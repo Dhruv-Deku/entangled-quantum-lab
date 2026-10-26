@@ -117,7 +117,9 @@ describe('learn: every lesson', () => {
       const lab = new Lab(1, mulberry32(5));
       const c = new Campaign(lab);
       c.startLesson(i);
-      SOLUTIONS[lesson.chip!](lab);
+      const sol = SOLUTIONS[lesson.chip!];
+      // a one-step lesson's moves (multi-step lessons have no fixed first target)
+      (Array.isArray(sol) ? sol[0] : sol)(lab);
       target.forEach((t, q) => {
         if (!t) return;
         const r = blochVector(lab.state, q);
