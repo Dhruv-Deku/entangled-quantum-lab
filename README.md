@@ -88,7 +88,7 @@ voice control, shared labs and classes, and 322 unit tests.
 - [Part 4: Tools for exploring](#part-4-tools-for-exploring)
   - [Build: circuit builder](#build-circuit-builder), [Code window: tabs, zoom, simplify](#code-window-tabs-zoom-simplify), [Step debugger](#step-debugger), [Big-state views](#big-state-views), [Many worlds](#many-worlds), [Library, import and custom gates](#library-import-and-custom-gates), [Voice commands](#voice-commands), [Listen to a state](#listen-to-a-state), [Snapshot](#snapshot)
 - [Part 5: Together, and every day](#part-5-together-and-every-day)
-  - [The Play tab: ten wonders](#the-play-tab-ten-wonders), [Quantum Rush](#quantum-rush), [Shared lab](#shared-lab), [Classroom and certificate](#classroom-and-certificate), [Daily challenge, achievements and levels](#daily-challenge-achievements-and-levels), [Trophies and celebrations](#trophies-and-celebrations), [Orb finishes](#orb-finishes), [Puzzles](#puzzles)
+  - [Code Lab: write your own programs](#code-lab-write-your-own-programs), [The Play tab: ten wonders](#the-play-tab-ten-wonders), [Quantum Rush](#quantum-rush), [Shared lab](#shared-lab), [Classroom and certificate](#classroom-and-certificate), [Daily challenge, achievements and levels](#daily-challenge-achievements-and-levels), [Trophies and celebrations](#trophies-and-celebrations), [Orb finishes](#orb-finishes), [Puzzles](#puzzles)
 - [Under the hood](#under-the-hood)
 
 ## Try it
@@ -817,6 +817,22 @@ the same circuit, ready to post.
 ![A snapshot: My quantum circuit, 3 qubits, 3 gates, the GHZ circuit and its state on the board, and a QR code to open it](docs/screenshots/snapshot-card.png)
 
 ## Part 5: Together, and every day
+
+### Code Lab: write your own programs
+
+![The Code Lab panel: a program in OpenQASM 3 (H, two CNOTs, ry(pi/4), a measurement) above a token keyboard of gates, qubits, angles and editing keys, with the hint rx: now tap an angle, then its qubit](docs/screenshots/code-lab.png)
+
+The **Code Lab** (first on the Play tab, the **Edit** button on the code window,
+or say "code lab") is where you write your own programs. There is no keyboard
+in a headset, so code is built from tokens: tap a gate (h, cx, rx, ccx,
+measure ...), then its qubits, and an angle for rotations. Every statement
+finishes itself, so what is on the panel is always real OpenQASM 3 you could
+paste into Qiskit. **Run** plays the program on the orbs a gate at a time,
+**Step** goes line by line, **From orbs** turns the circuit you made with your
+hands into code, **Example** loads a Bell pair, GHZ, two-qubit Grover or a
+tilt-and-twist, and **Link** copies a replay link: whoever opens it watches your
+circuit play back, gate by gate. Unfinished lines show a _ where something is
+missing, and Run points at the first one.
 
 ### The Play tab: ten wonders
 

@@ -17,6 +17,9 @@ import { loadSave, writeSave } from '../lab/save';
 import type { Op } from '../quantum/circuit';
 import { simplify } from '../quantum/optimize';
 import { decodeCircuit, encodeCircuit, SHARE_PREFIX } from '../quantum/share';
+
+/** Replay links play a circuit back gate by gate. */
+const REPLAY_PREFIX = '#r=';
 import { ORB_SKINS, qubitColor, type OrbSkinId } from '../lab/visuals';
 import type { GateName } from '../quantum/gates';
 import type { CampaignView } from './campaign';
@@ -42,6 +45,7 @@ import { ACHIEVEMENTS, levelFor, Profile, xpFor, type ProgressContext } from './
 import { ket, RUSH_QUBITS, RushSession } from './rush';
 import { manyWorlds } from '../quantum/paths';
 import { ALBUM, albumMatches } from './album';
+import { CodeProgram, EXAMPLES, fromOps, type CodeGate } from './code-lab';
 import { computerFlips, score as pennyScore, type PennyPhase, type PennyRecord } from './penny';
 import { Ambient } from '../lab/ambient';
 import { bestStreak, dayKey, dailyNumber, emptyDaily, recordDaily, shareText, streak, type DailyRecord } from './daily';
@@ -97,10 +101,12 @@ const IBM_SHOTS = 1000;
 /** How much bigger a zoomed window is. */
 const ZOOM = 1.3;
 const NAV_SLOTS = 18;
+const LAB_LINES = 10;
+const LAB_KEYS = ['h', 'x', 'y', 'z', 's', 'sdg', 't', 'tdg', 'rx', 'ry', 'rz', 'cx', 'cz', 'swap', 'ccx', 'measure', 'q0', 'q1', 'q2', 'q3', 'q4', 'pi', 'pi2', 'pi4', 'mpi2', 'up', 'down', 'delete', 'clear', 'link', 'subqubit', 'addqubit', 'example', 'fromorbs'];
 const TABS = ['course', 'campaign', 'learn', 'puzzle', 'build', 'sandbox', 'play'] as const;
 /** The Play tab: arcade and showcase picks. */
-const PLAY = ['Quantum Rush', 'Zen Rush', 'Daily', 'Surface Code', 'Many worlds', 'Quantum dice', 'Penny flip', 'Schrodinger cat', 'State album', 'Giant sphere', 'Inside a qubit', 'Night sky', 'History', 'Ambient music'] as const;
-const PLAY_TAGS = ['60s', 'zen', 'day', '49q', 'H H', 'd8', 'coin', 'box', '15', '1 m', 'JJ', 'sky', '1981', 'hum'];
+const PLAY = ['Code lab', 'Quantum Rush', 'Zen Rush', 'Daily', 'Surface Code', 'Many worlds', 'Quantum dice', 'Penny flip', 'Schrodinger cat', 'State album', 'Giant sphere', 'Inside a qubit', 'Night sky', 'History', 'Ambient music'] as const;
+const PLAY_TAGS = ['qasm', '60s', 'zen', 'day', '49q', 'H H', 'd8', 'coin', 'box', '15', '1 m', 'JJ', 'sky', '1981', 'hum'];
 /** Where hidden panels park, out of reach of every pointer. */
 const PARKED = new Vector3(0, -50, 0);
 
@@ -198,6 +204,7 @@ export class UISystem extends createSystem({
   private noiseAsset: UIKitMLAsset | null = null;
   private libAsset: UIKitMLAsset | null = null;
   private looksAsset: UIKitMLAsset | null = null;
+  private codelabAsset: UIKitMLAsset | null = null;
   private dbgAsset: UIKitMLAsset | null = null;
   private classAsset: UIKitMLAsset | null = null;
   /** why the shared lab last refused an op (for the voice reply) */
@@ -266,13 +273,13 @@ export class UISystem extends createSystem({
       }
     }
     // a share link opens its circuit in the sandbox (progress stays in the save)
-    if (!this.openShared() && !resumed) {
+    if (!this.openReplay() && !this.openShared() && !resumed) {
       campaign.startChapter(0);
       campaign.intro = true;
     }
     this.openRoomLink();
     this.openDailyLink();
-    const onHash = () => this.openShared() || this.openRoomLink() || this.openDailyLink();
+    const onHash = () => this.openReplay() || this.openShared() || this.openRoomLink() || this.openDailyLink();
     window.addEventListener('hashchange', onHash);
     this.cleanupFuncs.push(() => window.removeEventListener('hashchange', onHash));
 
@@ -281,6 +288,8 @@ export class UISystem extends createSystem({
         // Quantum Rush lives in the sandbox: going anywhere else ends the round
         if ((this.rush || this.rushOver) && v.mode !== 'sandbox') this.endRush(false);
         if (this.game && v.mode !== 'sandbox') this.endGame(false);
+        // a program playing on the orbs stops when the orbs are taken over
+        if (this.runner && v.mode !== 'sandbox') this.runner = null;
         this.render(v);
         this.afterCampaign(v);
         this.afterDaily();
@@ -332,12 +341,13 @@ export class UISystem extends createSystem({
     this.dbgAsset = this.world.getSceneObject<UIKitMLAsset>('debug-panel') ?? null;
     this.classAsset = this.world.getSceneObject<UIKitMLAsset>('class-panel') ?? null;
     this.looksAsset = this.world.getSceneObject<UIKitMLAsset>('looks-panel') ?? null;
-    if (!this.looksAsset || !this.classAsset || !this.chapter || !this.dock || !this.code || !this.nav || !this.builderAsset || !this.notesAsset || !this.noiseAsset || !this.libAsset || !this.dbgAsset) return false;
+    this.codelabAsset = this.world.getSceneObject<UIKitMLAsset>('codelab-panel') ?? null;
+    if (!this.codelabAsset || !this.looksAsset || !this.classAsset || !this.chapter || !this.dock || !this.code || !this.nav || !this.builderAsset || !this.notesAsset || !this.noiseAsset || !this.libAsset || !this.dbgAsset) return false;
     this.code.visible = false;
 
     // panels take poke and ray input but must never capture the grab pointer,
     // or a hand reaching for an orb just above the dock grabs the dock instead
-    for (const panel of [this.chapter, this.dock, this.code, this.nav, this.builderAsset, this.notesAsset, this.noiseAsset, this.libAsset, this.dbgAsset, this.classAsset, this.looksAsset]) {
+    for (const panel of [this.chapter, this.dock, this.code, this.nav, this.builderAsset, this.notesAsset, this.noiseAsset, this.libAsset, this.dbgAsset, this.classAsset, this.looksAsset, this.codelabAsset]) {
       panel.traverse((o) => {
         (o as unknown as { pointerEventsType: unknown }).pointerEventsType = { deny: 'grab' };
       });
@@ -352,7 +362,7 @@ export class UISystem extends createSystem({
     const dockIds = ['g-h', 'g-x', 'g-y', 'g-z', 'g-s', 'g-t', 'g-rl', 'g-rr', 'a-cnot', 'a-swap', 'a-measure', 'a-shots', 'a-export', 't-prev', 't-next', 'dock-status', 'a-voice', 'a-voice-l', 'a-debug', 'a-debug-l', 'a-view', 'a-view-l', 'a-share', 'a-share-l', 'a-listen', 'a-listen-l'];
     for (let i = 0; i < SLOTS; i++) dockIds.push(`t-${i}`, `t-${i}-l`);
     for (const id of dockIds) this.els.set(id, this.dock.requireElementById(id));
-    const codeIds = ['code-close', 'code-note', 'code-link', 'code-eyebrow', 'code-title', 'code-zoom', 'code-zoom-label', 'code-simplify', 'code-simplify-label', 'code-run', 'code-ibm', 'code-ibm-l', 'code-up', 'code-down', 'code-mach', 'code-m-superconducting', 'code-m-ions', 'code-m-atoms', 'code-compare', 'code-full'];
+    const codeIds = ['code-close', 'code-note', 'code-link', 'code-eyebrow', 'code-title', 'code-zoom', 'code-zoom-label', 'code-simplify', 'code-simplify-label', 'code-run', 'code-ibm', 'code-ibm-l', 'code-up', 'code-down', 'code-mach', 'code-m-superconducting', 'code-m-ions', 'code-m-atoms', 'code-compare', 'code-full', 'code-edit'];
     for (const f of FORMATS) codeIds.push(`code-tab-${f}`, `code-tab-${f}-l`);
     for (let i = 0; i < CODE_LINES; i++) codeIds.push(`code-r-${i}`, `code-n-${i}`, `code-h-${i}`, `code-t-${i}`);
     for (const id of codeIds) this.els.set(id, this.code.requireElementById(id));
@@ -372,6 +382,10 @@ export class UISystem extends createSystem({
     for (const id of classIds) this.els.set(id, this.classAsset.requireElementById(id));
     // development: the UI and the lab model, for driving scenes from the managed browser
     if (import.meta.env.DEV) Object.assign(globalThis as object, { __entangledUI: this, __entangledQ: { lab, campaign } });
+    const labIds = ['lab-eyebrow', 'lab-step', 'lab-run', 'lab-close', 'lab-status'];
+    for (let i = 0; i < LAB_LINES; i++) labIds.push(`lab-r-${i}`, `lab-n-${i}`, `lab-t-${i}`);
+    for (const k of LAB_KEYS) labIds.push(`lab-k-${k}`);
+    for (const id of labIds) this.els.set(id, this.codelabAsset.requireElementById(id));
     const looksIds = ['looks-eyebrow', 'looks-close', 'looks-note'];
     for (let i = 0; i < ORB_SKINS.length; i++) looksIds.push(`looks-r-${i}`, `looks-sw-${i}`, `looks-n-${i}`, `looks-m-${i}`, `looks-b-${i}`, `looks-bl-${i}`);
     for (const id of looksIds) this.els.set(id, this.looksAsset.requireElementById(id));
@@ -575,6 +589,11 @@ export class UISystem extends createSystem({
     on('btn-lib', () => this.toggleLibrary());
     on('lib-close', () => this.toggleLibrary());
     on('looks-close', () => this.toggleProfile(false));
+    on('code-edit', () => this.openCodeLab(true));
+    on('lab-close', () => this.closeCodeLab());
+    on('lab-run', () => this.runProgram(false));
+    on('lab-step', () => this.runProgram(true));
+    for (const k of LAB_KEYS) on(`lab-k-${k}`, () => this.labKey(k));
     ORB_SKINS.forEach((skin, i) => on(`looks-b-${i}`, () => this.wearSkin(skin.id)));
     // the finish saved with the profile
     this.world.getSystem(LabSystem)?.setSkin(this.currentSkin());
@@ -1106,6 +1125,7 @@ export class UISystem extends createSystem({
   private startPlay(k: number): void {
     const item = PLAY[k];
     const lsys = this.world.getSystem(LabSystem);
+    if (item === 'Code lab') return this.labOpen ? this.closeCodeLab() : this.openCodeLab(false);
     if (item === 'Quantum Rush') return this.startRush();
     if (item === 'Zen Rush') return this.startRush(true);
     // the switches: they stay on while you do anything else
@@ -1169,6 +1189,8 @@ export class UISystem extends createSystem({
   /** Is this Play item running (for the navigator's highlight)? */
   private playOn(item: (typeof PLAY)[number]): boolean {
     switch (item) {
+      case 'Code lab':
+        return this.labOpen;
       case 'Quantum Rush':
         return !!(this.rush || this.rushOver) && !this.rushZen;
       case 'Zen Rush':
@@ -2321,6 +2343,169 @@ export class UISystem extends createSystem({
     this.renderDebugger();
   }
 
+  // ---- the Code Lab: write your own program
+
+  private labOpen = false;
+  private readonly program = new CodeProgram();
+  private labMsg: { text: string; bad: boolean } | null = null;
+  private labExample = 0;
+  /** A program playing on the orbs: its ops, how many have run, and the clock to the next (step mode waits for Step). */
+  private runner: { ops: Op[]; done: number; timer: number; stepping: boolean; replay: boolean } | null = null;
+
+  /** Open the Code Lab; `fromOrbs` starts it from the circuit on the orbs. */
+  private openCodeLab(fromOrbs: boolean): void {
+    this.labOpen = true;
+    if (this.code) this.code.visible = false;
+    if (this.notes?.open) this.notes.close();
+    this.libOpen = this.noiseOpen = this.profileOpen = this.albumOpen = false;
+    if (fromOrbs || !this.program.stmts.length) this.loadFromOrbs();
+    this.use('codelab');
+    this.flash('Code Lab: tap a gate, then its qubits. Run plays your program on the orbs.');
+    feedback('select');
+    this.renderCodeLab();
+    this.renderNav(campaign.view);
+  }
+
+  private closeCodeLab(): void {
+    this.labOpen = false;
+    feedback('select');
+    this.renderNav(campaign.view);
+  }
+
+  private loadFromOrbs(): void {
+    const { stmts, skipped } = fromOps(lab.history.ops.slice(0, lab.history.cursor));
+    this.program.load(lab.n, stmts);
+    this.labMsg = stmts.length ? { text: `Loaded ${stmts.length} line${stmts.length === 1 ? '' : 's'} from the orbs${skipped ? ` (${skipped} step${skipped === 1 ? '' : 's'} the Code Lab has no key for left out)` : ''}.`, bad: false } : null;
+  }
+
+  private labKey(k: string): void {
+    const p = this.program;
+    let err: string | null = null;
+    const gates: CodeGate[] = ['h', 'x', 'y', 'z', 's', 'sdg', 't', 'tdg', 'rx', 'ry', 'rz', 'cx', 'cz', 'swap', 'ccx', 'measure'];
+    if ((gates as string[]).includes(k)) p.gate(k as CodeGate);
+    else if (/^q[0-4]$/.test(k)) err = p.qubit(Number(k[1]));
+    else if (k === 'pi' || k === 'pi2' || k === 'pi4' || k === 'mpi2') err = p.angle({ pi: 'pi', pi2: 'pi/2', pi4: 'pi/4', mpi2: '-pi/2' }[k]!);
+    else if (k === 'up') p.move(-1);
+    else if (k === 'down') p.move(1);
+    else if (k === 'delete') p.backspace();
+    else if (k === 'clear') p.clear();
+    else if (k === 'addqubit') p.setQubits(p.n + 1);
+    else if (k === 'subqubit') p.setQubits(p.n - 1);
+    else if (k === 'fromorbs') this.loadFromOrbs();
+    else if (k === 'example') {
+      const ex = EXAMPLES[this.labExample++ % EXAMPLES.length];
+      p.load(ex.n, ex.stmts);
+      this.labMsg = { text: `Example: ${ex.name}. Tap Run to play it on the orbs.`, bad: false };
+    } else if (k === 'link') {
+      const r = p.ops();
+      if ('error' in r) err = r.error;
+      else {
+        const url = `${location.origin}${location.pathname}${REPLAY_PREFIX}${encodeURIComponent(encodeCircuit(p.n, r.ops))}`;
+        try {
+          void navigator.clipboard?.writeText(url);
+        } catch {
+          // no clipboard in this browser: the link is still shown below
+        }
+        this.labMsg = { text: `Replay link copied: it plays your program back, gate by gate. ${url.length > 70 ? url.slice(0, 67) + '...' : url}`, bad: false };
+      }
+    }
+    if (err) this.labMsg = { text: err, bad: true };
+    else if (!['example', 'link', 'fromorbs'].includes(k)) this.labMsg = null;
+    feedback(err ? 'reject' : 'select');
+    this.renderCodeLab();
+  }
+
+  /** Run (or Step) the program on the orbs: a fresh sandbox, then one gate at a time. */
+  private runProgram(step: boolean): void {
+    if (step && this.runner?.stepping && this.runner.done < this.runner.ops.length) {
+      this.runNext();
+      return this.renderCodeLab();
+    }
+    const r = this.program.ops();
+    if ('error' in r) {
+      this.labMsg = { text: r.error, bad: true };
+      this.program.cursor = r.line;
+      feedback('reject');
+      return this.renderCodeLab();
+    }
+    this.endRush(false);
+    this.endGame(false);
+    campaign.enterSandbox(this.program.n, []);
+    this.runner = { ops: r.ops, done: 0, timer: step ? 0 : 0.35, stepping: step, replay: false };
+    this.labMsg = { text: step ? 'Stepping: tap Step for each line.' : `Running ${r.ops.length} line${r.ops.length === 1 ? '' : 's'} on ${this.program.n} qubit${this.program.n === 1 ? '' : 's'}...`, bad: false };
+    if (step) this.runNext();
+    this.use('codelab:run');
+    this.renderCodeLab();
+  }
+
+  private runNext(): void {
+    const r = this.runner;
+    if (!r || r.done >= r.ops.length) return;
+    const op = r.ops[r.done++];
+    lab.apply(op);
+    feedback(op.kind === 'measure' ? 'measure' : op.kind === 'gate' && op.controls?.length ? 'entangle' : 'gate');
+    if (r.done >= r.ops.length) {
+      this.labMsg = { text: r.replay ? 'Replay finished: the circuit is yours to change.' : `Done: ${r.ops.length} line${r.ops.length === 1 ? '' : 's'} ran. Try 100 shots, or the Many worlds view.`, bad: false };
+      if (r.replay) this.flash('Replay finished: the circuit is yours to change.');
+    }
+  }
+
+  private updateRunner(dt: number): void {
+    const r = this.runner;
+    if (!r || r.stepping || r.done >= r.ops.length) return;
+    r.timer -= dt;
+    if (r.timer > 0) return;
+    r.timer = 0.75;
+    this.runNext();
+    if (this.labOpen) this.renderCodeLab();
+  }
+
+  private renderCodeLab(): void {
+    if (!this.codelabAsset) return;
+    const p = this.program;
+    const { text, first } = p.lines();
+    const running = this.runner && this.runner.done < this.runner.ops.length ? this.runner.done - 1 : -2;
+    // keep the cursor's line in view
+    const curLine = first + Math.max(0, p.cursor);
+    const start = Math.max(0, Math.min(text.length - LAB_LINES, curLine - LAB_LINES + 2));
+    for (let i = 0; i < LAB_LINES; i++) {
+      const at = start + i;
+      const line = text[at];
+      this.els.get(`lab-r-${i}`)?.setProperties({ display: line === undefined ? 'none' : 'flex', backgroundColor: at === first + p.cursor ? '#24324a' : running >= 0 && at === first + running ? '#1f3a30' : '#141517' });
+      if (line === undefined) continue;
+      this.text(`lab-n-${i}`, String(at + 1));
+      this.text(`lab-t-${i}`, line + (at === first + p.cursor ? '  <' : ''));
+      this.els.get(`lab-t-${i}`)?.setProperties({ color: at < first ? '#8fb7ff' : line.includes('_') ? '#ff8a7a' : '#c9ccd1' });
+    }
+    this.text('lab-eyebrow', `Code Lab  /  OpenQASM 3  /  ${p.n} qubit${p.n === 1 ? '' : 's'}, ${p.stmts.length} line${p.stmts.length === 1 ? '' : 's'}`);
+    const cur = p.current;
+    this.text('lab-status', this.labMsg?.text ?? (cur && cur.qubits.length < (cur.gate === 'ccx' ? 3 : ['cx', 'cz', 'swap'].includes(cur.gate) ? 2 : 1) ? `${cur.gate}: now tap ${['rx', 'ry', 'rz'].includes(cur.gate) && cur.angle === null ? 'an angle, then ' : ''}its qubit${cur.gate === 'ccx' || ['cx', 'cz', 'swap'].includes(cur.gate) ? 's (control first)' : ''}.` : 'Tap a gate, then its qubits. Run plays it on the orbs; Step goes line by line.'));
+    this.els.get('lab-status')?.setProperties({ color: this.labMsg?.bad ? '#ff8a7a' : C.textDim });
+    this.bg('lab-run', C.primary);
+    this.bg('lab-step', this.runner?.stepping && this.runner.done < this.runner.ops.length ? C.done : '#34363b');
+  }
+
+  /** A replay link (#r=): open the circuit and play it back, gate by gate. */
+  private openReplay(): boolean {
+    if (!location.hash.startsWith(REPLAY_PREFIX)) return false;
+    let shared: ReturnType<typeof decodeCircuit> = null;
+    try {
+      shared = decodeCircuit(decodeURIComponent(location.hash.slice(REPLAY_PREFIX.length)));
+    } catch {
+      shared = null;
+    }
+    try {
+      history.replaceState(null, '', location.pathname + location.search);
+    } catch {
+      // the address keeps the link; reloading replays it again
+    }
+    if (!shared) return false;
+    campaign.enterSandbox(shared.n, []);
+    this.runner = { ops: shared.ops, done: 0, timer: 1.2, stepping: false, replay: true };
+    this.flash(`Replaying a shared circuit: ${shared.ops.length} steps on ${shared.n} qubits.`);
+    return true;
+  }
+
   /** If the address has a share link, open that circuit in the sandbox. Returns true if it did. */
   private openShared(): boolean {
     if (!location.hash.startsWith(SHARE_PREFIX)) return false;
@@ -2888,7 +3073,7 @@ export class UISystem extends createSystem({
     const want = this.pokeOn ? near > 0.14 : near > 0.2;
     if (want === this.pokeOn) return;
     this.pokeOn = want;
-    for (const id of ['chapter-panel', 'gate-dock', 'code-panel', 'nav-panel', 'builder-panel', 'notes-panel', 'noise-panel', 'library-panel', 'debug-panel', 'class-panel', 'looks-panel']) {
+    for (const id of ['chapter-panel', 'gate-dock', 'code-panel', 'nav-panel', 'builder-panel', 'notes-panel', 'noise-panel', 'library-panel', 'debug-panel', 'class-panel', 'looks-panel', 'codelab-panel']) {
       const e = this.world.getSceneEntity(id);
       if (!e) continue;
       if (want && !e.hasComponent(PokeInteractable)) e.addComponent(PokeInteractable);
@@ -2965,6 +3150,13 @@ export class UISystem extends createSystem({
       this.builderAsset!.position.copy(PARKED);
     }
     this.placeBlend(this.code!, 'code-panel', 'code-zoom', this.zoomT, this.codeScale, this.codeOpenT);
+    if (this.labOpen) {
+      this.place(this.codelabAsset!, 'code-panel');
+      this.codelabAsset!.visible = true;
+    } else {
+      this.codelabAsset!.visible = false;
+      this.codelabAsset!.position.copy(PARKED);
+    }
     this.updateBoardMode();
     const lsys = this.world.getSystem(LabSystem);
     if (lsys) {
@@ -3032,6 +3224,7 @@ export class UISystem extends createSystem({
     campaign.update(Math.min(delta, 0.05) * slow);
     this.updateRush(Math.min(delta, 0.05));
     this.updateGame(Math.min(delta, 0.05));
+    this.updateRunner(Math.min(delta, 0.05));
     this.pollIbm(Math.min(delta, 0.05));
     this.updateDebugger(Math.min(delta, 0.05));
     if (this.dockFlash && performance.now() >= this.dockFlash.until) {

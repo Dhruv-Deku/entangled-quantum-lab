@@ -133,6 +133,7 @@ export function parseVoice(text: string): VoiceCommand | null {
   if (/(add|new) (a )?qubit/.test(s)) return { type: 'add' };
   if (/remove (a )?qubit/.test(s)) return { type: 'remove' };
   // before Show me and Continue: "next view", "show me the matrix"
+  if (/code lab|write (my )?(own )?code|my own code|program (it|my own)/.test(s)) return { type: 'play', item: 'Code lab' };
   if (/many worlds|every path|all the paths|feynman/.test(s)) return { type: 'view', worlds: true };
   const play: [RegExp, string][] = [
     [/\bzen\b/, 'Zen Rush'],

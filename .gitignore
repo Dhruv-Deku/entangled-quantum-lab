@@ -49,3 +49,4 @@ Screen Recording*.mp4
 
 .tmp-shots/
 .tmp-*.py
+.tmp-pose.sh

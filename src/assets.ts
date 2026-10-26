@@ -51,6 +51,11 @@ export default defineAssets({
     type: AssetType.UIKitML,
     name: 'Looks',
   },
+  'codelab-panel': {
+    url: publicAssetUrl('ui/codelab.uikitml'),
+    type: AssetType.UIKitML,
+    name: 'Code Lab',
+  },
   'noise-panel': {
     url: publicAssetUrl('ui/noise.uikitml'),
     type: AssetType.UIKitML,

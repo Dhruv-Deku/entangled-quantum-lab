@@ -78,6 +78,7 @@
       <div id="code-title" class="title">Your circuit</div>
     </div>
     <div class="btns">
+      <div id="code-edit" class="btn"><div class="bt">Edit</div></div>
       <div id="code-zoom" class="btn"><div id="code-zoom-label" class="bt">Zoom</div></div>
       <div id="code-close" class="btn"><div class="bt">Close</div></div>
     </div>

@@ -292,6 +292,26 @@
       }
     },
     {
+      "id": "codelab-panel",
+      "name": "Code Lab",
+      "content": {
+        "type": "asset",
+        "asset": "codelab-panel"
+      },
+      "transform": {
+        "position": [
+          0,
+          -50,
+          0
+        ],
+        "scale": 0.06
+      },
+      "components": {
+        "RayInteractable": {},
+        "PokeInteractable": {}
+      }
+    },
+    {
       "id": "looks-panel",
       "name": "Looks",
       "content": {
