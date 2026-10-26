@@ -106,7 +106,8 @@
     <div id="code-m-superconducting" class="btn"><div class="bt">Chip</div></div>
     <div id="code-m-ions" class="btn"><div class="bt">Ions</div></div>
     <div id="code-m-atoms" class="btn"><div class="bt">Atoms</div></div>
-    <div id="code-compare" class="btn"><div class="bt">Compare all three</div></div>
+    <div id="code-compare" class="btn"><div class="bt">Compare</div></div>
+    <div id="code-full" class="btn"><div class="bt">Full size</div></div>
   </div>
   <div class="foot">
     <div class="btns">

@@ -24,6 +24,7 @@ import { partialState, type LabEvent } from './lab';
 import { RainVisual } from './rain';
 import { CircuitBoard, type LandscapeView, type PulseView } from './circuit-board';
 import { FridgeVisual } from './fridge';
+import { studioEnvironment, useStudio } from './machine-kit';
 import { noiseLab } from './noise-lab';
 import { runNoisy } from '../quantum/density';
 import { ChipVisual } from './chip';
@@ -88,6 +89,11 @@ export class LabSystem extends createSystem({
   machine: PlatformId = 'superconducting';
   /** The UI wants the machine shown (the chip tab, or a course step about hardware). */
   hardwareWanted = false;
+  /** Full size: the machine around the qubits (fridge, vacuum chamber, optics table) stands 1:1 on the floor beside the desk. */
+  fullSize = false;
+  /** 0 on the desk .. 1 full size, eased. */
+  private grow = 0;
+  private roomShown: object | null = null;
   /** Big-state views: the Q-sphere and the state city float where the board was; the board shows their legend. */
   private qsphere!: QSphereVisual;
   private city!: StateCityVisual;
@@ -158,8 +164,6 @@ export class LabSystem extends createSystem({
     ws.add(this.chip.root);
     // the fridge stands at the back left, mirroring the chip
     this.fridge = new FridgeVisual(T5.qubits);
-    this.fridge.root.position.set(-0.37, 0.0, -0.33);
-    this.fridge.root.rotation.y = 0.5;
     this.fridge.root.visible = false;
     ws.add(this.fridge.root);
     // the ion trap and the atom array take the chip's place; their chamber and optics table the fridge's
@@ -174,14 +178,13 @@ export class LabSystem extends createSystem({
     }
     this.ionChamber = new IonChamberVisual();
     this.opticsTable = new OpticsTableVisual();
-    this.ionChamber.root.position.set(-0.37, 0.0, -0.33);
-    this.ionChamber.root.rotation.y = 0.5;
-    this.opticsTable.root.position.set(-0.36, 0.0, -0.3);
-    this.opticsTable.root.rotation.y = 0.5;
     for (const m of [this.ionChamber.root, this.opticsTable.root]) {
       m.visible = false;
       ws.add(m);
     }
+    // every machine reflects a soft studio, so steel, copper and glass read as real materials
+    const env = studioEnvironment(this.renderer);
+    for (const m of [this.chip.root, this.fridge.root, this.ionTrap.root, this.ionChamber.root, this.atomArray.root, this.opticsTable.root]) useStudio(m, env);
     this.qsphere = new QSphereVisual();
     this.qsphere.root.position.set(0, 0.25, -0.27);
     this.qsphere.root.visible = false;
@@ -192,6 +195,8 @@ export class LabSystem extends createSystem({
     this.city.root.visible = false;
     ws.add(this.city.root);
 
+    // development: the lab system, for probing scenes from the managed browser
+    if (import.meta.env.DEV) (globalThis as { __entangledLab?: LabSystem }).__entangledLab = this;
     this.syncOrbs(true);
     this.cleanupFuncs.push(lab.on((e) => this.onLabEvent(e)));
 
@@ -398,6 +403,31 @@ export class LabSystem extends createSystem({
     return this.orbs.length;
   }
 
+  /**
+   * The machine around the qubits sits at the back left of the desk, scaled
+   * down; at full size it grows to 1:1 and stands on the floor beside the desk,
+   * turned to face the player. Each time it comes into view (or grows) it
+   * plays its reveal.
+   */
+  private placeRoomMachine(dt: number): void {
+    const shown = [this.fridge, this.ionChamber, this.opticsTable].find((m) => m.root.visible) ?? null;
+    const target = this.fullSize ? 1 : 0;
+    const before = this.grow;
+    this.grow += (target - this.grow) * (1 - Math.exp(-dt * 3.2));
+    if (Math.abs(this.grow - target) < 1e-3) this.grow = target;
+    if (shown && (shown !== this.roomShown || (before < 0.5 && this.grow >= 0.5))) shown.reveal();
+    this.roomShown = shown;
+    if (!shown) return;
+    const g = this.grow, e = g * g * (3 - 2 * g);
+    const { deskScale, fullScale, lift } = shown.size;
+    const floor = -this.workspace.object3D!.position.y;
+    const r = shown.root;
+    r.scale.setScalar(Math.exp(Math.log(deskScale) * (1 - e) + Math.log(fullScale) * e));
+    r.position.set(-0.37 + (-1.0 + 0.37) * e, (floor + lift * fullScale) * e, -0.33 + (-0.75 + 0.33) * e);
+    r.rotation.y = 0.5 + (0.6 - 0.5) * e;
+    if (shown.stand) shown.stand.visible = g > 0.02;
+  }
+
   /** Recentre the desk in front of the player (also used by the recenter button). */
   recenter(): void {
     this.placePending = true;
@@ -418,7 +448,9 @@ export class LabSystem extends createSystem({
     if (this.ionTrap.root.visible || this.atomArray.root.visible) {
       this.ionTrap.setQubits(lab.n);
       this.atomArray.setQubits(lab.n);
+      this.ionChamber.setQubits(lab.n);
     }
+    this.placeRoomMachine(dt);
     if (this.chip.root.visible) this.chip.update(dt);
     if (this.fridge.root.visible) this.fridge.update(dt);
     if (this.ionTrap.root.visible) this.ionTrap.update(dt);

@@ -23,6 +23,7 @@ export type VoiceCommand =
   | { type: 'listen' | 'daily' | 'profile' | 'snapshot' }
   | { type: 'machine'; id: 'superconducting' | 'ions' | 'atoms' }
   | { type: 'compare' }
+  | { type: 'fullsize'; on: boolean }
   | { type: 'undo' | 'redo' | 'reset' | 'add' | 'remove' | 'next' | 'showme' | 'notes' | 'code' | 'simplify' | 'zoom' | 'noise' | 'library' | 'close' | 'debug' | 'view' };
 
 const NUMBERS: Record<string, number> = {
@@ -116,6 +117,8 @@ export function parseVoice(text: string): VoiceCommand | null {
   if (/\b(listen|play (the|this) (state|chord)|hear (it|the state))\b/.test(s)) return { type: 'listen' };
   if (/daily|today'?s (puzzle|challenge)/.test(s)) return { type: 'daily' };
   if (/compare (the |all )?(machines|computers|platforms|three)/.test(s)) return { type: 'compare' };
+  if (/(full|life|real|actual) size/.test(s)) return { type: 'fullsize', on: !/\b(shrink|small|desk|back|off)\b/.test(s) };
+  if (/^(shrink|make it small|back on the desk)/.test(s)) return { type: 'fullsize', on: false };
   if (/trapped ions?|ion trap|\bions\b/.test(s)) return { type: 'machine', id: 'ions' };
   if (/neutral atoms?|atom array|\batoms\b/.test(s)) return { type: 'machine', id: 'atoms' };
   if (/superconduct/.test(s)) return { type: 'machine', id: 'superconducting' };
@@ -217,6 +220,8 @@ export function describe(c: VoiceCommand): string {
       return c.id === 'ions' ? 'the trapped-ion computer' : c.id === 'atoms' ? 'the neutral-atom computer' : 'the superconducting chip';
     case 'compare':
       return 'run on all three machines';
+    case 'fullsize':
+      return c.on ? 'the machine at full size' : 'the machine back on the desk';
     default:
       return c.type;
   }

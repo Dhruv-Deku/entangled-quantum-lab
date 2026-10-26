@@ -80,3 +80,11 @@ group('voice: daily, progress, listening, pictures', () => {
     expect(parseVoice('take a picture')).toEqual({ type: 'snapshot' });
   });
 });
+
+group('voice: machines at full size', () => {
+  it('stands the machine 1:1 beside the desk, and puts it back', () => {
+    for (const s of ['full size', 'show it life size', 'make the fridge real size', 'actual size please']) expect(parseVoice(s), s).toEqual({ type: 'fullsize', on: true });
+    for (const s of ['back on the desk', 'shrink it', 'full size off']) expect(parseVoice(s), s).toEqual({ type: 'fullsize', on: false });
+    expect(parseVoice('compare the machines')).toEqual({ type: 'compare' });
+  });
+});

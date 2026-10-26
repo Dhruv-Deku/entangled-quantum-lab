@@ -4,6 +4,7 @@ import {
   CanvasTexture,
   Color,
   CylinderGeometry,
+  Euler,
   Group,
   Mesh,
   MeshBasicMaterial,
@@ -16,6 +17,7 @@ import {
   Vector3,
 } from '@iwsdk/core';
 import type { Op } from '../quantum/circuit';
+import { Beam, ease, finishes, Kit, LabelCard } from './machine-kit';
 import { GOLD, qubitColor, textTexture } from './visuals';
 
 /** Metres between ions along the chain. */
@@ -222,95 +224,179 @@ export class IonTrapVisual {
 }
 
 /**
- * The machine around the trap: a steel ultra-high-vacuum chamber on a stand,
- * with viewports on every side and a violet laser coming in through one.
+ * The machine around the trap, as it stands in a lab: a steel ultra-high
+ * vacuum chamber with viewports on every side and a large window on top, a
+ * pair of copper Helmholtz coils, an ion pump with its magnets on a side arm,
+ * the RF resonator that drives the trap rods, and the imaging objective and
+ * camera above. Three lasers come in through the windows: the violet cooling
+ * beam, the red repumper and a pair of Raman beams that do the gates. Through
+ * the front window you can see the ion chain glowing at the centre.
+ *
+ * Coming into view, the lasers switch on one at a time and the ions light up.
+ * On the desk it is a model; at full size it stands on an optical table.
  */
 export class IonChamberVisual {
   readonly root = new Group();
-  private readonly beamMat: MeshBasicMaterial;
+  /** Model units: the desk shows it 1:1, full size at 2.5x on a table 0.3 units tall. */
+  readonly size = { deskScale: 1, fullScale: 2.5, lift: 0.3 };
+  readonly stand = new Group();
+  private beams: { beam: Beam; at: number }[] = [];
+  private ions: { mat: MeshBasicMaterial; halo: SpriteMaterial }[] = [];
+  private readonly glow = glowTexture();
   private pulse = 0;
+  private t = 99;
 
   constructor() {
     this.root.name = 'IonChamber';
-    const steel = new MeshStandardMaterial({ color: '#b3b8bf', roughness: 0.25, metalness: 0.92 });
-    const dark = new MeshStandardMaterial({ color: '#2a2c30', roughness: 0.5, metalness: 0.6 });
-    const glass = new MeshStandardMaterial({ color: '#7d93b3', roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.5 });
+    const f = finishes();
+    const kit = new Kit();
+    const P = (x: number, y: number, z: number) => new Vector3(x, y, z);
     const H = 0.2;
-    // stand: a plate and three legs
-    const plate = new Mesh(new CylinderGeometry(0.1, 0.1, 0.008, 40), dark);
-    plate.position.y = 0.004;
-    this.root.add(plate);
+    // the breadboard it sits on, and three posts up to the chamber
+    kit.cyl(0.11, 0.008, f.dark, P(0, 0.004, 0), 48);
     for (let k = 0; k < 3; k++) {
-      const a = (k / 3) * Math.PI * 2;
-      const leg = new Mesh(new CylinderGeometry(0.005, 0.005, H - 0.05, 10), steel);
-      leg.position.set(Math.cos(a) * 0.06, (H - 0.05) / 2 + 0.008, Math.sin(a) * 0.06);
-      this.root.add(leg);
+      const a = (k / 3) * Math.PI * 2 + 0.3;
+      kit.cyl(0.006, H - 0.06, f.steel, P(Math.cos(a) * 0.055, (H - 0.06) / 2 + 0.008, Math.sin(a) * 0.055), 12);
+      kit.cyl(0.012, 0.006, f.steel, P(Math.cos(a) * 0.055, 0.011, Math.sin(a) * 0.055), 12);
     }
-    // the chamber: a short drum with heavy flanges top and bottom
-    const drum = new Mesh(new CylinderGeometry(0.07, 0.07, 0.08, 8), steel);
-    drum.position.y = H;
-    this.root.add(drum);
+    // the chamber: an octagon with heavy flanges top and bottom
+    kit.cyl(0.07, 0.08, f.steel, P(0, H, 0), 8);
     for (const dy of [-0.045, 0.045]) {
-      const flange = new Mesh(new CylinderGeometry(0.082, 0.082, 0.012, 40), steel);
-      flange.position.y = H + dy;
-      this.root.add(flange);
-      for (let k = 0; k < 16; k++) {
-        const a = (k / 16) * Math.PI * 2;
-        const bolt = new Mesh(new CylinderGeometry(0.0025, 0.0025, 0.016, 6), dark);
-        bolt.position.set(Math.cos(a) * 0.076, H + dy, Math.sin(a) * 0.076);
-        this.root.add(bolt);
+      kit.cyl(0.082, 0.012, f.steel, P(0, H + dy, 0), 48);
+      for (let k = 0; k < 20; k++) {
+        const a = (k / 20) * Math.PI * 2;
+        kit.cyl(0.0022, 0.018, f.dark, P(Math.cos(a) * 0.076, H + dy, Math.sin(a) * 0.076), 6);
       }
     }
-    // a viewport on each face of the octagon
+    // a viewport on each face; the window glass is a separate see-through part
     for (let k = 0; k < 8; k++) {
       const a = (k / 8) * Math.PI * 2 + Math.PI / 8;
-      const port = new Group();
-      const tube = new Mesh(new CylinderGeometry(0.016, 0.016, 0.03, 20), steel);
-      tube.rotation.z = Math.PI / 2;
-      tube.position.x = 0.078;
-      const rim = new Mesh(new CylinderGeometry(0.022, 0.022, 0.008, 24), steel);
-      rim.rotation.z = Math.PI / 2;
-      rim.position.x = 0.094;
-      const win = new Mesh(new CylinderGeometry(0.0145, 0.0145, 0.002, 24), glass);
-      win.rotation.z = Math.PI / 2;
-      win.position.x = 0.0985;
-      port.add(tube, rim, win);
-      port.rotation.y = -a;
-      port.position.y = H;
-      this.root.add(port);
+      const dir = P(Math.cos(a), 0, Math.sin(a));
+      const rot = new Euler(0, -a, Math.PI / 2);
+      kit.cyl(0.016, 0.03, f.steel, dir.clone().multiplyScalar(0.078).setY(H), 24, rot);
+      kit.cyl(0.022, 0.008, f.steel, dir.clone().multiplyScalar(0.094).setY(H), 24, rot);
+      for (let b = 0; b < 6; b++) {
+        const side = P(-dir.z, 0, dir.x);
+        const ang = (b / 6) * Math.PI * 2;
+        const p = dir.clone().multiplyScalar(0.0985).addScaledVector(side, Math.cos(ang) * 0.019).setY(H + Math.sin(ang) * 0.019);
+        kit.cyl(0.0016, 0.004, f.dark, p, 6, rot);
+      }
+      kit.cyl(0.0145, 0.002, f.glass, dir.clone().multiplyScalar(0.0985).setY(H), 24, rot);
     }
-    // the ion pump on top, and a cable out
-    const pump = new Mesh(new BoxGeometry(0.07, 0.05, 0.05), dark);
-    pump.position.y = H + 0.08;
-    this.root.add(pump);
-    const neck = new Mesh(new CylinderGeometry(0.014, 0.014, 0.03, 16), steel);
-    neck.position.y = H + 0.06;
-    this.root.add(neck);
-    // the laser: a small box on the plate's edge and a violet beam into the nearest window
-    const laser = new Mesh(new BoxGeometry(0.05, 0.03, 0.03), dark);
-    laser.position.set(0.17, H - 0.02, 0.07);
-    this.root.add(laser);
-    this.beamMat = new MeshBasicMaterial({ color: '#8b6cff', transparent: true, opacity: 0.6, depthWrite: false, blending: AdditiveBlending });
-    const from = new Vector3(0.145, H - 0.02, 0.07), to = new Vector3(Math.cos(Math.PI / 8) * 0.098, H, Math.sin(Math.PI / 8) * 0.098);
-    const beamGeo = new CylinderGeometry(0.0012, 0.0012, from.distanceTo(to), 8);
-    const beam = new Mesh(beamGeo, this.beamMat);
-    beam.position.copy(from).lerp(to, 0.5);
-    beam.lookAt(to);
-    beam.rotateX(Math.PI / 2);
-    this.root.add(beam);
-    const caption = new Mesh(new PlaneGeometry(0.1, 0.0375), new MeshBasicMaterial({ map: textTexture([{ text: 'Vacuum', color: '#8a8d93' }], 500), transparent: true, depthWrite: false }));
-    caption.rotation.x = -Math.PI / 2;
-    caption.position.set(0, 0.0085, 0.07);
-    this.root.add(caption);
+    // the big top window, and the imaging objective and camera above it
+    kit.cyl(0.05, 0.01, f.steel, P(0, H + 0.056, 0), 48);
+    kit.cyl(0.04, 0.002, f.glass, P(0, H + 0.062, 0), 48);
+    kit.cyl(0.022, 0.05, f.black, P(0, H + 0.09, 0), 32, undefined, 0.016);
+    kit.ring(0.022, 0.002, f.steel, P(0, H + 0.115, 0), 32);
+    kit.cyl(0.012, 0.07, f.anodised, P(0, H + 0.15, 0), 24);
+    kit.box(0.06, 0.05, 0.06, f.dark, P(0, H + 0.21, 0));
+    kit.box(0.04, 0.004, 0.03, f.anodised, P(0, H + 0.237, 0));
+    // a gantry holds the camera
+    for (const sx of [-1, 1]) kit.box(0.008, H + 0.22, 0.012, f.anodised, P(sx * 0.12, (H + 0.22) / 2, -0.06));
+    kit.box(0.25, 0.012, 0.012, f.anodised, P(0, H + 0.22, -0.06));
+    kit.box(0.012, 0.012, 0.06, f.anodised, P(0, H + 0.22, -0.03));
+    // Helmholtz coils either side: copper windings on a dark former, the front window left clear
+    for (const sx of [-1, 1]) {
+      kit.add(new TorusGeometry(0.085, 0.01, 12, 64), f.copper, P(sx * 0.112, H, 0), new Euler(0, Math.PI / 2, 0));
+      kit.add(new TorusGeometry(0.085, 0.004, 8, 64), f.dark, P(sx * 0.123, H, 0), new Euler(0, Math.PI / 2, 0));
+    }
+    // ion pump on a side arm: the steel body between two dark magnets, and a valve
+    kit.cyl(0.018, 0.08, f.steel, P(-0.12, H - 0.03, -0.04), 24, new Euler(0, 0, Math.PI / 2));
+    kit.box(0.07, 0.09, 0.06, f.brushed, P(-0.185, H - 0.04, -0.04));
+    for (const sz of [-1, 1]) kit.box(0.075, 0.095, 0.012, f.black, P(-0.185, H - 0.04, -0.04 + sz * 0.036));
+    kit.box(0.03, 0.025, 0.03, f.dark, P(-0.185, H + 0.018, -0.04));
+    kit.cyl(0.014, 0.03, f.steel, P(-0.11, H - 0.075, 0.03), 16);
+    kit.cyl(0.02, 0.012, f.dark, P(-0.11, H - 0.095, 0.03), 6);
+    // the RF helical resonator on the back port: a copper can
+    kit.cyl(0.03, 0.09, f.copper, P(0.07, H, -0.16), 32, new Euler(Math.PI / 2, 0, 0));
+    kit.cyl(0.032, 0.006, f.copper, P(0.07, H, -0.115), 32, new Euler(Math.PI / 2, 0, 0));
+    kit.rod(P(0.07, H, -0.115), P(Math.cos(-Math.PI * 0.375) * 0.1, H, Math.sin(-Math.PI * 0.375) * 0.1), 0.006, f.steel);
+
+    // three lasers on the breadboard's edge, each into its own window
+    const port = (k: number) => {
+      const a = (k / 8) * Math.PI * 2 + Math.PI / 8;
+      return P(Math.cos(a) * 0.1, H, Math.sin(a) * 0.1);
+    };
+    const lasers: { at: Vector3; port: number; color: string; r: number; delay: number }[] = [
+      { at: P(0.24, H - 0.015, 0.12), port: 0, color: '#8b6cff', r: 0.0014, delay: 0.3 },
+      { at: P(0.22, H - 0.02, -0.14), port: 7, color: '#ff5a4f', r: 0.0011, delay: 0.75 },
+      { at: P(-0.2, H - 0.02, 0.16), port: 3, color: '#b9a8ff', r: 0.0012, delay: 1.2 },
+      { at: P(-0.22, H - 0.02, -0.15), port: 4, color: '#b9a8ff', r: 0.0012, delay: 1.2 },
+    ];
+    for (const l of lasers) {
+      kit.box(0.06, 0.03, 0.035, f.black, l.at);
+      // on a post down to the table
+      kit.cyl(0.007, l.at.y - 0.015, f.steel, P(l.at.x, (l.at.y - 0.015) / 2, l.at.z), 10);
+      kit.cyl(0.016, 0.005, f.anodised, P(l.at.x, 0.0025, l.at.z), 16);
+      kit.box(0.03, 0.004, 0.02, f.anodised, l.at.clone().add(P(0, 0.017, 0)));
+      // the beam leaves the head toward the window, ending at the centre of the chamber
+      const from = l.at.clone().add(port(l.port).sub(l.at).setY(0).normalize().multiplyScalar(0.032));
+      const beam = new Beam(from, P(0, H, 0), l.r, l.color, 0.7);
+      this.root.add(beam.mesh);
+      this.beams.push({ beam, at: l.delay });
+    }
+
+    // the ion chain at the centre, seen through the windows
+    for (let k = 0; k < 5; k++) {
+      const mat = new MeshBasicMaterial({ color: '#8fb7ff', toneMapped: false });
+      const ion = new Mesh(new SphereGeometry(0.0022, 10, 8), mat);
+      ion.position.set((k - 2) * 0.009, H, 0);
+      const halo = new SpriteMaterial({ map: this.glow, color: '#8fb7ff', transparent: true, opacity: 0, depthWrite: false, blending: AdditiveBlending });
+      // the glow shows through the steel, as the fluorescence does through the windows
+      halo.depthTest = false;
+      const s = new Sprite(halo);
+      s.renderOrder = 5;
+      s.scale.setScalar(0.03);
+      s.position.copy(ion.position);
+      this.root.add(ion, s);
+      this.ions.push({ mat, halo });
+    }
+
+    // the optical table it stands on at full size
+    const top = new Kit();
+    top.box(0.56, 0.02, 0.4, f.dark, P(0, -0.01, 0));
+    for (const [x, z] of [[-0.24, -0.16], [0.24, -0.16], [0.24, 0.16], [-0.24, 0.16]]) {
+      top.cyl(0.028, 0.26, f.anodised, P(x, -0.15, z), 24);
+      top.cyl(0.036, 0.02, f.black, P(x, -0.29, z), 24);
+    }
+    top.build(this.stand);
+    this.stand.visible = false;
+    this.root.add(this.stand);
+    kit.build(this.root);
+
+    const name = new LabelCard(0.16, 'Vacuum chamber', 'a hundred billion times thinner than air');
+    name.mesh.position.set(0, 0.07, 0.15);
+    const coils = new LabelCard(0.1, 'Helmholtz coils', 'a steady magnetic field');
+    coils.mesh.position.set(0.17, H + 0.1, 0.04);
+    const chain = new LabelCard(0.1, 'Ion chain', 'seen through the window');
+    chain.mesh.position.set(-0.13, H + 0.07, 0.11);
+    this.root.add(name.mesh, coils.mesh, chain.mesh);
   }
 
-  /** The beam brightens while a run plays. */
+  /** Switch the lasers on one at a time, then light the ions. */
+  reveal(): void {
+    this.t = 0;
+  }
+
+  /** One ion per qubit glows at the centre. */
+  setQubits(n: number): void {
+    this.ions.forEach((ion, k) => (ion.mat.visible = k >= (5 - n) / 2 && k < (5 + n) / 2));
+  }
+
+  /** The beams brighten while a run plays. */
   play(seconds: number): void {
     this.pulse = seconds;
   }
 
   update(dt: number): void {
+    this.t += dt;
     this.pulse = Math.max(0, this.pulse - dt);
-    this.beamMat.opacity = this.pulse > 0 ? 0.75 + 0.2 * Math.sin(performance.now() / 60) : 0.45;
+    const flicker = this.pulse > 0 ? 1.2 + 0.25 * Math.sin(performance.now() / 60) : 0.75;
+    for (const b of this.beams) b.beam.set(ease((this.t - b.at) / 0.5), flicker);
+    const lit = ease((this.t - 1.6) / 0.8);
+    for (const ion of this.ions) {
+      ion.halo.opacity = ion.mat.visible ? lit * (this.pulse > 0 ? 0.9 : 0.6) : 0;
+      ion.mat.color.set('#8fb7ff').multiplyScalar(0.3 + 0.7 * lit);
+    }
   }
 }

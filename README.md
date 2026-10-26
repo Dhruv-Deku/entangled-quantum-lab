@@ -27,10 +27,12 @@ the Meta Immersive Web SDK (IWSDK), three.js and TypeScript.
   Born-rule measurement, honest Bloch arrows that shrink when qubits entangle,
   entanglement measured as negativity, noise that matches Qiskit to 3e-16, and
   circuits that export to Qiskit, OpenQASM 3 and PennyLane.
-- **Three quantum computers in 3D.** Watch lasers address a chain of trapped
-  ions, atoms fly across an optical-tweezer array to entangle, or pulses travel
-  down a dilution refrigerator to a superconducting chip, then compare all three
-  on the same circuit.
+- **Three quantum computers in 3D, at full size.** Watch lasers address a
+  chain of trapped ions, atoms get sorted one by one in optical tweezers, or
+  pulses travel down a dilution refrigerator to a superconducting chip. Press
+  Full size and the machine stands beside your desk at its real size: a 2.4 m
+  cryostat whose vacuum cans slide away while it cools to 15 mK. Then compare
+  all three on the same circuit.
 - **From the first qubit to research topics.** A 14-module course with quizzes,
   25 chapters from superposition to Shor's algorithm, VQE for the H2 molecule, a
   Bell test, error correction, quantum walks and randomized benchmarking.
@@ -42,19 +44,20 @@ the Meta Immersive Web SDK (IWSDK), three.js and TypeScript.
 
 ## Highlights
 
-| Atoms carried into place to entangle | The density matrix as a 3D city |
+| A quantum computer opens and cools to 15 mK | Atoms carried into place to entangle |
 | --- | --- |
-| ![A neutral atom is carried along the lane to its partner, the pair glow gold while the Rydberg interaction entangles them, and it is carried back](docs/screenshots/anim-atoms.gif) | ![State city: the real and imaginary parts of the density matrix as towers](docs/screenshots/state-city.png) |
+| ![The dilution refrigerator at full size: its vacuum cans slide away to reveal the copper stages and coaxial lines, and the thermometers cool from 300 K down to 15 mK](docs/screenshots/anim-fridge.gif) | ![A neutral atom is carried along the lane to its partner, the pair glow gold while the Rydberg interaction entangles them, and it is carried back](docs/screenshots/anim-atoms.gif) |
 | **The same circuit on three machines** | **Beat the classical limit** |
 | ![Superconducting 89.4%, trapped ions 97.3%, neutral atoms 93.8%, with shot times and wiring costs](docs/screenshots/machines-compare.png) | ![The Bell test: S = 2.93 +- 0.09 with entanglement, 1.45 without, against the classical limit 2](docs/screenshots/ch19-bell-test.png) |
-| **Inside a superconducting quantum computer** | **On your real desk, in mixed reality** |
-| ![The dilution refrigerator, the pulse schedule, the chip and the falling shots](docs/screenshots/quantum-hardware.png) | ![Panels and orbs on a real desk with hand tracking](docs/screenshots/ar-passthrough-hands.png) |
+| **Life-size, beside your desk** | **On your real desk, in mixed reality** |
+| ![A 2.4 m dilution refrigerator standing at full size beside the desk, its copper chandelier inside a cut-away can, next to the orbs, the pulse schedule and the code window](docs/screenshots/machine-fridge-full.png) | ![Panels and orbs on a real desk with hand tracking](docs/screenshots/ar-passthrough-hands.png) |
 | **See a whole state at once** | **Your progress** |
 | ![The Q-sphere of a four-qubit state](docs/screenshots/qsphere.png) | ![Level, daily streak and achievements](docs/screenshots/profile-board.png) |
 
 **By the numbers:** 25 chapters, a 14-module course, 15 lessons, 12 puzzles and
-a daily challenge, 4 big-state views, 3 kinds of quantum computer in 3D, 23
-achievements, voice control, shared labs and classes, and 295 unit tests.
+a daily challenge, 4 big-state views, 3 kinds of quantum computer in 3D at
+full size, 23 achievements, voice control, shared labs and classes, and 297 unit
+tests.
 
 ## Contents
 
@@ -76,7 +79,7 @@ achievements, voice control, shared labs and classes, and 295 unit tests.
 ```sh
 npm install
 npm run dev        # managed browser with the Quest 3 emulator (IWER)
-npm test           # 295 unit tests: physics, three kinds of quantum computer, gestures, the course, 25 chapters, 15 lessons, puzzles, the daily challenge, achievements, builder, noise, chemistry, import, IBM compiling, Bell tests, error correction, benchmarking, voice, shared rooms and more
+npm test           # 297 unit tests: physics, three kinds of quantum computer, gestures, the course, 25 chapters, 15 lessons, puzzles, the daily challenge, achievements, builder, noise, chemistry, import, IBM compiling, Bell tests, error correction, benchmarking, voice, shared rooms and more
 npm run typecheck
 npm run build
 ```
@@ -123,7 +126,8 @@ depends on a single input path.
 | – | Zoom the code window and notes (bigger, at eye level) | Zoom | = |
 | – | Page through long code | Back / More | Up / Down |
 | – | Route onto the 5-qubit chip and run with hardware errors | Qiskit, On chip, Run on chip | K, G to On chip, O |
-| – | Pick the machine: superconducting chip, trapped ions, neutral atoms; compare all three | On chip: Chip / Ions / Atoms, Compare all three | voice: "trapped ions", "compare the machines" |
+| – | Pick the machine: superconducting chip, trapped ions, neutral atoms; compare all three | On chip: Chip / Ions / Atoms, Compare | voice: "trapped ions", "compare the machines" |
+| – | Stand the machine at its real size beside the desk, or put it back | On chip: Full size | voice: "full size", "back on the desk" |
 | – | The maths of each step: matrix, formula, state vectors | Qiskit, Maths | K, G to Maths, then Ctrl+Z / Ctrl+Y |
 | – | Run on a real IBM quantum computer | Qiskit, On chip, Run on IBM | Shift+O on the On chip tab |
 | – | Noise lab: T1, T2, gate error, zero-noise extrapolation | sandbox card: Noise | E (Shift+E on/off, Shift+M mitigate) |
@@ -423,12 +427,18 @@ matches the ideal, readout flips about 2%, and SWAPs cost fidelity.
 ![From the headset during a run: the dilution refrigerator, the pulse schedule with its sweeping cursor, the code window, the chip and the falling shots](docs/screenshots/quantum-hardware.png)
 
 On the chip tab the rest of the machine appears. A **dilution refrigerator**
-stands at the back left: five copper cooling stages from 50 K down to 15 mK on
-steel rods, a coaxial line per qubit coiling down to the chip package, and a
-status light on the top flange (blue when ready, mint when a run finishes).
-During a run each drive pulse travels down its qubit's line as a bead in that
-qubit's colour, two-qubit pulses go down in gold, and readout tones come back
-up in white.
+stands at the back left, modelled at real size and shown scaled down on the
+desk: the copper "chandelier" a superconducting chip lives in. Five plates step
+down from 50 K to 15 mK, hung from a steel top flange on fibreglass standoffs.
+The pulse-tube cooler and the still's pumping line come down the middle, a
+heat-exchanger coil feeds the mixing chamber, and 24 semi-rigid coaxial lines
+loop their way down through attenuators, circulators and amplifiers to the chip
+in its magnetic shield. Each time it comes into view its vacuum cans close and
+slide away, and the stage thermometers cool down from room temperature. A
+status light on the top flange is blue when ready and mint when a run
+finishes. During a run each drive pulse travels down its qubit's line as a
+glowing bead in that qubit's colour, two-qubit pulses go down in gold, and a
+readout tone goes down one line and comes back up the amplified one in white.
 
 The circuit board rises above the code window and shows the **pulse
 schedule**: what the routed circuit looks like to the control electronics. One
@@ -458,15 +468,22 @@ surroundings where the fridge stands:
 
 - **Trapped ions** (Quantinuum, IonQ): a linear Paul trap, four gold rods and
   two needle endcaps holding a chain of glowing ions, one per qubit, with the
-  imaging lens above, inside a steel vacuum chamber with viewports and a violet
-  laser. During a run a laser lights each ion a gate addresses; a two-qubit gate
+  imaging lens above. Around it stands the vacuum chamber: viewports on every
+  side, copper Helmholtz coils, an ion pump with its magnets, the RF resonator,
+  and the objective and camera above. Coming into view, its lasers switch on one
+  at a time (violet cooling, red repump, the Raman pair for gates) and the ion
+  chain lights up behind the window. During a run a laser lights each ion a gate addresses; a two-qubit gate
   lights both in gold and sets the chain swaying, because the ions talk through
   their shared motion. Every ion reaches every other, so nothing is rerouted.
   Gates are slow (10 us and 200 us) but very accurate (0.3% two-qubit error).
 - **Neutral atoms** (QuEra, Pasqal, Atom Computing): a glass cell under a
   microscope objective, a row of atoms each held in a red optical tweezer, and
-  spare atoms waiting behind, on an optics table with the laser, mirrors and
-  camera. Neighbours interact directly; for a gate between atoms further apart
+  spare atoms waiting behind. On its optics table the tweezer laser runs through
+  two crossed deflectors, a lens and a periscope into the objective; six cooling
+  beams cross in the cell between two copper coils, and blue and red Rydberg
+  lasers fire during gates. Coming into view it plays what a real machine does
+  before every run: atoms fall into a 5 x 5 grid of tweezers at random, about
+  half of them, and are then sorted one by one into a perfect block. Neighbours interact directly; for a gate between atoms further apart
   one atom is carried along the lane in front, the two glow gold while the
   Rydberg interaction entangles them, and it is carried back. Moving costs time
   and a little error; reading the atoms takes a camera exposure (about 10 ms).
@@ -476,7 +493,7 @@ surroundings where the fridge stands:
 The board shows each machine's pulse schedule with its own timings, so the
 long gaps on the atom array are atoms moving.
 
-**Compare all three** runs the same circuit 1,000 times on each machine and
+**Compare** runs the same circuit 1,000 times on each machine and
 puts the results side by side: every machine's outcomes against the ideal, how
 closely it agrees, how long one shot takes and what its wiring cost (SWAPs,
 atom moves, or nothing). Superconducting chips are fastest; ions are most
@@ -488,9 +505,27 @@ non-neighbours.
 
 ![Compare all three: 89.4% agreement and 1.8 us per shot on the superconducting chip, 97.3% and 560 us on trapped ions, 93.8% and 10 ms with one atom move on neutral atoms](docs/screenshots/machines-compare.png)
 
-| The ion trap's vacuum chamber | The atom array's optics table |
+#### Full size: walk around the machine
+
+![A 2.4 m dilution refrigerator standing at full size beside the desk, its copper chandelier inside a cut-away can, next to the orbs, the pulse schedule and the code window](docs/screenshots/machine-fridge-full.png)
+
+**Full size** on the chip tab (or say "full size") grows the machine around
+the qubits from its desk model to its real size and stands it on the floor
+beside the desk, turned to face you: a 2.4 m dilution refrigerator in its
+frame, a vacuum chamber on an optical table, or a 1.2 m optics table on its
+legs. Walk around it, lean in to read the thermometers, and run your circuit to
+watch the pulses go down the lines at full scale. "Back on the desk" shrinks it
+again.
+
+| Opening and cooling down | Inside, 50 K to 15 mK |
 | --- | --- |
-| ![The ultra-high-vacuum chamber: an octagonal steel chamber with viewports and bolted flanges on a three-legged stand, an ion pump on top, and a violet laser entering a window](docs/screenshots/machine-ions-room.png) | ![The optics table: a breadboard of tapped holes, a laser, two mirrors steering a red beam into a small glass cell, and the camera above it](docs/screenshots/machine-atoms-room.png) |
+| ![The vacuum cans slide away to reveal the copper stages and coaxial lines while the thermometers cool from 300 K to 15 mK](docs/screenshots/anim-fridge.gif) | ![The chandelier up close: copper plates, coaxial lines with their thermal loops, the heat-exchanger coil, and thermometer cards reading 50 K, 4 K, 800 mK, 100 mK and 15 mK](docs/screenshots/machine-fridge-inside.png) |
+| **The ion trap's vacuum chamber** | **The atom array's optics table** |
+| ![The vacuum chamber at full size on its optical table: copper Helmholtz coils either side, viewports and bolted flanges, the objective and camera above, laser beams entering the windows and the ion chain glowing at the centre](docs/screenshots/machine-ions-room.png) | ![The optics table at full size: the tweezer beam through deflectors, a lens and a periscope into the objective, copper coils around the glass cell, cooling beams crossing, and the atoms sorted into a 3 x 3 block](docs/screenshots/machine-atoms-room.png) |
+
+Every machine is built from merged parts (one mesh per material, a handful of
+draw calls each) and lit by a soft studio environment so steel, copper and
+glass read as real materials on the headset.
 
 ### Run on a real quantum computer
 

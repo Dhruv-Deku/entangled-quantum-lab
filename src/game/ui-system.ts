@@ -328,7 +328,7 @@ export class UISystem extends createSystem({
     const dockIds = ['g-h', 'g-x', 'g-y', 'g-z', 'g-s', 'g-t', 'g-rl', 'g-rr', 'a-cnot', 'a-swap', 'a-measure', 'a-shots', 'a-export', 't-prev', 't-next', 'dock-status', 'a-voice', 'a-voice-l', 'a-debug', 'a-debug-l', 'a-view', 'a-view-l', 'a-share', 'a-share-l', 'a-listen', 'a-listen-l'];
     for (let i = 0; i < SLOTS; i++) dockIds.push(`t-${i}`, `t-${i}-l`);
     for (const id of dockIds) this.els.set(id, this.dock.requireElementById(id));
-    const codeIds = ['code-close', 'code-note', 'code-link', 'code-eyebrow', 'code-title', 'code-zoom', 'code-zoom-label', 'code-simplify', 'code-simplify-label', 'code-run', 'code-ibm', 'code-ibm-l', 'code-up', 'code-down', 'code-mach', 'code-m-superconducting', 'code-m-ions', 'code-m-atoms', 'code-compare'];
+    const codeIds = ['code-close', 'code-note', 'code-link', 'code-eyebrow', 'code-title', 'code-zoom', 'code-zoom-label', 'code-simplify', 'code-simplify-label', 'code-run', 'code-ibm', 'code-ibm-l', 'code-up', 'code-down', 'code-mach', 'code-m-superconducting', 'code-m-ions', 'code-m-atoms', 'code-compare', 'code-full'];
     for (const f of FORMATS) codeIds.push(`code-tab-${f}`, `code-tab-${f}-l`);
     for (let i = 0; i < CODE_LINES; i++) codeIds.push(`code-r-${i}`, `code-n-${i}`, `code-h-${i}`, `code-t-${i}`);
     for (const id of codeIds) this.els.set(id, this.code.requireElementById(id));
@@ -504,6 +504,7 @@ export class UISystem extends createSystem({
     on('code-run', () => this.runChip());
     for (const id of ['superconducting', 'ions', 'atoms'] as const) on(`code-m-${id}`, () => this.setMachine(id));
     on('code-compare', () => this.compareMachines());
+    on('code-full', () => this.setFullSize(!this.world.getSystem(LabSystem)?.fullSize));
     on('code-ibm', () => void this.runIbm());
     this.cleanupFuncs.push(addIbmButton());
     // a job submitted before a reload: keep waiting for it
@@ -1051,6 +1052,13 @@ export class UISystem extends createSystem({
           this.showCode(false);
         }
         this.compareMachines();
+        return true;
+      case 'fullsize':
+        if (!this.code?.visible || this.codeFormat !== 'chip') {
+          this.codeFormat = 'chip';
+          this.showCode(false);
+        }
+        this.setFullSize(c.on);
         return true;
       case 'close':
         this.profileOpen = false;
@@ -2134,6 +2142,17 @@ export class UISystem extends createSystem({
     return Array.from(counts, (c) => c / 4000);
   }
 
+  /** Stand the machine around the qubits 1:1 on the floor beside the desk, or put it back. */
+  private setFullSize(on: boolean): void {
+    const labSys = this.world.getSystem(LabSystem);
+    if (!labSys) return;
+    labSys.fullSize = on;
+    const what = this.machine === 'superconducting' ? 'The dilution refrigerator' : this.machine === 'ions' ? 'The vacuum chamber' : 'The optics table';
+    this.flash(on ? `${what}, at its real size. Walk around it.` : `${what}, back on the desk.`);
+    feedback('select');
+    this.showCode(false);
+  }
+
   /** Run the circuit on all three machines and compare them on the board. */
   private compareMachines(): void {
     const ops = lab.history.ops.slice();
@@ -2275,6 +2294,7 @@ export class UISystem extends createSystem({
     this.els.get('code-mach')?.setProperties({ display: onChip ? 'flex' : 'none' });
     for (const m of ['superconducting', 'ions', 'atoms'] as const) this.bg(`code-m-${m}`, m === this.machine ? C.primary : '#34363b');
     this.bg('code-compare', this.compared?.key === key ? C.done : '#34363b');
+    this.bg('code-full', this.world.getSystem(LabSystem)?.fullSize ? C.primary : '#34363b');
     this.els.get('code-simplify')?.setProperties({ display: onChip ? 'none' : 'flex' });
     this.els.get('code-run')?.setProperties({ display: onChip ? 'flex' : 'none' });
     this.els.get('code-ibm')?.setProperties({ display: onChip ? 'flex' : 'none' });
