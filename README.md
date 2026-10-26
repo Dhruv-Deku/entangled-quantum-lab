@@ -44,6 +44,10 @@ the Meta Immersive Web SDK (IWSDK), three.js and TypeScript.
 - **Learn together.** Shared labs where two people each hold half of a Bell
   pair, and classes where a teacher assigns modules, watches progress and
   students earn certificates.
+- **A Play tab full of wonders.** Quantum dice, Schrodinger's cat, the quantum
+  penny flip, a State Album of fifteen famous states to collect, a room-sized
+  Bloch sphere to sit inside, a transmon qubit up close, a night sky, a history
+  gallery from 1981 to Willow, and ambient music that follows the state.
 - **A reason to come back.** Quantum Rush, an arcade round where you build
   target states against the clock with combos; a daily challenge whose par is
   provably optimal; streaks, 28 achievements, levels, and orb finishes you
@@ -60,6 +64,8 @@ the Meta Immersive Web SDK (IWSDK), three.js and TypeScript.
 | ![Superconducting 89.4%, trapped ions 97.3%, neutral atoms 93.8%, with shot times and wiring costs](docs/screenshots/machines-compare.png) | ![The Bell test: S = 2.93 +- 0.09 with entanglement, 1.45 without, against the classical limit 2](docs/screenshots/ch19-bell-test.png) |
 | **Life-size, beside your desk** | **On your real desk, in mixed reality** |
 | ![A 2.4 m dilution refrigerator standing at full size beside the desk, its copper chandelier inside a cut-away can, next to the orbs, the pulse schedule and the code window](docs/screenshots/machine-fridge-full.png) | ![Panels and orbs on a real desk with hand tracking](docs/screenshots/ar-passthrough-hands.png) |
+| **Step inside the Bloch sphere, under the stars** | **Inside a qubit: a transmon, a thousand times bigger** |
+| ![Night sky mode: a starfield dome over the lab, and a room-sized Bloch sphere around the desk whose arrow paints a trail across the sky](docs/screenshots/giant-sphere-night.png) | ![Inside a qubit: the aluminium cross, the SQUID loop with two violet Josephson junctions, the junction blown up above it, and the energy well with the qubit's |0> and |1> filling their levels](docs/screenshots/inside-a-qubit.png) |
 | **Every achievement is a 3D trophy** | **Life-size, in a glass case** |
 | ![The trophy shelf beside the progress board: silver cups, copper stars and mint glass gems for 15 of 28 achievements, dim silhouettes for the rest, and a burst of confetti in the qubit colours](docs/screenshots/trophies.png) | ![The full-size dilution refrigerator standing in a glass display case with a black plinth, slim corner posts and a door seam, beside the desk](docs/screenshots/machine-case.png) |
 | **Atoms carried into place to entangle** | **Orb finishes you unlock** |
@@ -67,8 +73,8 @@ the Meta Immersive Web SDK (IWSDK), three.js and TypeScript.
 
 **By the numbers:** 26 chapters, a 14-module course, 20 lessons, 12 puzzles, a
 daily challenge and Quantum Rush, a Play tab, 5 big-state views, 3 kinds of quantum computer
-in 3D at full size, a 49-qubit surface code, 28 achievements, 5 orb finishes,
-voice control, shared labs and classes, and 318 unit tests.
+in 3D at full size, a 49-qubit surface code, 31 achievements, 5 orb finishes, 14 Play tab wonders,
+voice control, shared labs and classes, and 322 unit tests.
 
 ## Contents
 
@@ -82,7 +88,7 @@ voice control, shared labs and classes, and 318 unit tests.
 - [Part 4: Tools for exploring](#part-4-tools-for-exploring)
   - [Build: circuit builder](#build-circuit-builder), [Code window: tabs, zoom, simplify](#code-window-tabs-zoom-simplify), [Step debugger](#step-debugger), [Big-state views](#big-state-views), [Many worlds](#many-worlds), [Library, import and custom gates](#library-import-and-custom-gates), [Voice commands](#voice-commands), [Listen to a state](#listen-to-a-state), [Snapshot](#snapshot)
 - [Part 5: Together, and every day](#part-5-together-and-every-day)
-  - [Quantum Rush](#quantum-rush), [Shared lab](#shared-lab), [Classroom and certificate](#classroom-and-certificate), [Daily challenge, achievements and levels](#daily-challenge-achievements-and-levels), [Trophies and celebrations](#trophies-and-celebrations), [Orb finishes](#orb-finishes), [Puzzles](#puzzles)
+  - [The Play tab: ten wonders](#the-play-tab-ten-wonders), [Quantum Rush](#quantum-rush), [Shared lab](#shared-lab), [Classroom and certificate](#classroom-and-certificate), [Daily challenge, achievements and levels](#daily-challenge-achievements-and-levels), [Trophies and celebrations](#trophies-and-celebrations), [Orb finishes](#orb-finishes), [Puzzles](#puzzles)
 - [Under the hood](#under-the-hood)
 
 ## Try it
@@ -90,7 +96,7 @@ voice control, shared labs and classes, and 318 unit tests.
 ```sh
 npm install
 npm run dev        # managed browser with the Quest 3 emulator (IWER)
-npm test           # 318 unit tests: physics, three kinds of quantum computer, gestures, the course, 25 chapters, 15 lessons, puzzles, the daily challenge, achievements, builder, noise, chemistry, import, IBM compiling, Bell tests, error correction, benchmarking, voice, shared rooms and more
+npm test           # 322 unit tests: physics, three kinds of quantum computer, gestures, the course, 25 chapters, 15 lessons, puzzles, the daily challenge, achievements, builder, noise, chemistry, import, IBM compiling, Bell tests, error correction, benchmarking, voice, shared rooms and more
 npm run typecheck
 npm run build
 ```
@@ -812,6 +818,55 @@ the same circuit, ready to post.
 
 ## Part 5: Together, and every day
 
+### The Play tab: ten wonders
+
+The navigator's **Play** tab gathers the things to do just for fun. Each one
+is a tap away (or say its name), and the switches stay on while you do
+anything else.
+
+| Quantum dice | Schrodinger's cat |
+| --- | --- |
+| ![Quantum dice: an eight-sided die lands on 2 after three qubits in superposition are measured, with the card explaining the Born rule and a confetti burst](docs/screenshots/quantum-dice.png) | ![Schrodinger's cat: the box on the desk opened by a measurement, the card reading Asleep, you measured 1](docs/screenshots/schrodinger-cat.png) |
+| **The penny flip you always win** | **The State Album** |
+| ![The quantum penny flip: Heads, you win, after H, the computer's secret move, and H again](docs/screenshots/penny-flip.png) | ![The State Album on the board: fifteen famous states, four collected in mint, the rest as question marks with hints](docs/screenshots/state-album.png) |
+
+- **Quantum dice**: an eight-sided die tumbles while three qubits, each put
+  half and half by an H, are measured; it lands on the number they give. The
+  randomness is the Born rule on the orbs, not a pseudo-random generator.
+- **Schrodinger's cat**: a wooden box on the desk. While the qubit is in
+  superposition the cat is awake and asleep at once (tilt the orb to change
+  the odds); measuring opens the lid on one or the other. A kinder cat.
+- **Penny flip**: David Meyer's 1999 game. You move, the computer secretly
+  flips the coin or not, you move again, and heads wins. Classically you win
+  half the time; with H before and H after you win every time, because a flip
+  does nothing to |+>.
+- **State Album**: fifteen famous states, from |1> and |+> to the four Bell
+  states and GHZ on five qubits. Make one on the orbs, any way you like, and it
+  is collected with a banner and a burst of confetti; the board shows the
+  album with hints for the empty slots.
+- **Zen Rush**: Quantum Rush with no clock, for practising.
+- **Giant sphere**: a Bloch sphere two metres across, centred over the desk so
+  you sit inside it, its six poles labelled. The selected qubit's arrow reaches
+  out from the middle and its tip paints a lasting trail: a circuit draws a
+  picture around you.
+- **Inside a qubit**: a transmon a thousand times bigger. The aluminium cross is
+  the capacitor; a small loop at one arm holds two Josephson junctions, shown
+  again blown up as two metal layers with a sliver of oxide between; a drive
+  line and a readout resonator reach in. Beside it the energy well: the levels
+  get closer as they climb, so a pulse tuned to 0-1 leaves |2> alone. The
+  selected qubit's |0> and |1> fill their levels as you turn it.
+- **Night sky**: the room gives way to a deep blue dome of stars with an aurora
+  low on the horizon; the lab stays where it is.
+- **History**: eight milestones in an arc around the desk, each a small turning
+  model above its card: Feynman 1981, Deutsch 1985, Shor 1994, Grover 1996, the
+  first two-qubit computers 1998, Sycamore 2019, logical qubits 2023 and Willow
+  2024.
+- **Ambient music**: every basis state with weight is a note of a pentatonic
+  chord, as loud as its amplitude, with a slow tremolo and a long echo; gates
+  glide the chord.
+
+![The history gallery: eight milestones from 1981 to 2024 standing in an arc behind the desk under the night sky](docs/screenshots/history-gallery.png)
+
 ### Quantum Rush
 
 ![Quantum Rush in play: the target "Plus plus" on the card, its amplitude bars beside the orbs' own on the board with a 60-second clock and a x3 combo, +493 rising out of the orbs, and sixty ticks around the desk](docs/screenshots/anim-rush.gif)
@@ -898,11 +953,12 @@ course) the board shows a **certificate**, and the 2D page can save it as a PNG.
   shorter sequence exists. Solving it extends a streak, and on the 2D page the
   result comes as one line to copy and paste: "Entangled daily #25: 2 moves
   (par 2), 3 of 3 stars. Streak: 1 day."
-- **Achievements**: 28 of them, from "First move" and "Spooky action" (your
+- **Achievements**: 31 of them, from "First move" and "Spooky action" (your
   first Bell pair) to "All for one" (a five-qubit GHZ state), "Rainmaker"
   (1,000 shots), "Beyond classical" (the Bell Test), "Below threshold" (the
   surface code), "Many worlds" (watching paths cancel), "Rush hour" and "On
-  fire" in Quantum Rush, daily streaks of three and seven days, and trying the
+  fire" in Quantum Rush, "Collector" (ten album states), "Quantum cheat" (three
+  penny flips won), "Explorer" (six of the Play tab's wonders), daily streaks of three and seven days, and trying the
   debugger, every big-state view, voice, the shared lab and all three kinds of
   quantum computer. Each one pops up above the dock with a chime.
 - **Levels**: XP comes from chapters, lessons, course modules, puzzle stars,

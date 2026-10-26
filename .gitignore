@@ -46,3 +46,6 @@ pids/
 
 # reference videos (not part of the project)
 Screen Recording*.mp4
+
+.tmp-shots/
+.tmp-*.py

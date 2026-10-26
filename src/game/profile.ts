@@ -60,6 +60,7 @@ export interface Achievement {
 
 const used = (s: Stats, f: string) => s.used.includes(f);
 const VIEWS = ['worlds', 'qsphere', 'city', 'heatmap', 'unitary'];
+const WONDERS = ['dice', 'cat', 'giant', 'inside', 'night', 'history'];
 const counter = (id: string, title: string, text: string, have: (s: Stats, c: ProgressContext) => number, need: (c: ProgressContext) => number): Achievement => ({
   id,
   title,
@@ -97,6 +98,9 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'worlds', title: 'Many worlds', text: 'Watch paths cancel in the many-worlds view.', done: (s) => used(s, 'worlds:cancel') },
   { id: 'surface', title: 'Below threshold', text: 'Finish the Surface Code chapter.', done: (_s, c) => c.chaptersDone.includes('Surface Code') },
   { id: 'skin', title: 'New look', text: 'Wear a new orb finish.', done: (s) => used(s, 'skin') },
+  counter('album', 'Collector', 'Collect 10 states in the State Album.', (s) => s.used.filter((f) => f.startsWith('album:')).length, () => 10),
+  { id: 'penny', title: 'Quantum cheat', text: 'Win the penny flip three times.', done: (s) => used(s, 'penny:3') },
+  counter('wonders', 'Explorer', 'Try the dice, the cat, the giant sphere, inside a qubit, the night sky and the history gallery.', (s) => WONDERS.filter((w) => used(s, w)).length, () => WONDERS.length),
 ];
 
 export const emptyProfile = (): ProfileData => ({ stats: { gates: 0, measures: 0, shots: 0, rewinds: 0, bellPairs: 0, ghz: 0, used: [], rushBest: 0, rushCombo: 0, rushTop: [] }, unlocked: {} });

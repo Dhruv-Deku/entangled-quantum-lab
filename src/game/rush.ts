@@ -152,8 +152,10 @@ export class RushSession {
   constructor(
     now: number,
     private rng: Rng,
+    /** Zen: no clock, no pressure; the round ends when you say so. */
+    readonly zen = false,
   ) {
-    this.endsAt = now + RUSH_SECONDS;
+    this.endsAt = zen ? Infinity : now + RUSH_SECONDS;
     this.shownAt = now;
     this.target = nextTarget(0, this.seen, rng);
     this.seen.add(this.target.name);
@@ -182,7 +184,7 @@ export class RushSession {
     this.solved++;
     this.results.push(r);
     this.lastSolve = now;
-    this.endsAt = Math.min(now + RUSH_SECONDS, this.endsAt + RUSH_BONUS);
+    if (!this.zen) this.endsAt = Math.min(now + RUSH_SECONDS, this.endsAt + RUSH_BONUS);
     this.advance(now);
     return r;
   }
@@ -191,7 +193,7 @@ export class RushSession {
   skip(now: number): void {
     this.combo = 1;
     this.lastSolve = -Infinity;
-    this.endsAt -= RUSH_SKIP_COST;
+    if (!this.zen) this.endsAt -= RUSH_SKIP_COST;
     this.advance(now);
   }
 

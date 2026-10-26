@@ -41,9 +41,12 @@ import { openDailyDialog, openShareDialog, savedName } from '../lab/share-dialog
 import { ACHIEVEMENTS, levelFor, Profile, xpFor, type ProgressContext } from './profile';
 import { ket, RUSH_QUBITS, RushSession } from './rush';
 import { manyWorlds } from '../quantum/paths';
+import { ALBUM, albumMatches } from './album';
+import { computerFlips, score as pennyScore, type PennyPhase, type PennyRecord } from './penny';
+import { Ambient } from '../lab/ambient';
 import { bestStreak, dayKey, dailyNumber, emptyDaily, recordDaily, shareText, streak, type DailyRecord } from './daily';
 import { loadDaily, loadProfile, saveDaily, saveProfile } from '../lab/profile-store';
-import { profileFigure, rushFigure, type ProfileView, type RushView, type SurfaceView } from '../lab/figures';
+import { albumFigure, profileFigure, rushFigure, type ProfileView, type RushView, type SurfaceView } from '../lab/figures';
 import { listen } from '../lab/sonify';
 import { downloadSnapshot } from '../lab/snapshot';
 import { Banner } from '../lab/banner';
@@ -96,7 +99,8 @@ const ZOOM = 1.3;
 const NAV_SLOTS = 18;
 const TABS = ['course', 'campaign', 'learn', 'puzzle', 'build', 'sandbox', 'play'] as const;
 /** The Play tab: arcade and showcase picks. */
-const PLAY = ['Quantum Rush', 'Daily', 'Surface Code', 'Many worlds'] as const;
+const PLAY = ['Quantum Rush', 'Zen Rush', 'Daily', 'Surface Code', 'Many worlds', 'Quantum dice', 'Penny flip', 'Schrodinger cat', 'State album', 'Giant sphere', 'Inside a qubit', 'Night sky', 'History', 'Ambient music'] as const;
+const PLAY_TAGS = ['60s', 'zen', 'day', '49q', 'H H', 'd8', 'coin', 'box', '15', '1 m', 'JJ', 'sky', '1981', 'hum'];
 /** Where hidden panels park, out of reach of every pointer. */
 const PARKED = new Vector3(0, -50, 0);
 
@@ -276,6 +280,7 @@ export class UISystem extends createSystem({
       campaign.on((v) => {
         // Quantum Rush lives in the sandbox: going anywhere else ends the round
         if ((this.rush || this.rushOver) && v.mode !== 'sandbox') this.endRush(false);
+        if (this.game && v.mode !== 'sandbox') this.endGame(false);
         this.render(v);
         this.afterCampaign(v);
         this.afterDaily();
@@ -301,7 +306,11 @@ export class UISystem extends createSystem({
         if (e.type === 'seek') this.profile.onRewind();
         if (e.type === 'op' || e.type === 'shots' || e.type === 'seek') this.checkAchievements();
         if (this.rush && (e.type === 'op' || e.type === 'seek')) this.checkRush();
-        if (e.type === 'op' || e.type === 'seek') this.checkWorlds();
+        if (e.type === 'op' || e.type === 'seek') {
+          this.checkWorlds();
+          this.checkAlbum();
+          if (this.game) this.renderGameCard();
+        }
       }),
       this.visibilityState.subscribe((v) => {
         this.immersive = v !== VisibilityState.NonImmersive;
@@ -379,7 +388,8 @@ export class UISystem extends createSystem({
     on('btn-next', () => {
       // Quantum Rush: Skip during a round, Again after it
       if (this.rush) return this.skipRush();
-      if (this.rushOver) return this.startRush();
+      if (this.rushOver) return this.startRush(this.rushZen);
+      if (this.game) return this.gameNext();
       if (campaign.mode === 'sandbox') {
         if (lab.n < MAX_ORBS) lab.reset(lab.n + 1);
       } else campaign.next();
@@ -388,6 +398,7 @@ export class UISystem extends createSystem({
     for (let i = 0; i < 3; i++) on(`choice-${i}`, () => feedback(campaign.answer(i) ? 'success' : 'reject'));
     on('btn-replay', () => {
       if (this.rush || this.rushOver) return this.endRush(true);
+      if (this.game) return this.endGame(true);
       // in the course the second button is Show me while a task is open
       if (campaign.mode === 'course' && campaign.showMe()) return feedback('select');
       campaign.replay();
@@ -683,6 +694,11 @@ export class UISystem extends createSystem({
       this.renderNav(v);
       return;
     }
+    if (this.game) {
+      this.renderGameCard();
+      this.renderNav(v);
+      return;
+    }
     if (v.intro) {
       this.text('chapter-eyebrow', 'Welcome');
       this.text('chapter-title', 'Entangled');
@@ -954,7 +970,11 @@ export class UISystem extends createSystem({
   private rushCardTimer = 0;
   private readonly clockNow = () => performance.now() / 1000;
 
-  private startRush(): void {
+  private rushZen = false;
+
+  private startRush(zen = false): void {
+    this.rushZen = zen;
+    this.endGame(false);
     this.profileOpen = this.libOpen = this.dbgOpen = this.classOpen = false;
     this.noiseOpen = false;
     if (this.code) this.code.visible = false;
@@ -963,11 +983,11 @@ export class UISystem extends createSystem({
     this.rushOver = null;
     this.rushLast = null;
     this.rushResetAt = 0;
-    this.rush = new RushSession(this.clockNow(), Math.random);
+    this.rush = new RushSession(this.clockNow(), Math.random, zen);
     if (campaign.mode !== 'sandbox' || lab.n !== RUSH_QUBITS || lab.history.length) campaign.enterSandbox(RUSH_QUBITS, []);
     this.tab = 'play';
     this.use('rush');
-    this.flash('Quantum Rush: make each target on the orbs, any way you like. 60 seconds; solves add time.');
+    this.flash(zen ? 'Zen Rush: no clock. Make each target at your own pace; Quit when you are done.' : 'Quantum Rush: make each target on the orbs, any way you like. 60 seconds; solves add time.');
     feedback('select');
     this.render(campaign.view);
   }
@@ -1054,7 +1074,7 @@ export class UISystem extends createSystem({
     }
     const r = this.rush!;
     const left = r.timeLeft(this.clockNow());
-    this.text('chapter-eyebrow', `Quantum Rush  /  ${Math.ceil(left)} s left${r.combo > 1 ? `  /  combo x${r.combo}` : ''}`);
+    this.text('chapter-eyebrow', `${r.zen ? 'Zen Rush  /  no clock' : `Quantum Rush  /  ${Math.ceil(left)} s left`}${r.combo > 1 ? `  /  combo x${r.combo}` : ''}`);
     this.text('chapter-title', r.target.name);
     this.text('chapter-body', `Make ${ket(r.target.state)} on the orbs, any way you like: par ${r.target.par}. It counts the moment they match.`);
     this.text('goal-text', `Score ${r.score.toLocaleString('en-US')}   /   ${r.solved} made`);
@@ -1073,7 +1093,7 @@ export class UISystem extends createSystem({
       this.rushResetAt = 0;
       lab.reset(RUSH_QUBITS);
     }
-    this.world.getSystem(LabSystem)?.rushFx.clock(r.timeLeft(now));
+    this.world.getSystem(LabSystem)?.rushFx.clock(r.zen ? null : r.timeLeft(now));
     if (r.over(now)) return this.endRush(false, true);
     this.rushCardTimer += dt;
     if (this.rushCardTimer > 0.25) {
@@ -1084,10 +1104,40 @@ export class UISystem extends createSystem({
 
   /** The Play tab: Quantum Rush, today's daily, the surface code, and a many-worlds demo. */
   private startPlay(k: number): void {
-    if (k === 0) return this.startRush();
+    const item = PLAY[k];
+    const lsys = this.world.getSystem(LabSystem);
+    if (item === 'Quantum Rush') return this.startRush();
+    if (item === 'Zen Rush') return this.startRush(true);
+    // the switches: they stay on while you do anything else
+    const toggle = (on: boolean, feature: string, text: string) => {
+      if (on) this.use(feature);
+      this.flash(text);
+      feedback('select');
+      this.renderNav(campaign.view);
+    };
+    if (item === 'Giant sphere') return toggle((this.giantOn = !this.giantOn), 'giant', this.giantOn ? 'You are inside the Bloch sphere. Turn a qubit and its arrow paints the sky around you.' : 'The giant sphere is put away.');
+    if (item === 'Inside a qubit') return toggle((this.insideOn = !this.insideOn), 'inside', this.insideOn ? 'Inside a qubit: a transmon a thousand times bigger. Its |0> and |1> levels fill as you turn the selected orb.' : 'Back to the desk.');
+    if (item === 'History') return toggle((this.historyOn = !this.historyOn), 'history', this.historyOn ? 'Quantum computing from 1981 to 2024, around the desk. Turn your head to walk the timeline.' : 'The gallery is put away.');
+    if (item === 'Night sky') {
+      this.nightOn = !this.nightOn;
+      lsys?.setNight(this.nightOn);
+      return toggle(this.nightOn, 'night', this.nightOn ? 'Night sky. The lab stays right where it is.' : 'The room is back.');
+    }
+    if (item === 'Ambient music') {
+      if (this.ambient.on) this.ambient.stop();
+      else this.ambient.start();
+      return toggle(this.ambient.on, 'ambient', this.ambient.on ? 'Ambient music: every basis state with weight is a note. Gates glide the chord.' : 'Music off.');
+    }
+    if (item === 'State album') {
+      this.albumOpen = !this.albumOpen;
+      if (this.albumOpen) this.profileOpen = this.libOpen = false;
+      return toggle(this.albumOpen, 'album-open', this.albumOpen ? `Your State Album: ${this.albumCount()} of ${ALBUM.length}. Make a state on the orbs to collect it.` : 'Album closed.');
+    }
     this.endRush(false);
-    if (k === 1) return this.startDaily();
-    if (k === 2) {
+    if (item === 'Quantum dice' || item === 'Penny flip' || item === 'Schrodinger cat') return this.startGame(item === 'Quantum dice' ? 'dice' : item === 'Penny flip' ? 'penny' : 'cat');
+    this.endGame(false);
+    if (item === 'Daily') return this.startDaily();
+    if (item === 'Surface Code') {
       campaign.startChapter(campaign.chapters.findIndex((c) => c.title === 'Surface Code'));
       return feedback('select');
     }
@@ -1098,6 +1148,199 @@ export class UISystem extends createSystem({
     this.renderNav(campaign.view);
     this.flash('Many worlds: every path through H, H, CZ, H, H. Opposite colours meet at the empty rings and cancel.');
     feedback('select');
+  }
+
+  // ---- the Play tab's wonders and mini-games
+
+  private giantOn = false;
+  private insideOn = false;
+  private historyOn = false;
+  private nightOn = false;
+  private albumOpen = false;
+  private readonly ambient = new Ambient();
+  private ambientTimer = 0;
+  private game: 'dice' | 'penny' | 'cat' | null = null;
+  private pennyPhase: PennyPhase = 'first';
+  private penny: PennyRecord = { you: 0, computer: 0 };
+  private pennyLast: { flipped: boolean; outcome: 0 | 1 } | null = null;
+  private diceAt = -1;
+  private diceLast: number | null = null;
+
+  /** Is this Play item running (for the navigator's highlight)? */
+  private playOn(item: (typeof PLAY)[number]): boolean {
+    switch (item) {
+      case 'Quantum Rush':
+        return !!(this.rush || this.rushOver) && !this.rushZen;
+      case 'Zen Rush':
+        return !!(this.rush || this.rushOver) && this.rushZen;
+      case 'Quantum dice':
+        return this.game === 'dice';
+      case 'Penny flip':
+        return this.game === 'penny';
+      case 'Schrodinger cat':
+        return this.game === 'cat';
+      case 'State album':
+        return this.albumOpen;
+      case 'Giant sphere':
+        return this.giantOn;
+      case 'Inside a qubit':
+        return this.insideOn;
+      case 'Night sky':
+        return this.nightOn;
+      case 'History':
+        return this.historyOn;
+      case 'Ambient music':
+        return this.ambient.on;
+      default:
+        return false;
+    }
+  }
+
+  private albumCount(): number {
+    return ALBUM.filter((e) => this.profile.data.stats.used.includes(`album:${e.id}`)).length;
+  }
+
+  /** A state on the orbs that is in the album, and not collected yet: collect it. */
+  private checkAlbum(): void {
+    for (const e of albumMatches(lab.history.state)) {
+      const key = `album:${e.id}`;
+      if (this.profile.data.stats.used.includes(key)) continue;
+      this.profile.use(key);
+      this.banner.show('New in your State Album', e.name, `${e.ket}  /  ${this.albumCount()} of ${ALBUM.length} collected`);
+      this.world.getSystem(LabSystem)?.celebrate(false);
+      this.checkAchievements();
+    }
+  }
+
+  private startGame(g: 'dice' | 'penny' | 'cat'): void {
+    this.profileOpen = this.libOpen = this.albumOpen = false;
+    if (this.code) this.code.visible = false;
+    this.setView(null);
+    this.game = g;
+    this.tab = 'play';
+    if (g === 'dice') {
+      campaign.enterSandbox(3, []);
+      this.diceLast = null;
+      this.use('dice');
+    } else if (g === 'penny') {
+      campaign.enterSandbox(1, []);
+      this.pennyPhase = 'first';
+      this.pennyLast = null;
+    } else {
+      campaign.enterSandbox(1, [{ kind: 'gate', gate: 'h', target: 0 }]);
+      this.use('cat');
+    }
+    this.game = g;
+    feedback('select');
+    this.render(campaign.view);
+  }
+
+  private endGame(render: boolean): void {
+    if (!this.game) return;
+    this.game = null;
+    this.world.getSystem(LabSystem)?.dice.hide();
+    if (render) this.render(campaign.view);
+  }
+
+  /** The card's main button in a mini-game. */
+  private gameNext(): void {
+    const lsys = this.world.getSystem(LabSystem);
+    if (this.game === 'dice') {
+      // three Hadamards and three measurements: a fair number from 1 to 8
+      lab.reset(3);
+      for (let q = 0; q < 3; q++) lab.gate('h', q);
+      lsys?.dice.roll();
+      this.diceAt = performance.now() / 1000 + 0.9;
+      feedback('gate');
+    } else if (this.game === 'penny') {
+      if (this.pennyPhase === 'first') {
+        // the computer moves in secret: flip or not
+        const flipped = computerFlips(Math.random);
+        if (flipped) lab.apply({ kind: 'gate', gate: 'x', target: 0 });
+        this.pennyLast = { flipped, outcome: 0 };
+        this.pennyPhase = 'second';
+        feedback('select');
+      } else if (this.pennyPhase === 'second') {
+        const outcome = lab.measure(0) ?? 0;
+        this.pennyLast = { flipped: this.pennyLast?.flipped ?? false, outcome };
+        this.penny = pennyScore(this.penny, outcome);
+        this.pennyPhase = 'reveal';
+        if (this.penny.you >= 3) this.use('penny:3');
+        feedback(outcome === 0 ? 'success' : 'reject');
+        if (outcome === 0) lsys?.celebrate(false);
+      } else {
+        lab.reset(1);
+        this.pennyPhase = 'first';
+        feedback('select');
+      }
+    } else if (this.game === 'cat') {
+      if (lab.history.ops.some((o) => o.kind === 'measure')) lab.load(1, [{ kind: 'gate', gate: 'h', target: 0 }]);
+      else lab.measure(0);
+      feedback('measure');
+    }
+    this.renderGameCard();
+  }
+
+  private updateGame(dt: number): void {
+    if (this.diceAt > 0 && performance.now() / 1000 >= this.diceAt && this.game === 'dice') {
+      this.diceAt = -1;
+      const bits = [0, 1, 2].map((q) => lab.measure(q) ?? 0);
+      const label = `${bits[2]}${bits[1]}${bits[0]}`;
+      this.diceLast = parseInt(label, 2) + 1;
+      this.world.getSystem(LabSystem)?.dice.land(this.diceLast, label);
+      feedback('measure');
+      this.renderGameCard();
+    }
+    this.ambientTimer += dt;
+    if (this.ambient.on && this.ambientTimer > 0.4) {
+      this.ambientTimer = 0;
+      this.ambient.set(lab.state.probabilities());
+    }
+  }
+
+  private renderGameCard(): void {
+    for (let i = 0; i < 5; i++) this.els.get(`pip-${i}`)?.setProperties({ display: 'none' });
+    this.els.get('btn-notes')?.setProperties({ display: 'none' });
+    this.els.get('btn-lib')?.setProperties({ display: 'none' });
+    this.text('btn-replay-label', 'Done');
+    this.bg('btn-next', C.primary);
+    this.bg('goal-dot', C.current);
+    if (this.game === 'dice') {
+      this.text('chapter-eyebrow', 'Play  /  Quantum dice');
+      this.text('chapter-title', this.diceLast ? `You rolled ${this.diceLast}` : 'An eight-sided die');
+      this.text('chapter-body', 'Three qubits, each put half and half by an H, then measured: three fair coin tosses no one can predict, read as a number from 1 to 8.');
+      this.text('goal-text', this.diceLast ? `|${(this.diceLast - 1).toString(2).padStart(3, '0')}> + 1 = ${this.diceLast}` : 'Tap Roll');
+      this.text('btn-next-label', this.diceLast ? 'Roll again' : 'Roll');
+    } else if (this.game === 'penny') {
+      const rec = `You ${this.penny.you} : ${this.penny.computer} Computer`;
+      this.text('chapter-eyebrow', `Play  /  Penny flip  /  ${rec}`);
+      if (this.pennyPhase === 'first') {
+        this.text('chapter-title', 'Your move');
+        this.text('chapter-body', 'The coin is heads up (|0>). Do anything you like to it, then the computer secretly flips it or not, you move again, and we look. Heads, you win. (Hint: think quantum.)');
+        this.text('goal-text', 'Make your move, then tap Done');
+        this.text('btn-next-label', 'Done');
+      } else if (this.pennyPhase === 'second') {
+        this.text('chapter-title', 'The computer has moved');
+        this.text('chapter-body', 'It flipped the coin, or it did not; you will not be told. Make your second move, then reveal.');
+        this.text('goal-text', 'Move again, then tap Reveal');
+        this.text('btn-next-label', 'Reveal');
+      } else {
+        const won = this.pennyLast?.outcome === 0;
+        this.text('chapter-title', won ? 'Heads: you win' : 'Tails: the computer wins');
+        this.text('chapter-body', `The computer ${this.pennyLast?.flipped ? 'flipped' : 'did not flip'} the coin. ${won ? 'With H before and after, a flip cannot touch |+>: you win every time.' : 'A classical move wins only half the time. Try H, and H again after.'}`);
+        this.text('goal-text', rec);
+        this.bg('goal-dot', won ? C.done : '#ff8a7a');
+        this.text('btn-next-label', 'Play again');
+      }
+    } else if (this.game === 'cat') {
+      const opened = lab.history.ops.some((o) => o.kind === 'measure');
+      const p1 = lab.history.state.prob1(0);
+      this.text('chapter-eyebrow', "Play  /  Schrodinger's cat");
+      this.text('chapter-title', opened ? (p1 > 0.5 ? 'Asleep' : 'Awake') : 'Awake and asleep');
+      this.text('chapter-body', opened ? 'Looking made it one or the other. Tap New cat for another superposition, and tilt the orb first to change the odds.' : `The qubit is in superposition, so the cat is both: awake ${Math.round((1 - p1) * 100)}%, asleep ${Math.round(p1 * 100)}%. Tilt the orb to change the odds, then open the box.`);
+      this.text('goal-text', opened ? 'Tap New cat' : 'Tap Open, or close your fist');
+      this.text('btn-next-label', opened ? 'New cat' : 'Open');
+    }
   }
 
   /** Today's daily challenge: the last puzzle on the Puzzles tab. */
@@ -1306,6 +1549,12 @@ export class UISystem extends createSystem({
       case 'rush':
         this.startRush();
         return true;
+      case 'play': {
+        const k = PLAY.indexOf(c.item as (typeof PLAY)[number]);
+        if (k < 0) return false;
+        this.startPlay(k);
+        return true;
+      }
       case 'skin':
         this.nextSkin();
         return true;
@@ -2003,7 +2252,7 @@ export class UISystem extends createSystem({
           : this.tab === 'puzzle'
             ? campaign.puzzles.map((c, i) => ({ label: c.chip ?? c.title, done: v.stars[i] === 3, current: v.mode === 'puzzle' && i === v.puzzleIndex, stars: v.stars[i] }))
             : this.tab === 'play'
-              ? PLAY.map((label, i) => ({ label, done: false, current: i === 0 && !!(this.rush || this.rushOver), play: true }))
+              ? PLAY.map((label) => ({ label, done: false, current: this.playOn(label), play: true }))
             : this.tab === 'build'
               ? BUILDS.map((c, i) => ({ label: c.chip, done: campaign.build.best.get(i) === 3, current: v.mode === 'build' && i === campaign.build.index, stars: campaign.build.best.get(i) ?? 0 }))
               : PRESETS.map((p, i) => ({ label: p.label, done: false, current: v.mode === 'sandbox' && i === campaign.preset }));
@@ -2030,7 +2279,7 @@ export class UISystem extends createSystem({
       this.text(`n-${i}-l`, it.label);
       this.els.get(`n-${i}-l`)?.setProperties({ color: it.current ? '#18191b' : it.done ? C.done : C.text });
       const stars = 'stars' in it ? (it.stars as number) : 0;
-      this.text(`n-${i}-n`, 'play' in it ? ['60s', 'day', '49q', 'H H'][at] : stars ? `${stars}/3` : String(at + 1));
+      this.text(`n-${i}-n`, 'play' in it ? PLAY_TAGS[at] : stars ? `${stars}/3` : String(at + 1));
       this.els.get(`n-${i}-n`)?.setProperties({ color: it.current ? '#18191b' : it.done ? C.done : stars ? '#c9ccd1' : '#6b6e75' });
     }
     this.text('nav-progress', `${v.coursed.length}/${v.courseCount} course   ${v.completed.length}/${v.chapterCount} chapters   ${v.learned.length}/${v.lessonCount} lessons`);
@@ -2197,6 +2446,19 @@ export class UISystem extends createSystem({
       labSys.showWheels(false);
       labSys.showVqe(undefined, H2);
       const fig = profileFigure(this.profileView());
+      labSys.showOverlay(fig.key, (b) => b.draw(fig.draw));
+      return;
+    }
+    // the State Album, while it is open
+    if (this.albumOpen) {
+      labSys.hardwareWanted = false;
+      labSys.showHardware(null);
+      labSys.showMaths(false);
+      labSys.showLandscape(null);
+      labSys.showDensity(false);
+      labSys.showWheels(false);
+      labSys.showVqe(undefined, H2);
+      const fig = albumFigure(ALBUM.map((e) => ({ name: e.name, ket: e.ket, hint: e.hint, qubits: e.qubits, got: this.profile.data.stats.used.includes(`album:${e.id}`) })));
       labSys.showOverlay(fig.key, (b) => b.draw(fig.draw));
       return;
     }
@@ -2711,7 +2973,13 @@ export class UISystem extends createSystem({
       const cv = campaign.view;
       const lattice = cv.mode === 'campaign' && !cv.intro && !this.profileOpen && !this.libOpen && cv.chapter?.title === 'Surface Code' ? ((campaign.memoryValue('surface') as SurfaceView | undefined) ?? null) : null;
       lsys.showSurface(lattice);
-      lsys.showStateView(this.libOpen || lattice ? null : this.stateView);
+      const inside = this.insideOn && !lattice;
+      lsys.showTransmon(inside);
+      lsys.showStateView(this.libOpen || lattice || inside ? null : this.stateView);
+      lsys.showCat(this.game === 'cat');
+      lsys.showGiant(this.giantOn);
+      lsys.showHistory(this.historyOn);
+      if (lsys.dice.root.visible && this.game !== 'dice') lsys.dice.hide();
       lsys.showTrophies(this.profileOpen ? ACHIEVEMENTS.map((a) => ({ id: a.id, title: a.title, unlocked: !!this.profile.data.unlocked[a.id] })) : null);
     }
     // notes sit where the code panel does; only one of the two is open at a time
@@ -2763,6 +3031,7 @@ export class UISystem extends createSystem({
     const slow = import.meta.env.DEV ? ((globalThis as { __entangledSlowmo?: number }).__entangledSlowmo ?? 1) : 1;
     campaign.update(Math.min(delta, 0.05) * slow);
     this.updateRush(Math.min(delta, 0.05));
+    this.updateGame(Math.min(delta, 0.05));
     this.pollIbm(Math.min(delta, 0.05));
     this.updateDebugger(Math.min(delta, 0.05));
     if (this.dockFlash && performance.now() >= this.dockFlash.until) {

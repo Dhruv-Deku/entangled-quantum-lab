@@ -717,7 +717,8 @@ const phaseOf = (re: number, im: number) => `hsl(${Math.round((((Math.atan2(im, 
 
 /** The Rush board: the target's amplitudes beside the orbs' own, the clock, the score and the combo. */
 export function rushFigure(v: RushView): Figure {
-  const secs = Math.ceil(v.secondsLeft);
+  const zen = !Number.isFinite(v.secondsLeft);
+  const secs = zen ? 0 : Math.ceil(v.secondsLeft);
   return {
     key: `rush:${secs}:${v.score}:${v.solved}:${v.combo}:${v.target.name}:${v.now.map(([a, b]) => `${a.toFixed(2)},${b.toFixed(2)}`).join(';')}:${v.last?.points ?? ''}:${v.over ? 'over' : ''}`,
     draw: (g, w, h) => {
@@ -776,15 +777,15 @@ export function rushFigure(v: RushView): Figure {
       g.beginPath();
       g.arc(cx, cy, r, 0, Math.PI * 2);
       g.stroke();
-      const frac = Math.max(0, Math.min(1, v.secondsLeft / 60));
-      g.strokeStyle = v.secondsLeft <= 10 ? CORAL : BLUE;
+      const frac = zen ? 1 : Math.max(0, Math.min(1, v.secondsLeft / 60));
+      g.strokeStyle = zen ? MINT : v.secondsLeft <= 10 ? CORAL : BLUE;
       g.lineCap = 'round';
       g.beginPath();
       g.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2);
       g.stroke();
       g.lineCap = 'butt';
-      text(g, `${secs}`, cx, cy + 30, INK, '700 92px', 'center');
-      text(g, 'seconds', cx, cy + 70, DIM, '600 22px', 'center');
+      text(g, zen ? 'zen' : `${secs}`, cx, cy + 30, INK, '700 92px', 'center');
+      text(g, zen ? 'no clock' : 'seconds', cx, cy + 70, DIM, '600 22px', 'center');
       // combo and solved
       roundRect(g, cx - 110, cy + r + 34, 220, 56, 28);
       g.fillStyle = v.combo > 1 ? 'rgba(61,220,151,0.18)' : '#26272b';
@@ -883,6 +884,32 @@ export function surfaceFigure(v: SurfaceView): Figure {
         text(g, 'threshold', a.sx(0.095) - 8, a.y0 + 26, DIM, '600 20px', 'right');
         text(g, 'bigger is better', a.sx(0.045), a.y0 + a.h - 30, MINT, '600 20px', 'center');
       }
+    },
+  };
+}
+
+// ---------------------------------------------------------------- the State Album
+
+/** The State Album on the board: fifteen famous states, collected ones in mint, the rest with a hint. */
+export function albumFigure(items: { name: string; ket: string; hint: string; qubits: number; got: boolean }[]): Figure {
+  const got = items.filter((i) => i.got).length;
+  return {
+    key: `album:${items.map((i) => (i.got ? 1 : 0)).join('')}`,
+    draw: (g, w, h) => {
+      panel(g, w, h, 'State Album  /  make a state on the orbs to collect it', `${got} of ${items.length} collected`);
+      const cols = 5, cw = 290, ch = 160, x0 = 50, y0 = 100;
+      items.forEach((it, i) => {
+        const x = x0 + (i % cols) * (cw + 12), y = y0 + Math.floor(i / cols) * (ch + 12);
+        roundRect(g, x, y, cw, ch, 22);
+        g.fillStyle = it.got ? 'rgba(61,220,151,0.12)' : '#232428';
+        g.fill();
+        g.lineWidth = 3;
+        g.strokeStyle = it.got ? MINT : LINE;
+        g.stroke();
+        text(g, `${it.qubits} qubit${it.qubits > 1 ? 's' : ''}`, x + 20, y + 34, DIM, '600 18px');
+        text(g, it.got ? it.name : '?', x + 20, y + 78, it.got ? INK : DIM, '700 32px');
+        text(g, it.got ? it.ket : it.hint, x + 20, y + 120, it.got ? SOFT_BLUE : DIM, `${it.got ? 600 : 500} ${it.ket.length > 18 && it.got ? 18 : 20}px`);
+      });
     },
   };
 }

@@ -39,6 +39,12 @@ import { QSphereVisual, StateCityVisual } from './state-views-3d';
 import { ManyWorldsVisual } from './worlds-3d';
 import { RushFx } from './rush-fx';
 import { Confetti } from './confetti';
+import { DiceVisual } from './dice-3d';
+import { CatBox } from './cat-box';
+import { GiantSphere } from './giant-sphere';
+import { TransmonVisual } from './transmon';
+import { NightSky } from './night-sky';
+import { HistoryGallery } from './history';
 import { TrophyShelf, type TrophyItem } from './trophies';
 import { SurfaceCodeVisual } from './surface-3d';
 import type { SurfaceView } from './figures';
@@ -110,6 +116,15 @@ export class LabSystem extends createSystem({
   /** Quantum Rush on the desk: the sixty-tick clock and the score pop-ups. */
   rushFx!: RushFx;
   private confetti!: Confetti;
+  /** The Play tab's wonders: quantum dice, Schrodinger's cat, the giant Bloch sphere, inside a qubit, the night sky, the history gallery. */
+  dice!: DiceVisual;
+  private cat!: CatBox;
+  private giant!: GiantSphere;
+  private transmon!: TransmonVisual;
+  private sky!: NightSky;
+  private history!: HistoryGallery;
+  private passthrough = false;
+  private night = false;
   private trophies!: TrophyShelf;
   /** The Surface Code chapter's lattice, floating between the orb and the board. */
   private surface!: SurfaceCodeVisual;
@@ -227,6 +242,28 @@ export class LabSystem extends createSystem({
     ws.add(this.surface.root);
     this.confetti = new Confetti();
     ws.add(this.confetti.root);
+    this.dice = new DiceVisual();
+    this.dice.root.position.set(-0.22, 0, 0.03);
+    ws.add(this.dice.root);
+    this.cat = new CatBox();
+    this.cat.root.position.set(-0.24, 0, 0.0);
+    this.cat.root.rotation.y = 0.35;
+    ws.add(this.cat.root);
+    // the giant sphere is centred over the desk, big enough to sit inside
+    this.giant = new GiantSphere();
+    this.giant.root.position.set(0, 0.2, -0.25);
+    ws.add(this.giant.root);
+    this.transmon = new TransmonVisual();
+    this.transmon.env = env;
+    this.transmon.root.position.set(0, 0.24, -0.22);
+    this.transmon.root.rotation.x = 0.45;
+    this.transmon.root.scale.setScalar(1.25);
+    ws.add(this.transmon.root);
+    this.history = new HistoryGallery();
+    this.history.env = env;
+    ws.add(this.history.root);
+    this.sky = new NightSky();
+    this.scene.add(this.sky.root);
     // the trophy shelf stands upper right, above the navigator, while the progress board is up
     this.trophies = new TrophyShelf();
     this.trophies.env = env;
@@ -253,7 +290,8 @@ export class LabSystem extends createSystem({
         const immersive = v !== VisibilityState.NonImmersive;
         const blend = this.world.xrSession?.environmentBlendMode;
         const passthrough = immersive && (blend === 'alpha-blend' || blend === 'additive');
-        for (const room of this.queries.rooms.entities) if (room.object3D) room.object3D.visible = !passthrough;
+        this.passthrough = passthrough;
+        this.syncRoom();
         if (immersive) this.placePending = true;
         else {
           this.placePending = false;
@@ -477,6 +515,36 @@ export class LabSystem extends createSystem({
     this.confetti.burst(new Vector3(0, ORB_HEIGHT, -0.03), big);
   }
 
+  /** Play tab: the cat box on the desk (it follows q0). */
+  showCat(on: boolean): void {
+    this.cat.root.visible = on;
+  }
+
+  /** Play tab: the room-sized Bloch sphere (a fresh painting each time it opens). */
+  showGiant(on: boolean): void {
+    if (on && !this.giant.root.visible) this.giant.clear();
+    this.giant.root.visible = on;
+  }
+
+  showTransmon(on: boolean): void {
+    this.transmon.root.visible = on;
+  }
+
+  showHistory(on: boolean): void {
+    this.history.show(on);
+  }
+
+  /** The night sky replaces the virtual room (in passthrough it covers the real one too). */
+  setNight(on: boolean): void {
+    this.night = on;
+    this.sky.root.visible = on;
+    this.syncRoom();
+  }
+
+  private syncRoom(): void {
+    for (const room of this.queries.rooms.entities) if (room.object3D) room.object3D.visible = !this.passthrough && !this.night;
+  }
+
   /** The trophy shelf (null hides it). */
   showTrophies(items: readonly TrophyItem[] | null): void {
     this.trophies.root.visible = !!items;
@@ -529,6 +597,17 @@ export class LabSystem extends createSystem({
     if (this.worlds.root.visible) this.worlds.update(dt);
     if (this.rushFx.root.visible) this.rushFx.update(dt);
     if (this.confetti.root.visible) this.confetti.update(dt);
+    if (this.dice.root.visible) this.dice.update(dt);
+    if (this.cat.root.visible) {
+      // the cat follows q0: still in superposition, or measured
+      const p1 = lab.history.state.prob1(0);
+      this.cat.set(p1, lab.history.ops.some((o) => o.kind === 'measure' && o.qubit === 0));
+      this.cat.update(dt);
+    }
+    if (this.giant.root.visible) this.giant.set(blochVector(lab.state, lab.selected), lab.selected);
+    if (this.transmon.root.visible) this.transmon.set(lab.state.prob1(lab.selected), lab.selected);
+    if (this.sky.root.visible) this.sky.update(dt);
+    if (this.history.root.visible) this.history.update(dt);
     if (this.trophies.root.visible) this.trophies.update(dt);
     if (this.surface.root.visible) this.surface.update(dt);
     // on the chip tab the board rises above the code window so the pulse schedule shows

@@ -26,6 +26,7 @@ export type VoiceCommand =
   | { type: 'fullsize'; on: boolean }
   | { type: 'view'; worlds?: boolean }
   | { type: 'rush' | 'skin' }
+  | { type: 'play'; item: string }
   | { type: 'undo' | 'redo' | 'reset' | 'add' | 'remove' | 'next' | 'showme' | 'notes' | 'code' | 'simplify' | 'zoom' | 'noise' | 'library' | 'close' | 'debug' };
 
 const NUMBERS: Record<string, number> = {
@@ -133,6 +134,19 @@ export function parseVoice(text: string): VoiceCommand | null {
   if (/remove (a )?qubit/.test(s)) return { type: 'remove' };
   // before Show me and Continue: "next view", "show me the matrix"
   if (/many worlds|every path|all the paths|feynman/.test(s)) return { type: 'view', worlds: true };
+  const play: [RegExp, string][] = [
+    [/\bzen\b/, 'Zen Rush'],
+    [/\bdice\b|\bdie\b/, 'Quantum dice'],
+    [/penny|coin flip|flip a coin/, 'Penny flip'],
+    [/schrodinger|\bcat\b/, 'Schrodinger cat'],
+    [/\balbum\b|collection/, 'State album'],
+    [/giant|big sphere|inside the sphere/, 'Giant sphere'],
+    [/inside (a |the )?qubit|transmon|josephson/, 'Inside a qubit'],
+    [/night|stars|\bsky\b/, 'Night sky'],
+    [/history|timeline/, 'History'],
+    [/ambient|music/, 'Ambient music'],
+  ];
+  for (const [re, item] of play) if (re.test(s)) return { type: 'play', item };
   if (/\brush\b|arcade|time attack/.test(s)) return { type: 'rush' };
   if (/(next|change|new|switch) (skin|look|finish)|skins?$/.test(s)) return { type: 'skin' };
   if (/(change|switch|next) view|state city|q sphere|cue sphere|heat ?map|unitary|the matrix/.test(s)) return { type: 'view' };
@@ -227,6 +241,8 @@ export function describe(c: VoiceCommand): string {
       return 'run on all three machines';
     case 'rush':
       return 'Quantum Rush';
+    case 'play':
+      return c.item;
     case 'skin':
       return 'the next orb finish';
     case 'view':

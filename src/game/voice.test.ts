@@ -97,3 +97,22 @@ group('voice: new powers', () => {
     expect(parseVoice('next view')).toEqual({ type: 'view' });
   });
 });
+
+group('voice: the Play tab', () => {
+  it('opens each wonder by name', () => {
+    const cases: [string, string][] = [
+      ['zen rush', 'Zen Rush'],
+      ['roll the dice', 'Quantum dice'],
+      ['penny flip', 'Penny flip'],
+      ['schrodinger', 'Schrodinger cat'],
+      ['open my album', 'State album'],
+      ['giant sphere', 'Giant sphere'],
+      ['inside the qubit', 'Inside a qubit'],
+      ['night sky', 'Night sky'],
+      ['show the history', 'History'],
+      ['ambient music', 'Ambient music'],
+    ];
+    for (const [s, item] of cases) expect(parseVoice(s), s).toEqual({ type: 'play', item });
+    expect(parseVoice('quantum rush')).toEqual({ type: 'rush' });
+  });
+});
