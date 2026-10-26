@@ -20,10 +20,6 @@ the Meta Immersive Web SDK (IWSDK), three.js and TypeScript.
 
 ## Why it is different
 
-- **Your room is the lab.** The headset's room scan puts the qubits on your
-  real desk, and in the Quantum Hunt entangled pairs escape onto your floor and
-  furniture: catch one with your hand and its partner across the room collapses
-  at that instant, a gold thread stretched between them.
 - **Your hands are the interface.** Five natural gestures do the work of a
   quantum programming language, a ghost hand demonstrates each one, and every
   gesture also has a button, a key and a voice command.
@@ -42,13 +38,13 @@ the Meta Immersive Web SDK (IWSDK), three.js and TypeScript.
   pair, and classes where a teacher assigns modules, watches progress and
   students earn certificates.
 - **A reason to come back.** A daily challenge whose par is provably optimal,
-  streaks, 24 achievements and levels.
+  streaks, 23 achievements and levels.
 
 ## Highlights
 
-| Entanglement across your room | Atoms carried into place to entangle |
+| Atoms carried into place to entangle | The density matrix as a 3D city |
 | --- | --- |
-| ![The Quantum Hunt: glowing qubits on the floor and furniture of a scanned room, each tied to its partner by a gold thread arcing across the room, and the small task card](docs/screenshots/hunt-room.png) | ![A neutral atom is carried along the lane to its partner, the pair glow gold while the Rydberg interaction entangles them, and it is carried back](docs/screenshots/anim-atoms.gif) |
+| ![A neutral atom is carried along the lane to its partner, the pair glow gold while the Rydberg interaction entangles them, and it is carried back](docs/screenshots/anim-atoms.gif) | ![State city: the real and imaginary parts of the density matrix as towers](docs/screenshots/state-city.png) |
 | **The same circuit on three machines** | **Beat the classical limit** |
 | ![Superconducting 89.4%, trapped ions 97.3%, neutral atoms 93.8%, with shot times and wiring costs](docs/screenshots/machines-compare.png) | ![The Bell test: S = 2.93 +- 0.09 with entanglement, 1.45 without, against the classical limit 2](docs/screenshots/ch19-bell-test.png) |
 | **Inside a superconducting quantum computer** | **On your real desk, in mixed reality** |
@@ -56,15 +52,15 @@ the Meta Immersive Web SDK (IWSDK), three.js and TypeScript.
 | **See a whole state at once** | **Your progress** |
 | ![The Q-sphere of a four-qubit state](docs/screenshots/qsphere.png) | ![Level, daily streak and achievements](docs/screenshots/profile-board.png) |
 
-**By the numbers:** 26 chapters, a 14-module course, 15 lessons, 12 puzzles and
-a daily challenge, 4 big-state views, 3 kinds of quantum computer in 3D, 24
-achievements, a room-scale hunt, voice control, shared labs and classes, and 295 unit tests.
+**By the numbers:** 25 chapters, a 14-module course, 15 lessons, 12 puzzles and
+a daily challenge, 4 big-state views, 3 kinds of quantum computer in 3D, 23
+achievements, voice control, shared labs and classes, and 295 unit tests.
 
 ## Contents
 
 - [Try it](#try-it)
 - [Part 1: Your hands are the quantum computer](#part-1-your-hands-are-the-quantum-computer)
-  - [Your room is the lab](#your-room-is-the-lab), [Quantum Hunt](#quantum-hunt), [Gestures](#gestures), [Gates you can see](#gates-you-can-see), [Circuit board](#circuit-board), [Sandbox](#sandbox), [Share links](#share-links)
+  - [Gestures](#gestures), [Gates you can see](#gates-you-can-see), [Circuit board](#circuit-board), [Sandbox](#sandbox), [Share links](#share-links)
 - [Part 2: Learn, from the first qubit to research topics](#part-2-learn-from-the-first-qubit-to-research-topics)
   - [Course](#course), [Learn](#learn), [Notes](#notes), [The Mystery Qubit](#the-mystery-qubit), [QAOA: a variational algorithm](#qaoa-a-variational-algorithm), [Algorithm chapters](#algorithm-chapters), [Advanced chapters](#advanced-chapters), [The maths of every step](#the-maths-of-every-step)
 - [Part 3: Real quantum hardware](#part-3-real-quantum-hardware)
@@ -80,7 +76,7 @@ achievements, a room-scale hunt, voice control, shared labs and classes, and 295
 ```sh
 npm install
 npm run dev        # managed browser with the Quest 3 emulator (IWER)
-npm test           # 300 unit tests: physics, the room and the Quantum Hunt, three kinds of quantum computer, gestures, the course, 25 chapters, 15 lessons, puzzles, the daily challenge, achievements, builder, noise, chemistry, import, IBM compiling, Bell tests, error correction, benchmarking, voice, shared rooms and more
+npm test           # 295 unit tests: physics, three kinds of quantum computer, gestures, the course, 25 chapters, 15 lessons, puzzles, the daily challenge, achievements, builder, noise, chemistry, import, IBM compiling, Bell tests, error correction, benchmarking, voice, shared rooms and more
 npm run typecheck
 npm run build
 ```
@@ -90,39 +86,6 @@ On a Quest on the same Wi-Fi: run `npx @iwsdk/cli dev status`, open one of the
 certificate warning, and tap Enter XR.
 
 ## Part 1: Your hands are the quantum computer
-
-### Your room is the lab
-
-![The lab on the room's real table: the orbs, the circuit board and the panels sit on the scanned table, at its height](docs/screenshots/room-desk.png)
-
-On a Quest 3 the app asks for the room scan (planes and meshes with labels
-such as table, floor, wall, couch). The first time a table turns up near you,
-the whole lab moves onto it: the orbs rest at the table's real height, on its
-near side, facing you. Without a scan, the desk floats at a comfortable seated
-reach as before. Tests cover the choice of desk and spot, including runtimes
-that report a plane's normal upside down.
-
-### Quantum Hunt
-
-Chapter 26 turns the room into the experiment. Three entangled pairs escape:
-each qubit is a translucent orb with two ghost cores circling inside it (0 and
-1 at once), hidden on real surfaces from the room scan (floor, tables,
-shelves), as far apart as the room allows, each pair joined by a gold thread
-arcing across the room. The big panels step aside for a small task card that
-follows your gaze.
-
-Reach out and catch one with your hand (palm or fingertip, or a controller).
-Catching measures it, a fair coin toss, and a bead of light runs along the gold
-thread to its partner, which collapses where it stands to the same value. One
-pair is anti-correlated, so its partner always shows the opposite value. The
-thread then fades, because measuring used the entanglement up. Caught qubits
-float to a tray above your desk.
-
-Each pair is a real two-qubit state, measured with the same simulator as the
-rest of the app; tests check that partners always agree (or always disagree),
-that each outcome is a fair coin, and that the hiding places are spread out
-inside the room and never on the ceiling. Show me (J) catches the next qubit
-for players without room to walk.
 
 ### Gestures
 

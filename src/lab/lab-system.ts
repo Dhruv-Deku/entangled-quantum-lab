@@ -27,8 +27,6 @@ import { FridgeVisual } from './fridge';
 import { noiseLab } from './noise-lab';
 import { runNoisy } from '../quantum/density';
 import { ChipVisual } from './chip';
-import { pickDesk, readRoom, type Surface } from './room';
-import { huntStatus } from '../game/hunt';
 import { IonChamberVisual, IonTrapVisual } from './ion-trap';
 import { AtomArrayVisual, OpticsTableVisual } from './atom-array';
 import type { PlatformId } from '../quantum/platforms';
@@ -90,13 +88,6 @@ export class LabSystem extends createSystem({
   machine: PlatformId = 'superconducting';
   /** The UI wants the machine shown (the chip tab, or a course step about hardware). */
   hardwareWanted = false;
-  /** The real room: detected tables, floor, walls and furniture (empty until scanned). */
-  surfaces: Surface[] = [];
-  private roomTimer = 0;
-  /** This session's workspace already sits on a real desk. */
-  private onRealDesk = false;
-  /** The real desk the workspace sits on, if one was found. */
-  deskSurface: Surface | null = null;
   /** Big-state views: the Q-sphere and the state city float where the board was; the board shows their legend. */
   private qsphere!: QSphereVisual;
   private city!: StateCityVisual;
@@ -218,8 +209,6 @@ export class LabSystem extends createSystem({
         if (immersive) this.placePending = true;
         else {
           this.placePending = false;
-          this.onRealDesk = false;
-          this.deskSurface = null;
           ws.position.copy(DESK);
           ws.rotation.set(0, 0, 0);
         }
@@ -227,10 +216,7 @@ export class LabSystem extends createSystem({
     );
   }
 
-  /**
-   * Put the desk workspace in front of the head: on the real desk when the
-   * headset has found one, otherwise a comfortable seated reach below the head.
-   */
+  /** Put the desk workspace a comfortable seated reach below and in front of the head. */
   private placeWorkspaceFromHead(): void {
     const head = this.player.head;
     head.updateWorldMatrix(true, false);
@@ -240,16 +226,6 @@ export class LabSystem extends createSystem({
     if (fwd.lengthSq() < 1e-4) fwd.set(0, 0, -1);
     fwd.normalize();
     const ws = this.workspace.object3D!;
-    const desk = pickDesk(this.surfaces, pos);
-    if (desk) {
-      // on the real table: at its height, on its near side, facing the player
-      ws.position.copy(desk.spot);
-      const toHead = new Vector3(pos.x - desk.spot.x, 0, pos.z - desk.spot.z);
-      ws.rotation.set(0, toHead.lengthSq() > 1e-4 ? Math.atan2(toHead.x, toHead.z) : Math.atan2(-fwd.x, -fwd.z), 0);
-      this.deskSurface = desk.surface;
-      this.onRealDesk = true;
-      return;
-    }
     ws.position.copy(pos).addScaledVector(fwd, 0.4);
     ws.position.y = pos.y - 0.42;
     ws.rotation.set(0, Math.atan2(-fwd.x, -fwd.z), 0);
@@ -431,24 +407,6 @@ export class LabSystem extends createSystem({
     // development: slow motion (window.__entangledSlowmo), for recording the animations frame by frame
     const slow = import.meta.env.DEV ? ((globalThis as { __entangledSlowmo?: number }).__entangledSlowmo ?? 1) : 1;
     const dt = Math.min(delta, 0.05) * slow;
-    // the real room, twice a second; the first time a desk turns up, move the workspace onto it
-    this.roomTimer += delta;
-    if (this.roomTimer > 0.5) {
-      this.roomTimer = 0;
-      this.surfaces = readRoom(this.xrFrame, this.xrManager?.getReferenceSpace());
-      if (this.surfaces.length && !this.onRealDesk && this.world.xrSession) {
-        const head = new Vector3().setFromMatrixPosition(this.player.head.matrixWorld);
-        if (pickDesk(this.surfaces, head)) this.placePending = true;
-      }
-      if (import.meta.env.DEV)
-        (globalThis as { __entangledRoom?: unknown }).__entangledRoom = {
-          surfaces: this.surfaces.map((x) => ({ label: x.label, horizontal: x.horizontal, ny: +x.normal.y.toFixed(2), y: +x.center.y.toFixed(2), x: +x.center.x.toFixed(2), z: +x.center.z.toFixed(2), size: x.size.map((v) => +v.toFixed(2)) })),
-          onRealDesk: this.onRealDesk,
-          desk: this.deskSurface?.label ?? null,
-        };
-    }
-    // the desk steps aside while the Quantum Hunt uses the whole room
-    this.workspace.object3D!.visible = !huntStatus.active;
     // one machine at a time: the device where the chip floats, its surroundings where the fridge stands
     const device = this.hardwareWanted, room = !!this.pulseView;
     this.chip.root.visible = device && this.machine === 'superconducting';

@@ -5,7 +5,6 @@ import { UISystem } from './game/ui-system.js';
 import { DebugInputSystem } from './lab/debug-input.js';
 import { GestureSystem } from './lab/gesture-system.js';
 import { LabSystem } from './lab/lab-system.js';
-import { HuntSystem } from './lab/hunt-system.js';
 
 World.create(
   document.getElementById('scene-container') as HTMLDivElement,
@@ -16,5 +15,4 @@ World.create(
   world.registerSystem(DebugInputSystem);
   world.registerSystem(UISystem);
   world.registerSystem(TutorSystem);
-  world.registerSystem(HuntSystem);
 });

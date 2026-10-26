@@ -266,14 +266,6 @@ export const NOTES: Record<string, string[]> = {
     'Key idea: averaging over random sequences turns a tiny, hard-to-see error into a clear curve. It is the standard way chips report gate quality.',
   ],
 
-  'Quantum Hunt': [
-    'Each escaped pair shares one entangled state, (|00> + |11>)/sqrt(2), or (|01> + |10>)/sqrt(2) for the anti-correlated pair.',
-    'Neither qubit has a value of its own until one is measured. Catching a qubit measures it: a fair coin toss, 0 or 1.',
-    'At that instant its partner, wherever it is in the room, is left with the matching value (or the opposite one). The gold thread fades because the entanglement has been used up.',
-    'No message can be sent this way: each side alone still looks random. Only comparing the two afterwards shows the perfect agreement.',
-    'Key idea: entangled qubits are one system, however far apart they are.',
-  ],
-
   // ---------- builder ----------
   'Circuit diagrams': [
     'A circuit diagram reads left to right like music: one horizontal wire per qubit, and time flowing to the right. Each box on a wire is a single-qubit gate.',
