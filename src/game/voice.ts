@@ -21,7 +21,7 @@ export type VoiceCommand =
   | { type: 'assign'; module: number; on: boolean }
   | { type: 'share' | 'leave' | 'classroom' }
   | { type: 'listen' | 'daily' | 'profile' | 'snapshot' }
-  | { type: 'machine'; id: 'superconducting' | 'ions' | 'atoms' }
+  | { type: 'machine'; id: 'superconducting' | 'ions' | 'atoms' | 'photons' }
   | { type: 'compare' }
   | { type: 'fullsize'; on: boolean }
   | { type: 'view'; worlds?: boolean }
@@ -125,6 +125,7 @@ export function parseVoice(text: string): VoiceCommand | null {
   if (/trapped ions?|ion trap|\bions\b/.test(s)) return { type: 'machine', id: 'ions' };
   if (/neutral atoms?|atom array|\batoms\b/.test(s)) return { type: 'machine', id: 'atoms' };
   if (/superconduct/.test(s)) return { type: 'machine', id: 'superconducting' };
+  if (/photon|photonic|light chip|optical computer/.test(s)) return { type: 'machine', id: 'photons' };
   if (/trophies|achievements|my (progress|profile|level)/.test(s)) return { type: 'profile' };
   if (/snapshot|(take|save) a (picture|photo)|screenshot/.test(s)) return { type: 'snapshot' };
   if (/^(undo|go back|take that back)/.test(s)) return { type: 'undo' };
@@ -237,7 +238,7 @@ export function describe(c: VoiceCommand): string {
     case 'snapshot':
       return 'save a picture of the circuit';
     case 'machine':
-      return c.id === 'ions' ? 'the trapped-ion computer' : c.id === 'atoms' ? 'the neutral-atom computer' : 'the superconducting chip';
+      return c.id === 'ions' ? 'the trapped-ion computer' : c.id === 'atoms' ? 'the neutral-atom computer' : c.id === 'photons' ? 'the photonic chip' : 'the superconducting chip';
     case 'compare':
       return 'run on all three machines';
     case 'rush':

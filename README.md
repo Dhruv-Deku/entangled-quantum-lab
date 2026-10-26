@@ -73,8 +73,8 @@ the Meta Immersive Web SDK (IWSDK), three.js and TypeScript.
 
 **By the numbers:** 26 chapters, a 14-module course, 21 lessons, 12 puzzles, a
 daily challenge and Quantum Rush, a Play tab, 5 big-state views, 3 kinds of quantum computer
-in 3D at full size, a 49-qubit surface code, 34 achievements, 5 orb finishes, 21 Play tab items, daily quests,
-voice control, shared labs and classes, and 334 unit tests.
+in 3D at full size, a 49-qubit surface code, 34 achievements, 5 orb finishes, 25 Play tab items, daily quests,
+voice control, shared labs and classes, and 336 unit tests.
 
 ## Contents
 
@@ -88,7 +88,7 @@ voice control, shared labs and classes, and 334 unit tests.
 - [Part 4: Tools for exploring](#part-4-tools-for-exploring)
   - [Build: circuit builder](#build-circuit-builder), [Code window: tabs, zoom, simplify](#code-window-tabs-zoom-simplify), [Step debugger](#step-debugger), [Big-state views](#big-state-views), [Many worlds](#many-worlds), [Library, import and custom gates](#library-import-and-custom-gates), [Voice commands](#voice-commands), [Listen to a state](#listen-to-a-state), [Snapshot](#snapshot)
 - [Part 5: Together, and every day](#part-5-together-and-every-day)
-  - [Code Lab: write your own programs](#code-lab-write-your-own-programs), [Games that teach](#games-that-teach-spies-decoders-mazes-and-quests), [The Play tab: ten wonders](#the-play-tab-ten-wonders), [Quantum Rush](#quantum-rush), [Shared lab](#shared-lab), [Classroom and certificate](#classroom-and-certificate), [Daily challenge, achievements and levels](#daily-challenge-achievements-and-levels), [Trophies and celebrations](#trophies-and-celebrations), [Orb finishes](#orb-finishes), [Puzzles](#puzzles)
+  - [Code Lab: write your own programs](#code-lab-write-your-own-programs), [Games that teach](#games-that-teach-spies-decoders-mazes-and-quests), [New worlds](#new-worlds-light-teleportation-shor-and-a-modular-machine), [The Play tab: ten wonders](#the-play-tab-ten-wonders), [Quantum Rush](#quantum-rush), [Shared lab](#shared-lab), [Classroom and certificate](#classroom-and-certificate), [Daily challenge, achievements and levels](#daily-challenge-achievements-and-levels), [Trophies and celebrations](#trophies-and-celebrations), [Orb finishes](#orb-finishes), [Puzzles](#puzzles)
 - [Under the hood](#under-the-hood)
 
 ## Try it
@@ -96,7 +96,7 @@ voice control, shared labs and classes, and 334 unit tests.
 ```sh
 npm install
 npm run dev        # managed browser with the Quest 3 emulator (IWER)
-npm test           # 334 unit tests: physics, three kinds of quantum computer, gestures, the course, 25 chapters, 15 lessons, puzzles, the daily challenge, achievements, builder, noise, chemistry, import, IBM compiling, Bell tests, error correction, benchmarking, voice, shared rooms and more
+npm test           # 336 unit tests: physics, three kinds of quantum computer, gestures, the course, 25 chapters, 15 lessons, puzzles, the daily challenge, achievements, builder, noise, chemistry, import, IBM compiling, Bell tests, error correction, benchmarking, voice, shared rooms and more
 npm run typecheck
 npm run build
 ```
@@ -867,6 +867,41 @@ missing, and Run points at the first one.
 - **First five minutes**: a guided welcome tour, the first item on the Play tab
   after the Code Lab (and a Learn lesson): turn a qubit, H, measure, entangle,
   and 100 shots of your first Bell pair, with the ghost hand showing each move.
+
+### New worlds: light, teleportation, Shor and a modular machine
+
+| A photonic quantum computer | Teleportation booths |
+| --- | --- |
+| ![The photonic chip on the On chip tab: glowing waveguides with copper phase shifters floating beside the desk, the photonic rack with fibre spools and status lights, and the code window titled Your circuit on photonic chip](docs/screenshots/photonic-chip.png) | ![Teleportation booths under q0 and q2 with mint rings, and the card reading Bob got 1 and 1: he fixes q2 with them](docs/screenshots/teleporter.png) |
+| **Shor's algorithm in 3D** | **A modular quantum computer** |
+| ![Sixteen bars behind the orbs after the quantum Fourier transform: four mint spikes at 0, 4, 8 and 12, with the caption the comb becomes spikes every 16 / 4](docs/screenshots/shor-3d.png) | ![A room-scale modular machine behind the desk: a black frame holding three dilution refrigerators behind glass, racks of status lights at both ends and a light bar along the top](docs/screenshots/modular-machine.png) |
+
+- **Photonic chip**: a fourth kind of quantum computer, on the On chip tab
+  (**Photons**, the Play tab, or say "photonic"). Each qubit is a single photon
+  in its own silicon waveguide; light flows from the photon sources through a
+  mesh of beam splitters and copper phase-shifter heaters to the detectors, and
+  a two-qubit gate bridges two waveguides in gold. The machine around it is a
+  rack of control electronics with fibre spools and a small cryostat for the
+  single-photon detectors; Full size makes it two metres tall. Its model: gates
+  in nanoseconds, any qubits linked by steering light, entangling gates that
+  only sometimes work and photon loss as the main error (Xanadu, PsiQuantum,
+  Quandela). Compare now runs the circuit on all four machines.
+- **Teleporter**: q0 gets a random message (a tilt and a twist). Make an
+  entangled pair on q1 and q2, do the Bell measurement on q0 and q1, and watch
+  the two classical bits fly from the sending pad to the receiving pad; fix q2
+  with them (X, Z) and a column of light rises: q2 now points exactly where q0
+  did, with the fidelity on the card, and q0 has lost it. Nothing travels
+  faster than light; nothing is copied.
+- **Shor in 3D**: factoring 15 with a = 7, on a loop: sixteen bars for the input
+  register in superposition, then 7^x mod 15 with its repeating pattern, the
+  comb left after measuring the function, the quantum Fourier transform turning
+  it into spikes every 16 / 4, and 15 = 3 x 5. Every number is computed (tests
+  check the spikes at 0, 4, 8, 12 and the factors).
+- **System Two**: a room-sized modular machine three metres behind the desk, in
+  the style of IBM's Quantum System Two: a long black frame with three dilution
+  refrigerators behind glass (each opening and cooling down as it appears),
+  racks of control electronics with status lights at both ends, and a light bar
+  along the top.
 
 ### The Play tab: ten wonders
 

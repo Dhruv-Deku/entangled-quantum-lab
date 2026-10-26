@@ -43,6 +43,8 @@ import { AutoTransport } from '../net/transport';
 import { openDailyDialog, openShareDialog, savedName } from '../lab/share-dialog';
 import { ACHIEVEMENTS, levelFor, Profile, xpFor, type ProgressContext } from './profile';
 import { ket, RUSH_QUBITS, RushSession } from './rush';
+import type { Vec3 } from '../quantum/gates';
+import { blochVector } from '../quantum/bloch';
 import { manyWorlds } from '../quantum/paths';
 import { ALBUM, albumMatches } from './album';
 import { CodeProgram, EXAMPLES, fromOps, type CodeGate } from './code-lab';
@@ -110,8 +112,8 @@ const LAB_LINES = 10;
 const LAB_KEYS = ['h', 'x', 'y', 'z', 's', 'sdg', 't', 'tdg', 'rx', 'ry', 'rz', 'cx', 'cz', 'swap', 'ccx', 'measure', 'q0', 'q1', 'q2', 'q3', 'q4', 'pi', 'pi2', 'pi4', 'mpi2', 'up', 'down', 'delete', 'clear', 'link', 'subqubit', 'addqubit', 'example', 'fromorbs'];
 const TABS = ['course', 'campaign', 'learn', 'puzzle', 'build', 'sandbox', 'play'] as const;
 /** The Play tab: arcade and showcase picks. */
-const PLAY = ['Code lab', 'First five minutes', 'Daily quests', 'Quantum Rush', 'Zen Rush', 'Daily', 'Spy game', 'Be the decoder', 'Grover maze', 'Surface Code', 'Many worlds', 'Quantum dice', 'Penny flip', 'Schrodinger cat', 'State album', 'Giant sphere', 'Inside a qubit', 'Night sky', 'History', 'Ambient music'] as const;
-const PLAY_TAGS = ['qasm', 'tour', '3/day', '60s', 'zen', 'day', 'BB84', 'd=3', '8',  '49q', 'H H', 'd8', 'coin', 'box', '15', '1 m', 'JJ', 'sky', '1981', 'hum'];
+const PLAY = ['Code lab', 'First five minutes', 'Daily quests', 'Quantum Rush', 'Zen Rush', 'Daily', 'Spy game', 'Be the decoder', 'Grover maze', 'Teleporter', 'Shor in 3D', 'System Two', 'Photonic chip', 'Surface Code', 'Many worlds', 'Quantum dice', 'Penny flip', 'Schrodinger cat', 'State album', 'Giant sphere', 'Inside a qubit', 'Night sky', 'History', 'Ambient music'] as const;
+const PLAY_TAGS = ['qasm', 'tour', '3/day', '60s', 'zen', 'day', 'BB84', 'd=3', '8', 'tp', '15', '3x', 'light',  '49q', 'H H', 'd8', 'coin', 'box', '15', '1 m', 'JJ', 'sky', '1981', 'hum'];
 
 /** Where hidden panels park, out of reach of every pointer. */
 const PARKED = new Vector3(0, -50, 0);
@@ -377,7 +379,7 @@ export class UISystem extends createSystem({
     const dockIds = ['g-h', 'g-x', 'g-y', 'g-z', 'g-s', 'g-t', 'g-rl', 'g-rr', 'a-cnot', 'a-swap', 'a-measure', 'a-shots', 'a-export', 't-prev', 't-next', 'dock-status', 'a-voice', 'a-voice-l', 'a-debug', 'a-debug-l', 'a-view', 'a-view-l', 'a-share', 'a-share-l', 'a-listen', 'a-listen-l'];
     for (let i = 0; i < SLOTS; i++) dockIds.push(`t-${i}`, `t-${i}-l`);
     for (const id of dockIds) this.els.set(id, this.dock.requireElementById(id));
-    const codeIds = ['code-close', 'code-note', 'code-link', 'code-eyebrow', 'code-title', 'code-zoom', 'code-zoom-label', 'code-simplify', 'code-simplify-label', 'code-run', 'code-ibm', 'code-ibm-l', 'code-up', 'code-down', 'code-mach', 'code-m-superconducting', 'code-m-ions', 'code-m-atoms', 'code-compare', 'code-full', 'code-edit'];
+    const codeIds = ['code-close', 'code-note', 'code-link', 'code-eyebrow', 'code-title', 'code-zoom', 'code-zoom-label', 'code-simplify', 'code-simplify-label', 'code-run', 'code-ibm', 'code-ibm-l', 'code-up', 'code-down', 'code-mach', 'code-m-superconducting', 'code-m-ions', 'code-m-atoms', 'code-m-photons', 'code-compare', 'code-full', 'code-edit'];
     for (const f of FORMATS) codeIds.push(`code-tab-${f}`, `code-tab-${f}-l`);
     for (let i = 0; i < CODE_LINES; i++) codeIds.push(`code-r-${i}`, `code-n-${i}`, `code-h-${i}`, `code-t-${i}`);
     for (const id of codeIds) this.els.set(id, this.code.requireElementById(id));
@@ -573,7 +575,7 @@ export class UISystem extends createSystem({
     for (const f of FORMATS) on(`code-tab-${f}`, () => this.setFormat(f));
     on('code-simplify', () => this.simplifyCircuit());
     on('code-run', () => this.runChip());
-    for (const id of ['superconducting', 'ions', 'atoms'] as const) on(`code-m-${id}`, () => this.setMachine(id));
+    for (const id of ['superconducting', 'ions', 'atoms', 'photons'] as const) on(`code-m-${id}`, () => this.setMachine(id));
     on('code-compare', () => this.compareMachines());
     on('code-full', () => this.setFullSize(!this.world.getSystem(LabSystem)?.fullSize));
     on('code-ibm', () => void this.runIbm());
@@ -1173,6 +1175,22 @@ export class UISystem extends createSystem({
     };
     if (item === 'Giant sphere') return toggle((this.giantOn = !this.giantOn), 'giant', this.giantOn ? 'You are inside the Bloch sphere. Turn a qubit and its arrow paints the sky around you.' : 'The giant sphere is put away.');
     if (item === 'Inside a qubit') return toggle((this.insideOn = !this.insideOn), 'inside', this.insideOn ? 'Inside a qubit: a transmon a thousand times bigger. Its |0> and |1> levels fill as you turn the selected orb.' : 'Back to the desk.');
+    if (item === 'Shor in 3D') {
+      this.shorOn = !this.shorOn;
+      lsys?.showShor(this.shorOn);
+      return toggle(this.shorOn, 'shor', this.shorOn ? "Shor's algorithm factoring 15: superposition, the repeating pattern, a measurement, the Fourier transform, and the factors." : 'Shor put away.');
+    }
+    if (item === 'System Two') {
+      this.systemTwoOn = !this.systemTwoOn;
+      lsys?.showSystemTwo(this.systemTwoOn);
+      return toggle(this.systemTwoOn, 'system-two', this.systemTwoOn ? 'A modular quantum computer, three metres behind you: three cryostats linked into one machine. Turn around and look.' : 'The big machine is put away.');
+    }
+    if (item === 'Photonic chip') {
+      this.codeFormat = 'chip';
+      this.showCode(false);
+      this.setMachine('photons');
+      return this.renderNav(campaign.view);
+    }
     if (item === 'History') return toggle((this.historyOn = !this.historyOn), 'history', this.historyOn ? 'Quantum computing from 1981 to 2024, around the desk. Turn your head to walk the timeline.' : 'The gallery is put away.');
     if (item === 'Night sky') {
       this.nightOn = !this.nightOn;
@@ -1190,7 +1208,7 @@ export class UISystem extends createSystem({
       return toggle(this.albumOpen, 'album-open', this.albumOpen ? `Your State Album: ${this.albumCount()} of ${ALBUM.length}. Make a state on the orbs to collect it.` : 'Album closed.');
     }
     this.endRush(false);
-    const games: Record<string, 'dice' | 'penny' | 'cat' | 'spy' | 'decoder' | 'grover'> = { 'Quantum dice': 'dice', 'Penny flip': 'penny', 'Schrodinger cat': 'cat', 'Spy game': 'spy', 'Be the decoder': 'decoder', 'Grover maze': 'grover' };
+    const games: Record<string, 'dice' | 'penny' | 'cat' | 'spy' | 'decoder' | 'grover' | 'teleport'> = { 'Quantum dice': 'dice', 'Penny flip': 'penny', 'Schrodinger cat': 'cat', 'Spy game': 'spy', 'Be the decoder': 'decoder', 'Grover maze': 'grover', Teleporter: 'teleport' };
     if (games[item]) return this.startGame(games[item]);
     this.endGame(false);
     if (item === 'Daily') return this.startDaily();
@@ -1212,11 +1230,13 @@ export class UISystem extends createSystem({
   private giantOn = false;
   private insideOn = false;
   private historyOn = false;
+  private shorOn = false;
+  private systemTwoOn = false;
   private nightOn = false;
   private albumOpen = false;
   private readonly ambient = new Ambient();
   private ambientTimer = 0;
-  private game: 'dice' | 'penny' | 'cat' | 'spy' | 'decoder' | 'grover' | null = null;
+  private game: 'dice' | 'penny' | 'cat' | 'spy' | 'decoder' | 'grover' | 'teleport' | null = null;
   private pennyPhase: PennyPhase = 'first';
   private penny: PennyRecord = { you: 0, computer: 0 };
   private pennyLast: { flipped: boolean; outcome: 0 | 1 } | null = null;
@@ -1236,6 +1256,14 @@ export class UISystem extends createSystem({
         return this.game === 'decoder';
       case 'Grover maze':
         return this.game === 'grover';
+      case 'Teleporter':
+        return this.game === 'teleport';
+      case 'Shor in 3D':
+        return this.shorOn;
+      case 'System Two':
+        return this.systemTwoOn;
+      case 'Photonic chip':
+        return this.machine === 'photons' && !!this.code?.visible && this.codeFormat === 'chip';
       case 'Quantum Rush':
         return !!(this.rush || this.rushOver) && !this.rushZen;
       case 'Zen Rush':
@@ -1280,7 +1308,7 @@ export class UISystem extends createSystem({
     }
   }
 
-  private startGame(g: 'dice' | 'penny' | 'cat' | 'spy' | 'decoder' | 'grover'): void {
+  private startGame(g: 'dice' | 'penny' | 'cat' | 'spy' | 'decoder' | 'grover' | 'teleport'): void {
     this.profileOpen = this.libOpen = this.albumOpen = false;
     if (this.code) this.code.visible = false;
     this.setView(null);
@@ -1304,6 +1332,9 @@ export class UISystem extends createSystem({
     } else if (g === 'decoder') {
       campaign.enterSandbox(1, []);
       this.decoderRound();
+    } else if (g === 'teleport') {
+      campaign.enterSandbox(3, []);
+      this.teleportNew();
     } else {
       campaign.enterSandbox(3, []);
       this.groverNew();
@@ -1320,6 +1351,7 @@ export class UISystem extends createSystem({
     ls?.dice.hide();
     ls?.spy.hide();
     if (ls) ls.grover.root.visible = false;
+    if (ls) ls.teleporter.root.visible = false;
     ls?.showSurfacePuzzle(null);
     if (render) this.render(campaign.view);
   }
@@ -1330,6 +1362,7 @@ export class UISystem extends createSystem({
     if (this.game === 'spy') return this.spyNext();
     if (this.game === 'decoder') return this.decoderNext();
     if (this.game === 'grover') return this.groverNext();
+    if (this.game === 'teleport') return this.teleportNext();
     if (this.game === 'dice') {
       // three Hadamards and three measurements: a fair number from 1 to 8
       lab.reset(3);
@@ -1371,6 +1404,10 @@ export class UISystem extends createSystem({
 
   private updateGame(dt: number): void {
     const ls = this.world.getSystem(LabSystem);
+    if (this.game === 'teleport' && this.tele.phase === 'flying' && ls?.teleporter.arrived) {
+      this.tele.phase = 'fix';
+      this.renderGameCard();
+    }
     if (this.game === 'spy' && this.spyPhase === 'flying' && ls?.spy.arrived) {
       this.spyPhase = 'guess';
       this.renderGameCard();
@@ -1406,7 +1443,7 @@ export class UISystem extends createSystem({
       });
       this.els.get('choice-2')?.setProperties({ display: 'none' });
     }
-    if (this.game === 'spy' || this.game === 'decoder' || this.game === 'grover') return this.renderLearnGame();
+    if (this.game === 'spy' || this.game === 'decoder' || this.game === 'grover' || this.game === 'teleport') return this.renderLearnGame();
     this.els.get('btn-notes')?.setProperties({ display: 'none' });
     this.els.get('btn-lib')?.setProperties({ display: 'none' });
     this.text('btn-replay-label', 'Done');
@@ -1634,6 +1671,53 @@ export class UISystem extends createSystem({
     this.renderGameCard();
   }
 
+  private readonly tele = { phase: 'pair' as 'pair' | 'measure' | 'flying' | 'fix' | 'done', m0: 0, m1: 0, message: [0, 0, 1] as Vec3, sent: 0 };
+
+  /** A new message on q0: a random tilt and twist. */
+  private teleportNew(): void {
+    const theta = 0.5 + Math.random() * 2.1, phi = Math.random() * Math.PI * 2;
+    lab.load(3, [{ kind: 'gate', gate: 'ry', target: 0, params: [theta] }, { kind: 'gate', gate: 'rz', target: 0, params: [phi] }]);
+    this.tele.message = blochVector(lab.history.state, 0);
+    this.tele.phase = 'pair';
+    const ls = this.world.getSystem(LabSystem);
+    if (ls) {
+      ls.teleporter.reset();
+      ls.teleporter.root.visible = true;
+    }
+  }
+
+  private teleportNext(): void {
+    const t = this.tele, ls = this.world.getSystem(LabSystem);
+    if (t.phase === 'pair') {
+      lab.gate('h', 1);
+      lab.entangle(1, 2);
+      t.phase = 'measure';
+      feedback('entangle');
+    } else if (t.phase === 'measure') {
+      lab.entangle(0, 1);
+      lab.gate('h', 0);
+      t.m0 = lab.measure(0) ?? 0;
+      t.m1 = lab.measure(1) ?? 0;
+      ls?.teleporter.sendBits(t.m0, t.m1);
+      t.phase = 'flying';
+      feedback('measure');
+    } else if (t.phase === 'fix') {
+      if (t.m1) lab.gate('x', 2);
+      if (t.m0) lab.gate('z', 2);
+      ls?.teleporter.arrive();
+      t.phase = 'done';
+      t.sent++;
+      ls?.celebrate(false);
+      this.quest('puzzle');
+      this.use('teleport');
+      feedback('success');
+    } else if (t.phase === 'done') {
+      this.teleportNew();
+      feedback('select');
+    } else return;
+    this.renderGameCard();
+  }
+
   private renderLearnGame(): void {
     this.els.get('btn-notes')?.setProperties({ display: 'none' });
     this.els.get('btn-lib')?.setProperties({ display: 'none' });
@@ -1682,6 +1766,36 @@ export class UISystem extends createSystem({
         this.text('goal-text', this.dec.wins >= 3 ? 'Distance 5 next: 25 qubits' : 'Win three to go bigger');
         this.bg('goal-dot', this.dec.won ? C.done : '#ff8a7a');
         this.text('btn-next-label', 'New round');
+      }
+    } else if (this.game === 'teleport') {
+      const t = this.tele;
+      this.text('chapter-eyebrow', `Play  /  Teleporter  /  ${t.sent} sent`);
+      const labels = { pair: 'Make the pair', measure: 'Measure', flying: 'Wait', fix: 'Fix', done: 'Send another' };
+      this.text('btn-next-label', labels[t.phase]);
+      if (t.phase === 'flying') this.bg('btn-next', C.primaryIdle);
+      if (t.phase === 'pair') {
+        this.text('chapter-title', 'Send q0 to q2');
+        this.text('chapter-body', "q0 carries a message: its arrow, a state nobody knows. Teleport it to q2 without moving it. First Alice and Bob share an entangled pair: q1 and q2.");
+        this.text('goal-text', 'Tap Make the pair');
+      } else if (t.phase === 'measure') {
+        this.text('chapter-title', 'The Bell measurement');
+        this.text('chapter-body', 'Alice entangles the message with her half of the pair (a CNOT from q0 to q1, then H on q0) and measures both. That gives two ordinary bits.');
+        this.text('goal-text', 'Tap Measure');
+      } else if (t.phase === 'flying') {
+        this.text('chapter-title', 'Two bits in flight');
+        this.text('chapter-body', `Alice sends ${t.m0} and ${t.m1} to Bob the ordinary way. Nothing else travels; on their own, the bits say nothing about the message.`);
+        this.text('goal-text', 'Watch them cross');
+      } else if (t.phase === 'fix') {
+        this.text('chapter-title', `Bob got ${t.m0} and ${t.m1}`);
+        this.text('chapter-body', `He fixes q2 with them: ${t.m1 ? 'X, because the second bit is 1' : 'no X (second bit 0)'}${t.m0 ? ', then Z, because the first bit is 1' : ', no Z (first bit 0)'}.`);
+        this.text('goal-text', 'Tap Fix');
+      } else {
+        const now = blochVector(lab.history.state, 2), m = t.message;
+        const overlap = (1 + now[0] * m[0] + now[1] * m[1] + now[2] * m[2]) / 2;
+        this.text('chapter-title', 'Teleported');
+        this.text('chapter-body', `q2 now points exactly where q0 did (fidelity ${overlap.toFixed(3)}), and q0 has lost it: the state moved, it was not copied. It took two bits and one entangled pair; nothing went faster than light.`);
+        this.text('goal-text', 'Tap Send another');
+        this.bg('goal-dot', C.done);
       }
     } else if (this.game === 'grover') {
       const label = { oracle: 'Oracle', diffuse: 'Diffuse', look: 'Look', opened: 'New maze' }[this.groverPhase];
@@ -3192,7 +3306,9 @@ export class UISystem extends createSystem({
         ? `Pulse schedule on T5${routed.swaps ? `  /  ${routed.swaps} routing SWAP${routed.swaps === 1 ? '' : 's'}` : ''}`
         : machine === 'ions'
           ? 'Laser pulses on the ion chain  /  every pair can interact'
-          : 'Laser pulses on the atom array  /  the long gaps are atoms moving';
+          : machine === 'photons'
+            ? 'Light through the photonic chip  /  a whole run takes nanoseconds'
+            : 'Laser pulses on the atom array  /  the long gaps are atoms moving';
     return { schedule: sched, qubits, holders, title };
   }
 
@@ -3380,7 +3496,7 @@ export class UISystem extends createSystem({
     const onMaths = this.codeFormat === 'maths';
     this.text('code-title', onChip ? (this.machine === 'superconducting' ? 'Your circuit on the T5 chip' : `Your circuit on ${PLATFORMS[this.machine].name.toLowerCase()}`) : onMaths ? 'The maths of this step' : `Your circuit in ${lang}`);
     this.els.get('code-mach')?.setProperties({ display: onChip ? 'flex' : 'none' });
-    for (const m of ['superconducting', 'ions', 'atoms'] as const) this.bg(`code-m-${m}`, m === this.machine ? C.primary : '#34363b');
+    for (const m of ['superconducting', 'ions', 'atoms', 'photons'] as const) this.bg(`code-m-${m}`, m === this.machine ? C.primary : '#34363b');
     this.bg('code-compare', this.compared?.key === key ? C.done : '#34363b');
     this.bg('code-full', this.world.getSystem(LabSystem)?.fullSize ? C.primary : '#34363b');
     this.els.get('code-simplify')?.setProperties({ display: onChip ? 'none' : 'flex' });
@@ -3524,7 +3640,7 @@ export class UISystem extends createSystem({
     this.updateBoardMode();
     const lsys = this.world.getSystem(LabSystem);
     if (lsys) {
-      lsys.boardRaised = this.dbgOpen || this.classOpen;
+      lsys.boardRaised = this.dbgOpen || this.classOpen || this.shorOn;
       // the Surface Code chapter's lattice takes the space the big-state views use
       const cv = campaign.view;
       const lattice = cv.mode === 'campaign' && !cv.intro && !this.profileOpen && !this.libOpen && cv.chapter?.title === 'Surface Code' ? ((campaign.memoryValue('surface') as SurfaceView | undefined) ?? null) : null;

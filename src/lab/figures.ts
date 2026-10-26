@@ -649,9 +649,9 @@ export function compareFigure(n: number, ideal: ArrayLike<number>, results: Mach
     key: `compare:${n}:${results.map((r) => `${r.name}:${r.agreement.toFixed(4)}`).join('|')}`,
     draw: (g, w, h) => {
       const shots = results[0] ? results[0].counts.reduce((a, b) => a + b, 0) : 0;
-      panel(g, w, h, 'The same circuit on three kinds of quantum computer', `${shots} shots each`);
+      panel(g, w, h, `The same circuit on ${results.length} kinds of quantum computer`, `${shots} shots each`);
       const best = Math.max(...results.map((r) => r.agreement));
-      const colW = (w - 88 - 2 * 24) / 3;
+      const colW = (w - 88 - (results.length - 1) * 24) / Math.max(1, results.length);
       const dim = 1 << n;
       results.forEach((r, i) => {
         const x = 44 + i * (colW + 24), y = 92;

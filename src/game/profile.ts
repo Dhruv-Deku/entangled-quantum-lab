@@ -94,7 +94,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'voice', title: 'Say it', text: 'Give a voice command.', done: (s) => used(s, 'voice') },
   { id: 'listen', title: 'Hear it', text: 'Listen to a quantum state.', done: (s) => used(s, 'listen') },
   { id: 'shared', title: 'Together', text: 'Join a shared lab or a class.', done: (s) => used(s, 'shared') },
-  counter('machines', 'Hardware tour', 'Try all three machines.', (s) => ['superconducting', 'ions', 'atoms'].filter((m) => used(s, `machine:${m}`)).length, () => 3),
+  counter('machines', 'Hardware tour', 'Try all four machines.', (s) => ['superconducting', 'ions', 'atoms', 'photons'].filter((m) => used(s, `machine:${m}`)).length, () => 4),
   counter('rush', 'Rush hour', 'Score 5,000 in one Quantum Rush.', (s) => s.rushBest, () => 5000),
   { id: 'combo', title: 'On fire', text: 'Reach a x5 combo in Quantum Rush.', done: (s) => s.rushCombo >= 5 },
   { id: 'worlds', title: 'Many worlds', text: 'Watch paths cancel in the many-worlds view.', done: (s) => used(s, 'worlds:cancel') },

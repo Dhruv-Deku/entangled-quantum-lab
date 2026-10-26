@@ -30,6 +30,7 @@ import { runNoisy } from '../quantum/density';
 import { ChipVisual } from './chip';
 import { IonChamberVisual, IonTrapVisual } from './ion-trap';
 import { AtomArrayVisual, OpticsTableVisual } from './atom-array';
+import { PhotonicChipVisual, PhotonicRackVisual } from './photonic';
 import type { PlatformId } from '../quantum/platforms';
 import type { Routed } from '../quantum/routing';
 import { drawCertificate, type CertificateInfo } from './certificate';
@@ -47,6 +48,9 @@ import { NightSky } from './night-sky';
 import { HistoryGallery } from './history';
 import { SpyVisual } from './bb84-3d';
 import { GroverDoors } from './grover-3d';
+import { Teleporter } from './teleporter';
+import { ShorVisual } from './shor-3d';
+import { SystemTwo } from './system-two';
 import { TrophyShelf, type TrophyItem } from './trophies';
 import { SurfaceCodeVisual } from './surface-3d';
 import type { SurfaceView } from './figures';
@@ -100,6 +104,8 @@ export class LabSystem extends createSystem({
   ionChamber!: IonChamberVisual;
   atomArray!: AtomArrayVisual;
   opticsTable!: OpticsTableVisual;
+  photonChip!: PhotonicChipVisual;
+  photonRack!: PhotonicRackVisual;
   /** Which machine the hardware views show. */
   machine: PlatformId = 'superconducting';
   /** The UI wants the machine shown (the chip tab, or a course step about hardware). */
@@ -129,6 +135,9 @@ export class LabSystem extends createSystem({
   /** The spy game's stations and the Grover maze's doors. */
   spy!: SpyVisual;
   grover!: GroverDoors;
+  teleporter!: Teleporter;
+  private shor!: ShorVisual;
+  private systemTwo!: SystemTwo;
   private night = false;
   private trophies!: TrophyShelf;
   /** The Surface Code chapter's lattice, floating between the orb and the board. */
@@ -205,7 +214,8 @@ export class LabSystem extends createSystem({
     // the ion trap and the atom array take the chip's place; their chamber and optics table the fridge's
     this.ionTrap = new IonTrapVisual();
     this.atomArray = new AtomArrayVisual();
-    for (const device of [this.ionTrap.root, this.atomArray.root]) {
+    this.photonChip = new PhotonicChipVisual();
+    for (const device of [this.ionTrap.root, this.atomArray.root, this.photonChip.root]) {
       device.position.set(0.3, 0.14, -0.27);
       device.rotation.set(0.42, -0.34, 0, 'YXZ');
       device.scale.setScalar(1.5);
@@ -214,14 +224,15 @@ export class LabSystem extends createSystem({
     }
     this.ionChamber = new IonChamberVisual();
     this.opticsTable = new OpticsTableVisual();
-    for (const m of [this.ionChamber.root, this.opticsTable.root]) {
+    this.photonRack = new PhotonicRackVisual();
+    for (const m of [this.ionChamber.root, this.opticsTable.root, this.photonRack.root]) {
       m.visible = false;
       ws.add(m);
     }
     // every machine reflects a soft studio, so steel, copper and glass read as real materials
     const env = studioEnvironment(this.renderer);
     setOrbEnvironment(env);
-    for (const m of [this.chip.root, this.fridge.root, this.ionTrap.root, this.ionChamber.root, this.atomArray.root, this.opticsTable.root]) useStudio(m, env);
+    for (const m of [this.chip.root, this.fridge.root, this.ionTrap.root, this.ionChamber.root, this.atomArray.root, this.opticsTable.root, this.photonChip.root, this.photonRack.root]) useStudio(m, env);
     this.qsphere = new QSphereVisual();
     this.qsphere.root.position.set(0, 0.25, -0.27);
     this.qsphere.root.visible = false;
@@ -269,6 +280,15 @@ export class LabSystem extends createSystem({
     ws.add(this.history.root);
     this.spy = new SpyVisual();
     ws.add(this.spy.root);
+    this.teleporter = new Teleporter();
+    ws.add(this.teleporter.root);
+    // Shor's bars stand in a row behind the orbs
+    this.shor = new ShorVisual();
+    this.shor.root.position.set(0, 0.215, -0.33);
+    ws.add(this.shor.root);
+    this.systemTwo = new SystemTwo();
+    this.systemTwo.env = env;
+    ws.add(this.systemTwo.root);
     this.grover = new GroverDoors();
     this.grover.env = env;
     ws.add(this.grover.root);
@@ -502,7 +522,7 @@ export class LabSystem extends createSystem({
    * plays its reveal.
    */
   private placeRoomMachine(dt: number): void {
-    const shown = [this.fridge, this.ionChamber, this.opticsTable].find((m) => m.root.visible) ?? null;
+    const shown = [this.fridge, this.ionChamber, this.opticsTable, this.photonRack].find((m) => m.root.visible) ?? null;
     const target = this.fullSize ? 1 : 0;
     const before = this.grow;
     this.grow += (target - this.grow) * (1 - Math.exp(-dt * 3.2));
@@ -534,6 +554,15 @@ export class LabSystem extends createSystem({
     this.surface.root.visible = true;
     this.surface.root.position.x = -0.12;
     this.surface.showPuzzle(p.d, p.lit, p.flips, p.errors);
+  }
+
+  showShor(on: boolean): void {
+    if (on && !this.shor.root.visible) this.shor.restart();
+    this.shor.root.visible = on;
+  }
+
+  showSystemTwo(on: boolean): void {
+    this.systemTwo.show(on);
   }
 
   /** Play tab: the cat box on the desk (it follows q0). */
@@ -602,10 +631,13 @@ export class LabSystem extends createSystem({
     this.ionChamber.root.visible = room && this.machine === 'ions';
     this.atomArray.root.visible = device && this.machine === 'atoms';
     this.opticsTable.root.visible = room && this.machine === 'atoms';
+    this.photonChip.root.visible = device && this.machine === 'photons';
+    this.photonRack.root.visible = room && this.machine === 'photons';
     if (this.ionTrap.root.visible || this.atomArray.root.visible) {
       this.ionTrap.setQubits(lab.n);
       this.atomArray.setQubits(lab.n);
       this.ionChamber.setQubits(lab.n);
+      this.photonChip.setQubits(lab.n);
     }
     this.placeRoomMachine(dt);
     if (this.chip.root.visible) this.chip.update(dt);
@@ -614,6 +646,8 @@ export class LabSystem extends createSystem({
     if (this.ionChamber.root.visible) this.ionChamber.update(dt);
     if (this.atomArray.root.visible) this.atomArray.update(dt);
     if (this.opticsTable.root.visible) this.opticsTable.update(dt);
+    if (this.photonChip.root.visible) this.photonChip.update(dt);
+    if (this.photonRack.root.visible) this.photonRack.update(dt);
     if (this.qsphere.root.visible) this.qsphere.update(dt);
     if (this.city.root.visible) this.city.update(dt);
     if (this.worlds.root.visible) this.worlds.update(dt);
@@ -621,6 +655,13 @@ export class LabSystem extends createSystem({
     if (this.confetti.root.visible) this.confetti.update(dt);
     if (this.dice.root.visible) this.dice.update(dt);
     if (this.spy.root.visible) this.spy.update(dt);
+    if (this.teleporter.root.visible) this.teleporter.update(dt);
+    if (this.shor.root.visible) this.shor.update(dt);
+    if (this.systemTwo.root.visible) {
+      // a few metres behind the desk, standing on the floor
+      this.systemTwo.root.position.set(0, -this.workspace.object3D!.position.y, -3.3);
+      this.systemTwo.update(dt);
+    }
     if (this.grover.root.visible) this.grover.update(dt);
     if (this.cat.root.visible) {
       // the cat follows q0: still in superposition, or measured
@@ -880,12 +921,14 @@ export class LabSystem extends createSystem({
     this.fridge.play(this.pulseView.schedule.pulses, this.pulseView.schedule.duration, seconds);
     this.ionChamber.play(seconds);
     this.opticsTable.play(seconds);
+    this.photonRack.play(seconds);
   }
 
   /** Play a compiled run on whichever machine is showing. */
   playMachine(routed: Routed): void {
     if (this.machine === 'superconducting') this.chip.play(routed);
     else if (this.machine === 'ions') this.ionTrap.play(routed.ops);
+    else if (this.machine === 'photons') this.photonChip.play(routed.ops);
     else this.atomArray.play(routed.ops);
   }
 
@@ -893,6 +936,7 @@ export class LabSystem extends createSystem({
   machineSeconds(routed: Routed): number {
     if (this.machine === 'superconducting') return Math.max(1.6, routed.ops.length * 0.16 + 0.4);
     if (this.machine === 'ions') return Math.max(1.6, routed.ops.length * 0.24 + 0.4);
+    if (this.machine === 'photons') return Math.max(1.6, routed.ops.length * 0.2 + 0.4);
     const far = routed.ops.filter((o) => o.kind === 'gate' && o.controls?.length === 1 && Math.abs(o.controls[0] - o.target) > 1).length;
     return Math.max(1.6, routed.ops.length * 0.3 + far * 2.0 + 0.4);
   }

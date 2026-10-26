@@ -7,19 +7,23 @@ import { route, T5, type Chip, type Routed } from './routing';
 import { QState } from './state';
 
 /**
- * Three kinds of quantum computer, each running the same circuit its own way:
+ * Four kinds of quantum computer, each running the same circuit its own way:
  *
  * - superconducting circuits (IBM, Google): fast microwave gates, but each
  *   qubit only talks to its neighbours, so the compiler adds SWAPs;
  * - trapped ions (Quantinuum, IonQ): every ion talks to every other through
  *   the chain's shared motion; slow laser gates, very low error;
  * - neutral atoms (QuEra, Pasqal, Atom Computing): atoms in optical tweezers;
- *   two atoms interact when one is moved next to the other (Rydberg blockade).
+ *   two atoms interact when one is moved next to the other (Rydberg blockade);
+ * - photonic chips (Xanadu, PsiQuantum, Quandela): single photons in silicon
+ *   waveguides; gates take nanoseconds and any qubits can be linked by
+ *   steering light, but entangling gates only work some of the time and
+ *   photons get lost, which is the main source of error.
  *
  * Error rates and timings are typical published figures, rounded.
  */
 
-export type PlatformId = 'superconducting' | 'ions' | 'atoms';
+export type PlatformId = 'superconducting' | 'ions' | 'atoms' | 'photons';
 
 export interface Platform {
   id: PlatformId;
@@ -82,9 +86,23 @@ export const PLATFORMS: Record<PlatformId, Platform> = {
       'Wiring: atoms are moved next to each other. Reading them takes a camera.',
     ],
   },
+  photons: {
+    id: 'photons',
+    name: 'Photonic chip',
+    qubit: 'photon',
+    examples: 'Xanadu, PsiQuantum, Quandela',
+    noise: { p1: 0.0005, p2: 0.02, readout: 0.02 },
+    moveError: 0,
+    timing: { drive: 1, two: () => 10, readout: 50, swapPulses: 3 },
+    facts: [
+      'Qubits: single photons of light in silicon waveguides.',
+      'Gates: beam splitters and phase shifters, in nanoseconds. Entangling photons works only some of the time.',
+      'Wiring: any qubits, by steering light. Losing photons is the main error.',
+    ],
+  },
 };
 
-export const PLATFORM_ORDER: PlatformId[] = ['superconducting', 'ions', 'atoms'];
+export const PLATFORM_ORDER: PlatformId[] = ['superconducting', 'ions', 'atoms', 'photons'];
 
 /** n qubits, every pair connected. */
 export function allToAll(n: number): Chip {
@@ -164,7 +182,7 @@ export interface PlatformResult {
   overhead: string;
 }
 
-/** Run the same circuit on all three machines. */
+/** Run the same circuit on every machine. */
 export function comparePlatforms(n: number, ops: readonly Op[], ideal: ArrayLike<number>, shots: number, rng: Rng): PlatformResult[] {
   return PLATFORM_ORDER.map((id) => {
     const routed = compileFor(id, n, ops);
@@ -178,7 +196,7 @@ export function comparePlatforms(n: number, ops: readonly Op[], ideal: ArrayLike
       // every shot ends by reading all the qubits
       micros: (platformSchedule(id, routed, n).duration + PLATFORMS[id].timing.readout) / 1000,
       twoQubit: routed.twoQubitAfter,
-      overhead: id === 'superconducting' ? (routed.swaps ? `${routed.swaps} SWAP${routed.swaps === 1 ? '' : 's'} added` : 'no SWAPs needed') : id === 'ions' ? 'all-to-all: no SWAPs' : moves ? `${moves} atom move${moves === 1 ? '' : 's'}` : 'neighbours only: no moves',
+      overhead: id === 'superconducting' ? (routed.swaps ? `${routed.swaps} SWAP${routed.swaps === 1 ? '' : 's'} added` : 'no SWAPs needed') : id === 'ions' ? 'all-to-all: no SWAPs' : id === 'photons' ? 'light steered: no SWAPs, photon loss' : moves ? `${moves} atom move${moves === 1 ? '' : 's'}` : 'neighbours only: no moves',
     };
   });
 }

@@ -62,3 +62,20 @@ describe('three kinds of quantum computer', () => {
     expect(formatTime(2_500)).toBe('2.5 ms');
   });
 });
+
+describe('the photonic chip', () => {
+  it('is the fastest machine, needs no SWAPs, and without noise gives the ideal answer', () => {
+    const ghz = [h(0), cx(0, 1), cx(1, 2)];
+    const r = compileFor('photons', 4, dense);
+    expect(r.swaps).toBe(0);
+    expect(machineQubits('photons', 3)).toBe(3);
+    const t = (id: 'photons' | 'superconducting') => platformSchedule(id, compileFor(id, 3, ghz), 3).duration;
+    expect(t('photons')).toBeLessThan(t('superconducting'));
+    const saved = { ...PLATFORMS.photons.noise };
+    Object.assign(PLATFORMS.photons.noise, { p1: 0, p2: 0, readout: 0 });
+    const run = runPlatform('photons', compileFor('photons', 3, ghz), 3, 300, mulberry32(2));
+    Object.assign(PLATFORMS.photons.noise, saved);
+    expect(run.counts[0] + run.counts[7]).toBe(300);
+    expect(PLATFORM_ORDER).toContain('photons');
+  });
+});

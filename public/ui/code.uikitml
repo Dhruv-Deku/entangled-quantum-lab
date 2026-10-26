@@ -69,7 +69,7 @@
   .hd { font-size: 12; font-weight: 600; color: #8fb7ff; }
   .ln { font-size: 12; color: #c9ccd1; }
   .foot { flex-direction: row; justify-content: space-between; align-items: center; }
-  .mach { flex-direction: row; gap: 6; align-items: center; }
+  .mach { flex-direction: row; flex-wrap: wrap; gap: 6; align-items: center; }
 </style>
 <div class="card">
   <div class="head">
@@ -107,6 +107,7 @@
     <div id="code-m-superconducting" class="btn"><div class="bt">Chip</div></div>
     <div id="code-m-ions" class="btn"><div class="bt">Ions</div></div>
     <div id="code-m-atoms" class="btn"><div class="bt">Atoms</div></div>
+    <div id="code-m-photons" class="btn"><div class="bt">Photons</div></div>
     <div id="code-compare" class="btn"><div class="bt">Compare</div></div>
     <div id="code-full" class="btn"><div class="bt">Full size</div></div>
   </div>
