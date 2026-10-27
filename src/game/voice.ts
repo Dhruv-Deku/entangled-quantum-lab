@@ -137,6 +137,8 @@ export function parseVoice(text: string): VoiceCommand | null {
   if (/code lab|write (my )?(own )?code|my own code|program (it|my own)/.test(s)) return { type: 'play', item: 'Code lab' };
   if (/many worlds|every path|all the paths|feynman/.test(s)) return { type: 'view', worlds: true };
   const play: [RegExp, string][] = [
+    [/class challenge|challenge the class/, 'Class challenge'],
+    [/versus|\bvs\b|race (a |my )?friends?|race me/, 'Rush versus'],
     [/\bzen\b/, 'Zen Rush'],
     [/\bdice\b|\bdie\b/, 'Quantum dice'],
     [/penny|coin flip|flip a coin/, 'Penny flip'],

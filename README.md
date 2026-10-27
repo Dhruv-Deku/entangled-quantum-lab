@@ -73,8 +73,8 @@ the Meta Immersive Web SDK (IWSDK), three.js and TypeScript.
 
 **By the numbers:** 26 chapters, a 14-module course, 21 lessons, 12 puzzles, a
 daily challenge and Quantum Rush, a Play tab, 5 big-state views, 4 kinds of quantum computer
-in 3D at full size, a 49-qubit surface code, 34 achievements, 5 orb finishes, 25 Play tab items, daily quests,
-voice control, shared labs and classes, and 340 unit tests.
+in 3D at full size, a 49-qubit surface code, 35 achievements, 5 orb finishes, 27 Play tab items, daily quests,
+voice control, shared labs and classes, and 343 unit tests.
 
 ## Contents
 
@@ -88,7 +88,7 @@ voice control, shared labs and classes, and 340 unit tests.
 - [Part 4: Tools for exploring](#part-4-tools-for-exploring)
   - [Build: circuit builder](#build-circuit-builder), [Code window: tabs, zoom, simplify](#code-window-tabs-zoom-simplify), [Step debugger](#step-debugger), [Big-state views](#big-state-views), [Many worlds](#many-worlds), [Library, import and custom gates](#library-import-and-custom-gates), [Voice commands](#voice-commands), [Listen to a state](#listen-to-a-state), [Snapshot](#snapshot)
 - [Part 5: Together, and every day](#part-5-together-and-every-day)
-  - [Code Lab: write your own programs](#code-lab-write-your-own-programs), [Games that teach](#games-that-teach-spies-decoders-mazes-and-quests), [New worlds](#new-worlds-light-teleportation-shor-and-a-modular-machine), [The Play tab: ten wonders](#the-play-tab-ten-wonders), [Quantum Rush](#quantum-rush), [Shared lab](#shared-lab), [Classroom and certificate](#classroom-and-certificate), [Daily challenge, achievements and levels](#daily-challenge-achievements-and-levels), [Trophies and celebrations](#trophies-and-celebrations), [Orb finishes](#orb-finishes), [Puzzles](#puzzles)
+  - [Code Lab: write your own programs](#code-lab-write-your-own-programs), [Games that teach](#games-that-teach-spies-decoders-mazes-and-quests), [New worlds](#new-worlds-light-teleportation-shor-and-a-modular-machine), [The Play tab: ten wonders](#the-play-tab-ten-wonders), [Quantum Rush](#quantum-rush), [Race your friends](#race-your-friends-rush-versus-and-the-class-challenge), [Shared lab](#shared-lab), [Classroom and certificate](#classroom-and-certificate), [Daily challenge, achievements and levels](#daily-challenge-achievements-and-levels), [Trophies and celebrations](#trophies-and-celebrations), [Orb finishes](#orb-finishes), [Puzzles](#puzzles)
 - [Under the hood](#under-the-hood)
 
 ## Try it
@@ -96,7 +96,7 @@ voice control, shared labs and classes, and 340 unit tests.
 ```sh
 npm install
 npm run dev        # managed browser with the Quest 3 emulator (IWER)
-npm test           # 340 unit tests: physics, four kinds of quantum computer, gestures, spells, the course, 25 chapters, 15 lessons, puzzles, the daily challenge, achievements, builder, noise, chemistry, import, IBM compiling, Bell tests, error correction, benchmarking, voice, shared rooms and more
+npm test           # 343 unit tests: physics, four kinds of quantum computer, gestures, spells, the course, 25 chapters, 15 lessons, puzzles, the daily challenge, achievements, builder, noise, chemistry, import, IBM compiling, Bell tests, error correction, benchmarking, voice, shared rooms and more
 npm run typecheck
 npm run build
 ```
@@ -1000,6 +1000,28 @@ moves deep, each with a true minimum par found by search.
   sets off a burst of confetti, and two achievements wait at 5,000 points and a
   x5 combo.
 
+### Race your friends: Rush versus and the class challenge
+
+| Rush versus, mid-race | The final standings | A class challenge, from the teacher's side |
+| --- | --- | --- |
+| ![Rush versus with 57 seconds left: the card reads q1 in superposition with the standings 1. Maya 740, 2. You 520, 3. Leo 310, and the board shows the target bars with the standings along the bottom](docs/screenshots/rush-versus.png) | ![The race is over: the card reads You won! with 1. You 1,180, 2. Maya 960, 3. Leo 410, the board shows the final standings and confetti falls over the orbs](docs/screenshots/rush-versus-won.png) | ![The class panel as a live scoreboard: Ben 1,240 still playing, Dara 990 and Ann 860 finished in mint, Chen and Eli still playing](docs/screenshots/class-challenge.png) |
+
+- **Rush versus** (Play tab, or say "rush versus"): opens a shared lab if you
+  are not in one, and once your friends have joined with its code, starts the
+  same Rush round for everyone at once. Every player gets the same seed, so the
+  same targets in the same order, and plays on their own orbs: the shared
+  circuit and qubit claims pause while you race and come back when you finish.
+  A three-second countdown pops over the orbs; during the round the card and
+  the board show the standings live, and at the end the card says where you
+  came (You won! sets off confetti and unlocks the **Rival** achievement).
+  Again starts another race for the whole room.
+- **Class challenge** (Play tab, or say "class challenge"): the teacher opens
+  a class, waits for the students, and starts the race; every student plays the
+  same round, and the teacher's class panel turns into a live scoreboard with a
+  bar per student, blue while they play and mint once they finish. Assignments
+  brings back the module view. Only the teacher can start one (tested in
+  `src/net/room.test.ts`, along with the paused circuit and the standings).
+
 ### Shared lab
 
 ![A shared lab: a Bell pair where q0 belongs to Ana and q1 to you, with the room code on the Share button](docs/screenshots/shared-lab.png)
@@ -1063,13 +1085,13 @@ course) the board shows a **certificate**, and the 2D page can save it as a PNG.
   shorter sequence exists. Solving it extends a streak, and on the 2D page the
   result comes as one line to copy and paste: "Entangled daily #25: 2 moves
   (par 2), 3 of 3 stars. Streak: 1 day."
-- **Achievements**: 34 of them, from "First move" and "Spooky action" (your
+- **Achievements**: 35 of them, from "First move" and "Spooky action" (your
   first Bell pair) to "All for one" (a five-qubit GHZ state), "Rainmaker"
   (1,000 shots), "Beyond classical" (the Bell Test), "Below threshold" (the
   surface code), "Many worlds" (watching paths cancel), "Rush hour" and "On
-  fire" in Quantum Rush, "Collector" (ten album states), "Quantum cheat" (three
+  fire" in Quantum Rush, "Rival" (winning a Rush versus), "Collector" (ten album states), "Quantum cheat" (three
   penny flips won), "Explorer" (six of the Play tab's wonders), daily streaks of three and seven days, and trying the
-  debugger, every big-state view, voice, the shared lab and all three kinds of
+  debugger, every big-state view, voice, the shared lab and all four kinds of
   quantum computer. Each one pops up above the dock with a chime.
 - **Levels**: XP comes from chapters, lessons, course modules, puzzle stars,
   daily challenges and achievements; levels go from Newcomer to Quantum master.

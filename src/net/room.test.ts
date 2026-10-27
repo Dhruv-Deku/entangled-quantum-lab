@@ -48,12 +48,13 @@ class Bus {
 function person(bus: Bus, code: string, id: string, name: string, role: Role, creator: boolean, seed: number) {
   const lab = new Lab(2, mulberry32(seed));
   const notes: string[] = [];
-  const got: { assigned: number[]; shots: number } = { assigned: [], shots: 0 };
+  const got: { assigned: number[]; shots: number; races: number[] } = { assigned: [], shots: 0, races: [] };
   const host: RoomHost = {
     snapshot: () => lab.history.toJSON(),
     restore: (h) => lab.restore({ history: h, selected: lab.selected }),
     showShots: () => void got.shots++,
     assigned: (m) => (got.assigned = m),
+    raceStart: (r) => void got.races.push(r.seed),
     changed: () => {},
     notify: (t) => notes.push(t),
   };
@@ -170,5 +171,82 @@ describe('classroom', () => {
     expect(tia.room.progress.get('s1')).toEqual(p);
     expect(assignmentProgress([0, 2], p, () => 6)).toEqual({ fraction: 0.75, complete: false });
     expect(assignmentProgress([0, 2], { ...p, done: [0, 2] }, () => 6).complete).toBe(true);
+  });
+});
+
+describe('racing', () => {
+  it('Rush versus: anyone in a shared lab starts it, everyone gets the same seed and sees the standings', () => {
+    const bus = new Bus();
+    const a = person(bus, 'LRACE', 'a', 'Ada', 'student', true, 1);
+    bus.flush();
+    const b = person(bus, 'LRACE', 'b', 'Bo', 'student', false, 2);
+    bus.flush();
+    expect(b.room.startRace(4242)).toBeNull();
+    bus.flush();
+    expect(a.got.races).toEqual([4242]);
+    expect(b.got.races).toEqual([4242]);
+    a.room.raceScore(300, 2, false);
+    b.room.raceScore(450, 3, false);
+    bus.flush();
+    expect(a.room.standings().map((s) => [s.name, s.score, s.me])).toEqual([
+      ['Bo', 450, false],
+      ['Ada', 300, true],
+    ]);
+    expect(a.room.raceOver()).toBe(false);
+    a.room.raceScore(900, 6, true);
+    b.room.raceScore(450, 3, true);
+    bus.flush();
+    expect(b.room.standings()[0]).toMatchObject({ name: 'Ada', score: 900, done: true });
+    expect(a.room.raceOver() && b.room.raceOver()).toBe(true);
+  });
+
+  it('while you race the shared circuit is paused, both ways, and claims do not apply', () => {
+    const bus = new Bus();
+    const a = person(bus, 'LPAUS', 'a', 'Ada', 'student', true, 1);
+    bus.flush();
+    const b = person(bus, 'LPAUS', 'b', 'Bo', 'student', false, 2);
+    bus.flush();
+    a.room.claim(0);
+    bus.flush();
+    a.room.startRace(7);
+    bus.flush();
+    expect(b.room.guard({ kind: 'gate', gate: 'x', target: 0 })).toBeNull();
+    a.lab.gate('h', 0);
+    bus.flush();
+    expect(b.lab.history.length).toBe(0);
+    b.lab.gate('x', 1);
+    bus.flush();
+    expect(a.lab.history.length).toBe(1);
+    // finished: the shared circuit is back
+    a.room.raceScore(100, 1, true);
+    b.room.raceScore(50, 1, true);
+    bus.flush();
+    a.lab.gate('z', 1);
+    bus.flush();
+    expect(b.lab.history.ops).toEqual(a.lab.history.ops);
+  });
+
+  it('class challenge: only the teacher starts it, and watches instead of playing', () => {
+    const bus = new Bus();
+    const t = person(bus, 'CCHAL', 't', 'Ms K', 'teacher', true, 1);
+    bus.flush();
+    const s1 = person(bus, 'CCHAL', 's1', 'Ann', 'student', false, 2);
+    const s2 = person(bus, 'CCHAL', 's2', 'Ben', 'student', false, 3);
+    bus.flush();
+    expect(s1.room.startRace(1)).toMatch(/teacher/);
+    bus.flush();
+    expect(t.got.races).toEqual([]);
+    expect(t.room.startRace(99)).toBeNull();
+    bus.flush();
+    expect(t.room.race).toMatchObject({ seed: 99, kind: 'class', playing: false });
+    expect(s1.room.race).toMatchObject({ seed: 99, kind: 'class', playing: true });
+    s1.room.raceScore(120, 1, false);
+    s2.room.raceScore(640, 4, true);
+    bus.flush();
+    expect(t.room.standings().map((s) => s.name)).toEqual(['Ben', 'Ann']);
+    expect(t.room.standings().some((s) => s.me)).toBe(false);
+    // a forged start from a student is ignored by everyone
+    s2.room.receive({ t: 'race', from: 's1', seed: 5, kind: 'class' });
+    expect(s2.room.race?.seed).toBe(99);
   });
 });

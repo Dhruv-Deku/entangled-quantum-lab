@@ -102,6 +102,9 @@ group('voice: the Play tab', () => {
   it('opens each wonder by name', () => {
     const cases: [string, string][] = [
       ['zen rush', 'Zen Rush'],
+      ['rush versus', 'Rush versus'],
+      ['race my friends', 'Rush versus'],
+      ['start a class challenge', 'Class challenge'],
       ['roll the dice', 'Quantum dice'],
       ['penny flip', 'Penny flip'],
       ['schrodinger', 'Schrodinger cat'],

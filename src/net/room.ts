@@ -12,6 +12,11 @@ import { qubitsOf } from '../quantum/matrix';
  *    two people can each hold half of a Bell pair and measure their own half.
  *  - C... a classroom: everyone works on their own, the teacher assigns course
  *    modules and sees each student's progress as it happens.
+ *
+ * Either room can race: Rush versus in a shared lab (anyone starts it, everyone
+ * plays) or a class challenge (the teacher starts it and watches the live
+ * scoreboard). Everyone gets the same seed, so the same targets in the same
+ * order, and plays on their own orbs: the shared circuit is paused while you race.
  */
 
 export type Role = 'teacher' | 'student';
@@ -50,7 +55,33 @@ export type Msg =
   | { t: 'sync'; from: string; v: number; history: HistoryJSON }
   | { t: 'shots'; from: string; counts: number[] }
   | { t: 'class'; from: string; assigned: number[] }
-  | { t: 'progress'; from: string; report: Progress; to?: string };
+  | { t: 'progress'; from: string; report: Progress; to?: string }
+  | { t: 'race'; from: string; seed: number; kind: RaceKind }
+  | { t: 'score'; from: string; seed: number; score: number; solved: number; done: boolean };
+
+export type RaceKind = 'versus' | 'class';
+
+export interface RaceScore {
+  score: number;
+  solved: number;
+  done: boolean;
+}
+
+export interface Standing extends RaceScore {
+  id: string;
+  name: string;
+  me: boolean;
+}
+
+export interface Race {
+  seed: number;
+  kind: RaceKind;
+  /** Who started it. */
+  by: string;
+  /** Whether I am playing (a teacher running a class challenge watches). */
+  playing: boolean;
+  scores: Map<string, RaceScore>;
+}
 
 export interface Transport {
   send(msg: Msg): void;
@@ -65,6 +96,8 @@ export interface RoomHost {
   showShots(counts: Uint32Array): void;
   /** The teacher assigned these course modules. */
   assigned(modules: number[]): void;
+  /** A race starts (for everyone in the room, at once): play it with this seed. */
+  raceStart?(race: Race): void;
   /** Presence, ownership, assignments or progress changed: redraw. */
   changed(): void;
   notify(text: string): void;
@@ -93,6 +126,8 @@ export class SharedRoom {
   assigned: number[] = [];
   /** Version of the circuit this copy holds (lab rooms). */
   version: number;
+  /** The latest race in this room, or null. */
+  race: Race | null = null;
   private applying = false;
   private closed = false;
 
@@ -128,14 +163,14 @@ export class SharedRoom {
 
   /** The local circuit changed (lab rooms): send it, unless the change came from the room. */
   localChange(): void {
-    if (this.applying || this.closed || this.kind !== 'lab') return;
+    if (this.applying || this.closed || this.kind !== 'lab' || this.racing()) return;
     this.version++;
     this.sendSync();
   }
 
   /** Shots taken here rain for everyone (lab rooms). */
   localShots(counts: Uint32Array): void {
-    if (this.applying || this.closed || this.kind !== 'lab') return;
+    if (this.applying || this.closed || this.kind !== 'lab' || this.racing()) return;
     this.tx.send({ t: 'shots', from: this.me.id, counts: [...counts] });
   }
 
@@ -186,12 +221,64 @@ export class SharedRoom {
    * (that is how the people holding a pair entangle it). Returns the reason, or null.
    */
   guard(op: Op): string | null {
-    if (this.kind !== 'lab' || this.me.role === 'teacher' || this.applying) return null;
+    if (this.kind !== 'lab' || this.me.role === 'teacher' || this.applying || this.racing()) return null;
     const qs = qubitsOf(op);
     const others = qs.map((q) => ({ q, owner: this.ownerOf(q) })).filter((x) => x.owner && x.owner !== this.me);
     if (!others.length) return null;
     if (qs.length === 1 || others.length === qs.length) return `q${others[0].q} belongs to ${others[0].owner!.name}: ask them to turn it.`;
     return null;
+  }
+
+  /** Am I in the middle of a race (my own orbs, not the shared circuit)? */
+  racing(): boolean {
+    const r = this.race;
+    return !!r && r.playing && !r.scores.get(this.me.id)?.done;
+  }
+
+  /**
+   * Start a race for everyone in the room. Anyone may in a shared lab; in a
+   * class only the teacher, who then watches rather than plays. Returns why
+   * not, or null.
+   */
+  startRace(seed: number): string | null {
+    if (this.closed) return 'You are not in a room.';
+    if (this.kind === 'class' && this.me.role !== 'teacher') return 'Only the teacher can start a class challenge.';
+    const kind: RaceKind = this.kind === 'class' ? 'class' : 'versus';
+    this.tx.send({ t: 'race', from: this.me.id, seed, kind });
+    this.begin(seed, kind, this.me.id);
+    return null;
+  }
+
+  private begin(seed: number, kind: RaceKind, by: string): void {
+    const playing = !(kind === 'class' && this.me.role === 'teacher');
+    this.race = { seed, kind, by, playing, scores: new Map() };
+    if (playing) this.race.scores.set(this.me.id, { score: 0, solved: 0, done: false });
+    this.host.raceStart?.(this.race);
+    this.host.changed();
+  }
+
+  /** My score so far (sent to everyone), and whether my round is over. */
+  raceScore(score: number, solved: number, done: boolean): void {
+    const r = this.race;
+    if (!r || !r.playing || this.closed) return;
+    r.scores.set(this.me.id, { score, solved, done });
+    this.tx.send({ t: 'score', from: this.me.id, seed: r.seed, score, solved, done });
+  }
+
+  /** Everyone in the race, best first (people still playing are included with their score so far). */
+  standings(): Standing[] {
+    const r = this.race;
+    if (!r) return [];
+    const nameOf = (id: string) => (id === this.me.id ? this.me.name : this.peers.get(id)?.name ?? 'Guest');
+    return [...r.scores]
+      .map(([id, sc]) => ({ id, name: nameOf(id), me: id === this.me.id, ...sc }))
+      .sort((a, b) => b.score - a.score || b.solved - a.solved || a.name.localeCompare(b.name));
+  }
+
+  /** Has everyone in the race finished? */
+  raceOver(): boolean {
+    const r = this.race;
+    return !!r && r.scores.size > 0 && [...r.scores.values()].every((s) => s.done);
   }
 
   receive(m: Msg): void {
@@ -228,8 +315,19 @@ export class SharedRoom {
         this.host.changed();
         return;
       }
+      case 'race':
+        if (this.kind === 'class' && this.peers.get(m.from)?.role !== 'teacher') return;
+        this.begin(m.seed, m.kind === 'class' ? 'class' : 'versus', m.from);
+        return;
+      case 'score': {
+        const r = this.race;
+        if (!r || m.seed !== r.seed) return;
+        r.scores.set(m.from, { score: Math.max(0, m.score | 0), solved: Math.max(0, m.solved | 0), done: !!m.done });
+        this.host.changed();
+        return;
+      }
       case 'sync':
-        if (this.kind !== 'lab') return;
+        if (this.kind !== 'lab' || this.racing()) return;
         if (m.v > this.version || (m.v === this.version && m.from > this.me.id)) {
           this.version = m.v;
           this.applying = true;
@@ -241,7 +339,7 @@ export class SharedRoom {
         }
         return;
       case 'shots':
-        if (this.kind !== 'lab') return;
+        if (this.kind !== 'lab' || this.racing()) return;
         this.applying = true;
         try {
           this.host.showShots(Uint32Array.from(m.counts));

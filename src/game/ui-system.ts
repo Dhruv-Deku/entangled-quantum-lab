@@ -39,7 +39,8 @@ import { codeLines, FORMAT_NAMES, FORMATS, linesOf, pages, program, routeOrError
 import { describe as describeVoice, parseVoice, type VoiceCommand } from './voice';
 import { explainStep, histogram, nextStop, stepTitle } from './debugger';
 import { nextView, STATE_VIEW_NAMES, type StateView } from '../quantum/state-views';
-import { assignmentProgress, kindOf, makeCode, parseCode, SharedRoom, type Progress, type Role, type RoomKind } from '../net/room';
+import { assignmentProgress, kindOf, makeCode, parseCode, SharedRoom, type Progress, type Race, type Role, type RoomKind } from '../net/room';
+import { mulberry32 } from '../quantum/measure';
 import { AutoTransport } from '../net/transport';
 import { openDailyDialog, openShareDialog, savedName } from '../lab/share-dialog';
 import { ACHIEVEMENTS, levelFor, Profile, xpFor, type ProgressContext } from './profile';
@@ -115,8 +116,8 @@ const LAB_LINES = 10;
 const LAB_KEYS = ['h', 'x', 'y', 'z', 's', 'sdg', 't', 'tdg', 'rx', 'ry', 'rz', 'cx', 'cz', 'swap', 'ccx', 'measure', 'q0', 'q1', 'q2', 'q3', 'q4', 'pi', 'pi2', 'pi4', 'mpi2', 'up', 'down', 'delete', 'clear', 'link', 'subqubit', 'addqubit', 'example', 'fromorbs'];
 const TABS = ['course', 'campaign', 'learn', 'puzzle', 'build', 'sandbox', 'play'] as const;
 /** The Play tab: arcade and showcase picks. */
-const PLAY = ['Code lab', 'First five minutes', 'Daily quests', 'Quantum Rush', 'Zen Rush', 'Daily', 'Spy game', 'Be the decoder', 'Grover maze', 'Teleporter', 'Shor in 3D', 'System Two', 'Photonic chip', 'Surface Code', 'Many worlds', 'Quantum dice', 'Penny flip', 'Schrodinger cat', 'State album', 'Giant sphere', 'Inside a qubit', 'Night sky', 'History', 'Ambient music'] as const;
-const PLAY_TAGS = ['qasm', 'tour', '3/day', '60s', 'zen', 'day', 'BB84', 'd=3', '8', 'tp', '15', '3x', 'light',  '49q', 'H H', 'd8', 'coin', 'box', '15', '1 m', 'JJ', 'sky', '1981', 'hum'];
+const PLAY = ['Code lab', 'First five minutes', 'Daily quests', 'Quantum Rush', 'Zen Rush', 'Rush versus', 'Class challenge', 'Daily', 'Spy game', 'Be the decoder', 'Grover maze', 'Teleporter', 'Shor in 3D', 'System Two', 'Photonic chip', 'Surface Code', 'Many worlds', 'Quantum dice', 'Penny flip', 'Schrodinger cat', 'State album', 'Giant sphere', 'Inside a qubit', 'Night sky', 'History', 'Ambient music'] as const;
+const PLAY_TAGS = ['qasm', 'tour', '3/day', '60s', 'zen', 'vs', 'class', 'day', 'BB84', 'd=3', '8', 'tp', '15', '3x', 'light',  '49q', 'H H', 'd8', 'coin', 'box', '15', '1 m', 'JJ', 'sky', '1981', 'hum'];
 
 /** Where hidden panels park, out of reach of every pointer. */
 const PARKED = new Vector3(0, -50, 0);
@@ -301,7 +302,7 @@ export class UISystem extends createSystem({
     this.cleanupFuncs.push(
       campaign.on((v) => {
         // Quantum Rush lives in the sandbox: going anywhere else ends the round
-        if ((this.rush || this.rushOver) && v.mode !== 'sandbox') this.endRush(false);
+        if ((this.rush || this.rushOver || this.racePending) && v.mode !== 'sandbox') this.endRush(false);
         if (this.game && v.mode !== 'sandbox') this.endGame(false);
         // a program playing on the orbs stops when the orbs are taken over
         if (this.runner && v.mode !== 'sandbox') this.runner = null;
@@ -432,8 +433,9 @@ export class UISystem extends createSystem({
     };
     on('btn-next', () => {
       // Quantum Rush: Skip during a round, Again after it
+      if (this.racePending) return;
       if (this.rush) return this.skipRush();
-      if (this.rushOver) return this.startRush(this.rushZen);
+      if (this.rushOver) return this.versusSeed !== null ? this.raceButton(this.room?.kind ?? 'lab') : this.startRush(this.rushZen);
       if (this.game) return this.gameNext();
       if (campaign.mode === 'sandbox') {
         if (lab.n < MAX_ORBS) lab.reset(lab.n + 1);
@@ -442,7 +444,7 @@ export class UISystem extends createSystem({
     });
     for (let i = 0; i < 3; i++) on(`choice-${i}`, () => (this.game === 'spy' ? this.spyAnswer(i) : feedback(campaign.answer(i) ? 'success' : 'reject')));
     on('btn-replay', () => {
-      if (this.rush || this.rushOver) return this.endRush(true);
+      if (this.rush || this.rushOver || this.racePending) return this.endRush(true);
       if (this.game) return this.endGame(true);
       // in the course the second button is Show me while a task is open
       if (campaign.mode === 'course' && campaign.showMe()) return feedback('select');
@@ -522,7 +524,15 @@ export class UISystem extends createSystem({
     on('cl-prev', () => this.pickModule(-1));
     on('cl-next', () => this.pickModule(1));
     on('cl-assign', () => this.toggleAssigned());
-    on('cl-go', () => this.startAssigned());
+    on('cl-go', () => {
+      // on the challenge scoreboard this button goes back to the assignments
+      if (this.classBoard && this.room?.race) {
+        this.classBoard = false;
+        this.renderClass();
+        return feedback('select');
+      }
+      this.startAssigned();
+    });
     on('cl-cert', () => this.toggleCertificate());
     on('a-listen', () => this.listenNow());
     on('nav-me', () => this.toggleProfile());
@@ -748,7 +758,7 @@ export class UISystem extends createSystem({
     }
     if (v.mode !== 'sandbox' || v.preset >= 0) this.sharedOpen = false;
     if (v.intro || v.mode === 'sandbox') this.els.get('choices')?.setProperties({ display: 'none' });
-    if (this.rush || this.rushOver) {
+    if (this.rush || this.rushOver || this.racePending) {
       this.renderRushCard();
       this.renderNav(v);
       return;
@@ -1031,7 +1041,7 @@ export class UISystem extends createSystem({
 
   private rushZen = false;
 
-  private startRush(zen = false): void {
+  private startRush(zen = false, seed: number | null = null): void {
     this.rushZen = zen;
     this.endGame(false);
     this.profileOpen = this.libOpen = this.dbgOpen = this.classOpen = false;
@@ -1042,11 +1052,15 @@ export class UISystem extends createSystem({
     this.rushOver = null;
     this.rushLast = null;
     this.rushResetAt = 0;
-    this.rush = new RushSession(this.clockNow(), Math.random, zen);
+    this.racePending = null;
+    this.versusSeed = seed;
+    // a race: everyone's targets come from the same seed, in the same order
+    this.rush = new RushSession(this.clockNow(), seed !== null ? mulberry32(seed) : Math.random, zen);
     if (campaign.mode !== 'sandbox' || lab.n !== RUSH_QUBITS || lab.history.length) campaign.enterSandbox(RUSH_QUBITS, []);
     this.tab = 'play';
     this.use('rush');
-    this.flash(zen ? 'Zen Rush: no clock. Make each target at your own pace; Quit when you are done.' : 'Quantum Rush: make each target on the orbs, any way you like. 60 seconds; solves add time.');
+    this.raceReport(0, 0, false);
+    this.flash(seed !== null ? 'Go! Make each target on your own orbs. Everyone has the same ones; the standings are on the card.' : zen ? 'Zen Rush: no clock. Make each target at your own pace; Quit when you are done.' : 'Quantum Rush: make each target on the orbs, any way you like. 60 seconds; solves add time.');
     feedback('select');
     this.render(campaign.view);
   }
@@ -1058,6 +1072,7 @@ export class UISystem extends createSystem({
     const now = this.clockNow();
     if (r.over(now) || !r.matches(lab.history.state)) return;
     const res = r.solve(now);
+    this.raceReport(r.score, r.solved, false);
     this.rushLast = { points: res.points, combo: res.combo, until: now + 1.6 };
     if (res.combo >= 4) this.world.getSystem(LabSystem)?.celebrate(false);
     this.rushResetAt = now + 0.7;
@@ -1079,6 +1094,10 @@ export class UISystem extends createSystem({
   private endRush(toSandbox: boolean, timeUp = false): void {
     const r = this.rush;
     this.rush = null;
+    // a race: my round is over (quitting counts as finishing, with the score so far)
+    if (r) this.raceReport(r.score, r.solved, true);
+    else if (this.racePending) this.raceReport(0, 0, true);
+    this.racePending = null;
     this.world.getSystem(LabSystem)?.rushFx.clock(null);
     if (timeUp && r) {
       const newBest = this.profile.onRush(r.score, r.bestCombo);
@@ -1090,12 +1109,113 @@ export class UISystem extends createSystem({
       this.profileDirty = true;
       this.checkAchievements();
       feedback(newBest ? 'success' : 'select');
-      this.banner.show(newBest ? 'New best' : 'Quantum Rush', `${r.score.toLocaleString('en-US')} points`, `${r.solved} made, best combo x${r.bestCombo}`);
+      this.banner.show(newBest ? 'New best' : this.versusSeed !== null ? 'Time' : 'Quantum Rush', `${r.score.toLocaleString('en-US')} points`, `${r.solved} made, best combo x${r.bestCombo}`);
       this.render(campaign.view);
       return;
     }
     this.rushOver = null;
+    this.versusSeed = null;
     if (toSandbox) this.render(campaign.view);
+  }
+
+  // ---- Rush versus and the class challenge: the same round for everyone in the room
+
+  /** The seed of the race I am playing (or just played), or null outside a race. */
+  private versusSeed: number | null = null;
+  /** The countdown before a race. */
+  private racePending: { seed: number; at: number; shown: number } | null = null;
+  /** The class panel shows the challenge scoreboard rather than the assignments. */
+  private classBoard = false;
+  private wonSeed: number | null = null;
+
+  /** Rush versus / Class challenge on the Play tab: open a room if needed, else start the race for everyone. */
+  private raceButton(kind: RoomKind): void {
+    const r = this.room;
+    if (!r) {
+      this.startRoom(kind, savedName() || (kind === 'class' ? 'Teacher' : 'Player'));
+      const code = this.room!.code;
+      this.flash(
+        kind === 'lab'
+          ? `Rush versus: room ${code} is open. When your friends have joined with that code, press Rush versus again and you all race.`
+          : `Class ${code} is open. When your students have joined with that code, press Class challenge again to start the race.`,
+      );
+      return feedback('select');
+    }
+    const others = [...r.peers.values()].filter((p) => p.role === 'student' || r.kind === 'lab').length;
+    if (!others) {
+      this.flash(`Nobody else is here yet: they join with code ${r.code}.`);
+      return feedback('reject');
+    }
+    const why = r.startRace(Math.floor(Math.random() * 2 ** 31));
+    if (why) {
+      this.flash(why);
+      feedback('reject');
+    }
+  }
+
+  /** Someone started a race: a three-second countdown, then the same round for everyone. A teacher watches the scoreboard. */
+  private onRaceStart(race: Race): void {
+    if (race.kind === 'class') this.classBoard = true;
+    if (!race.playing) {
+      this.toggleClass(true);
+      this.flash('Class challenge started: every student gets the same targets in the same order. The live scoreboard is in the class panel.');
+      return;
+    }
+    this.endRush(false);
+    this.endGame(false);
+    this.profileOpen = this.libOpen = this.dbgOpen = this.classOpen = false;
+    this.noiseOpen = false;
+    if (this.code) this.code.visible = false;
+    if (this.notes?.open) this.notes.close();
+    this.setView(null);
+    this.rushOver = null;
+    this.versusSeed = race.seed;
+    this.racePending = { seed: race.seed, at: this.clockNow() + 3, shown: 4 };
+    if (campaign.mode !== 'sandbox' || lab.n !== RUSH_QUBITS || lab.history.length) campaign.enterSandbox(RUSH_QUBITS, []);
+    this.tab = 'play';
+    this.use('race');
+    const by = race.by === this.room?.me.id ? 'You' : (this.room?.peers.get(race.by)?.name ?? 'Someone');
+    this.flash(`${race.kind === 'class' ? 'Class challenge' : 'Rush versus'}: ${by} started a race. Same targets for everyone, in the same order.`);
+    feedback('select');
+    this.render(campaign.view);
+  }
+
+  /** My score, to the others in the race (only for the race I am playing). */
+  private raceReport(score: number, solved: number, done: boolean): void {
+    const room = this.room;
+    if (this.versusSeed === null || !room?.race || room.race.seed !== this.versusSeed) return;
+    room.raceScore(score, solved, done);
+  }
+
+  /** The standings in one line: "1. Bo 980   2. You 760 (playing)". */
+  private standingsLine(room: SharedRoom, max = 4): string {
+    const st = room.standings();
+    const racing = !!this.rush;
+    const line = st.slice(0, max).map((x, k) => `${k + 1}. ${x.me ? 'You' : x.name} ${x.score.toLocaleString('en-US')}${racing ? (x.done ? ' (done)' : '') : x.done ? '' : ' (playing)'}`);
+    if (st.length > max) {
+      const mine = st.findIndex((x) => x.me);
+      if (mine >= max) line.push(`... ${mine + 1}. You ${st[mine].score.toLocaleString('en-US')}`);
+    }
+    return line.join('   ');
+  }
+
+  /** The room changed during a race: redraw the standings, and celebrate a win once everyone is done. */
+  private raceChanged(): void {
+    const room = this.room;
+    const race = room?.race;
+    if (!room || !race) return;
+    if ((this.rush || this.rushOver || this.racePending) && this.versusSeed === race.seed) this.renderRushCard();
+    if (this.versusSeed === race.seed && this.rushOver && room.raceOver() && this.wonSeed !== race.seed) {
+      this.wonSeed = race.seed;
+      const st = room.standings();
+      if (st.length > 1 && st[0].me && st[0].score > st[1].score) {
+        this.use('race:win');
+        this.profileDirty = true;
+        this.world.getSystem(LabSystem)?.celebrate(true);
+        this.banner.show('You won', `${st[0].score.toLocaleString('en-US')} points`, `against ${st.length - 1} other${st.length > 2 ? 's' : ''}`);
+        feedback('success');
+      }
+    }
   }
 
   private rushView(): RushView {
@@ -1112,6 +1232,7 @@ export class UISystem extends createSystem({
       combo: r?.combo ?? 1,
       last: this.rushLast && now < this.rushLast.until ? { points: this.rushLast.points, combo: this.rushLast.combo } : null,
       over: this.rushOver ? { best: this.rushOver.best, newBest: this.rushOver.newBest, bestCombo: this.rushOver.bestCombo, top: this.rushOver.top } : null,
+      race: this.room?.race && this.room.race.seed === this.versusSeed ? { name: this.room.race.kind === 'class' ? 'Class challenge' : 'Rush versus', final: this.room.raceOver(), standings: this.room.standings() } : undefined,
     };
   }
 
@@ -1121,6 +1242,37 @@ export class UISystem extends createSystem({
     this.els.get('btn-notes')?.setProperties({ display: 'none' });
     this.els.get('btn-lib')?.setProperties({ display: 'none' });
     const over = this.rushOver;
+    const room = this.room;
+    const race = this.versusSeed !== null && room?.race?.seed === this.versusSeed ? room.race : null;
+    const raceName = race?.kind === 'class' ? 'Class challenge' : 'Rush versus';
+    if (this.racePending) {
+      const left = Math.max(1, Math.ceil(this.racePending.at - this.clockNow()));
+      const racers = room ? [...room.peers.values()].filter((x) => x.role === 'student' || room.kind === 'lab').length + 1 : 1;
+      this.text('chapter-eyebrow', `${raceName}  /  ${racers} racing`);
+      this.text('chapter-title', `Starting in ${left}`);
+      this.text('chapter-body', 'Same targets for everyone, in the same order, each on your own orbs. Make each one as fast as you can; the standings update live.');
+      this.text('goal-text', 'Most points wins');
+      this.bg('goal-dot', C.current);
+      this.text('btn-next-label', 'Ready');
+      this.text('btn-replay-label', 'Quit');
+      this.bg('btn-next', C.primaryIdle);
+      return;
+    }
+    if (over && race && room) {
+      const st = room.standings();
+      const place = st.findIndex((x) => x.me);
+      const all = room.raceOver();
+      const ord = (k: number) => `${k}${k % 10 === 1 && k !== 11 ? 'st' : k % 10 === 2 && k !== 12 ? 'nd' : k % 10 === 3 && k !== 13 ? 'rd' : 'th'}`;
+      this.text('chapter-eyebrow', `${raceName}  /  ${all ? 'final' : 'waiting for the others'}`);
+      this.text('chapter-title', all ? (place === 0 && st.length > 1 ? 'You won!' : `${ord(place + 1)} of ${st.length}`) : `${over.score.toLocaleString('en-US')} points`);
+      this.text('chapter-body', this.standingsLine(room));
+      this.text('goal-text', `${over.score.toLocaleString('en-US')} points, ${over.solved} made, best combo x${over.bestCombo}`);
+      this.bg('goal-dot', all && place === 0 ? C.done : C.current);
+      this.text('btn-next-label', 'Again');
+      this.text('btn-replay-label', 'Done');
+      this.bg('btn-next', C.primary);
+      return;
+    }
     if (over) {
       this.text('chapter-eyebrow', 'Quantum Rush  /  round over');
       this.text('chapter-title', `${over.score.toLocaleString('en-US')} points`);
@@ -1134,9 +1286,9 @@ export class UISystem extends createSystem({
     }
     const r = this.rush!;
     const left = r.timeLeft(this.clockNow());
-    this.text('chapter-eyebrow', `${r.zen ? 'Zen Rush  /  no clock' : `Quantum Rush  /  ${Math.ceil(left)} s left`}${r.combo > 1 ? `  /  combo x${r.combo}` : ''}`);
+    this.text('chapter-eyebrow', `${r.zen ? 'Zen Rush  /  no clock' : `${race ? raceName : 'Quantum Rush'}  /  ${Math.ceil(left)} s left`}${r.combo > 1 ? `  /  combo x${r.combo}` : ''}`);
     this.text('chapter-title', r.target.name);
-    this.text('chapter-body', `Make ${ket(r.target.state)} on the orbs, any way you like: par ${r.target.par}. It counts the moment they match.`);
+    this.text('chapter-body', race && room ? `Make ${ket(r.target.state)}: par ${r.target.par}.   ${this.standingsLine(room, 3)}` : `Make ${ket(r.target.state)} on the orbs, any way you like: par ${r.target.par}. It counts the moment they match.`);
     this.text('goal-text', `Score ${r.score.toLocaleString('en-US')}   /   ${r.solved} made`);
     this.bg('goal-dot', left <= 10 ? '#ff8a7a' : C.current);
     this.text('btn-next-label', 'Skip');
@@ -1146,6 +1298,21 @@ export class UISystem extends createSystem({
 
   /** Every frame during a round: the clock, the reset after a solve, and time running out. */
   private updateRush(dt: number): void {
+    const p = this.racePending;
+    if (p) {
+      const now = this.clockNow();
+      const left = Math.ceil(p.at - now);
+      if (left < p.shown) {
+        p.shown = left;
+        if (left > 0) this.world.getSystem(LabSystem)?.rushFx.pop(String(left), 'get ready', C.textDim);
+        this.renderRushCard();
+      }
+      if (now >= p.at) {
+        this.world.getSystem(LabSystem)?.rushFx.pop('Go', 'same targets for all');
+        this.startRush(false, p.seed);
+      }
+      return;
+    }
     const r = this.rush;
     if (!r) return;
     const now = this.clockNow();
@@ -1182,6 +1349,7 @@ export class UISystem extends createSystem({
     }
     if (item === 'Quantum Rush') return this.startRush();
     if (item === 'Zen Rush') return this.startRush(true);
+    if (item === 'Rush versus' || item === 'Class challenge') return this.raceButton(item === 'Rush versus' ? 'lab' : 'class');
     // the switches: they stay on while you do anything else
     const toggle = (on: boolean, feature: string, text: string) => {
       if (on) this.use(feature);
@@ -1281,9 +1449,13 @@ export class UISystem extends createSystem({
       case 'Photonic chip':
         return this.machine === 'photons' && !!this.code?.visible && this.codeFormat === 'chip';
       case 'Quantum Rush':
-        return !!(this.rush || this.rushOver) && !this.rushZen;
+        return !!(this.rush || this.rushOver) && !this.rushZen && this.versusSeed === null;
       case 'Zen Rush':
         return !!(this.rush || this.rushOver) && this.rushZen;
+      case 'Rush versus':
+        return this.versusSeed !== null && this.room?.race?.kind === 'versus';
+      case 'Class challenge':
+        return this.room?.race?.kind === 'class' && (this.versusSeed !== null || this.classBoard);
       case 'Quantum dice':
         return this.game === 'dice';
       case 'Penny flip':
@@ -2143,6 +2315,7 @@ export class UISystem extends createSystem({
         },
         showShots: (counts) => lab.showShots(counts),
         assigned: (modules) => this.onAssigned(modules),
+        raceStart: (race) => this.onRaceStart(race),
         changed: () => this.roomChanged(),
         notify: (text) => this.flash(text),
       },
@@ -2168,6 +2341,8 @@ export class UISystem extends createSystem({
     this.room = null;
     lab.guard = null;
     this.classOpen = false;
+    this.classBoard = false;
+    this.racePending = null;
     if (!quiet) this.flash('You left the room.');
     this.roomChanged();
   }
@@ -2183,6 +2358,7 @@ export class UISystem extends createSystem({
     });
     this.world.getSystem(LabSystem)?.setOwners(owners);
     this.renderClass();
+    this.raceChanged();
   }
 
   /** The teacher assigned modules: start the first one not done yet. */
@@ -2312,6 +2488,8 @@ export class UISystem extends createSystem({
     // the teacher counts students; a student sees who teaches the class
     const teacherName = [...r.peers.values()].find((p) => p.role === 'teacher')?.name;
     this.text('cl-eyebrow', teacher ? `Class ${r.code}  /  ${students.length} student${students.length === 1 ? '' : 's'}` : `Class ${r.code}${teacherName ? `  /  teacher ${teacherName}` : ''}  /  you: ${r.me.name}`);
+    this.text('cl-go-l', 'Start next module');
+    if (this.classBoard && r.race?.kind === 'class') return this.renderClassBoard(r, teacher);
     this.text('cl-title', teacher ? 'Assign modules, watch progress' : 'Your assignment');
     this.els.get('cl-pick')?.setProperties({ display: teacher ? 'flex' : 'none' });
     const picked = r.assigned.includes(this.classPick);
@@ -2343,6 +2521,28 @@ export class UISystem extends createSystem({
     this.els.get('cl-go')?.setProperties({ display: teacher || !todo ? 'none' : 'flex' });
     this.els.get('cl-cert')?.setProperties({ display: teacher ? 'none' : 'flex' });
     this.bg('cl-cert', this.certificateInfo() ? C.done : '#34363b');
+  }
+
+  /** The class challenge scoreboard, live: every student's points, best first. */
+  private renderClassBoard(r: SharedRoom, teacher: boolean): void {
+    const st = r.standings();
+    const top = Math.max(1, ...st.map((x) => x.score));
+    const playing = st.filter((x) => !x.done).length;
+    this.text('cl-title', r.raceOver() ? 'Class challenge: final scores' : 'Class challenge: live scoreboard');
+    this.els.get('cl-pick')?.setProperties({ display: 'none' });
+    this.text('cl-line', st.length ? `Same targets for everyone. ${playing ? `${playing} still playing, ` : ''}${st.length - playing} finished.${teacher ? ' Class challenge on the Play tab starts another.' : ''}` : 'Waiting for the first scores...');
+    for (let i = 0; i < 6; i++) {
+      const x = st[i];
+      this.els.get(`cl-r-${i}`)?.setProperties({ display: x ? 'flex' : 'none' });
+      if (!x) continue;
+      this.text(`cl-n-${i}`, `${i + 1}. ${x.me ? 'You' : x.name}`);
+      this.els.get(`cl-f-${i}`)?.setProperties({ width: 130 * (x.score / top), backgroundColor: x.done ? C.done : C.primary });
+      this.text(`cl-s-${i}`, `${x.score.toLocaleString('en-US')} points, ${x.solved} made${x.done ? '' : ', playing'}`);
+    }
+    this.els.get('cl-list')?.setProperties({ display: st.length ? 'flex' : 'none' });
+    this.text('cl-go-l', 'Assignments');
+    this.els.get('cl-go')?.setProperties({ display: 'flex' });
+    this.els.get('cl-cert')?.setProperties({ display: 'none' });
   }
 
   /** A Share button on the 2D page, beside IBM Quantum. */

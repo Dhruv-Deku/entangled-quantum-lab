@@ -105,6 +105,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'spy', title: 'Spy catcher', text: 'Call Eve right three times in the spy game.', done: (s) => used(s, 'spy:3') },
   { id: 'decoder', title: 'Human decoder', text: 'Win three rounds of Be the decoder.', done: (s) => used(s, 'decoder:3') },
   { id: 'quests', title: 'Quest master', text: 'Finish nine daily quests.', done: (s) => used(s, 'quests:9') },
+  { id: 'rival', title: 'Rival', text: 'Win a Rush versus or a class challenge.', done: (s) => used(s, 'race:win') },
   counter('wonders', 'Explorer', 'Try the dice, the cat, the giant sphere, inside a qubit, the night sky and the history gallery.', (s) => WONDERS.filter((w) => used(s, w)).length, () => WONDERS.length),
 ];
 

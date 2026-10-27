@@ -711,6 +711,8 @@ export interface RushView {
   last: { points: number; combo: number } | null;
   /** The round is over: the summary. */
   over: { best: number; newBest: boolean; bestCombo: number; top: { score: number; day: string; current: boolean }[] } | null;
+  /** Rush versus or a class challenge: everyone's scores, best first. */
+  race?: { name: string; final: boolean; standings: { name: string; score: number; done: boolean; me: boolean }[] };
 }
 
 const phaseOf = (re: number, im: number) => `hsl(${Math.round((((Math.atan2(im, re) * 180) / Math.PI) + 360) % 360)}, 58%, 64%)`;
@@ -720,9 +722,10 @@ export function rushFigure(v: RushView): Figure {
   const zen = !Number.isFinite(v.secondsLeft);
   const secs = zen ? 0 : Math.ceil(v.secondsLeft);
   return {
-    key: `rush:${secs}:${v.score}:${v.solved}:${v.combo}:${v.target.name}:${v.now.map(([a, b]) => `${a.toFixed(2)},${b.toFixed(2)}`).join(';')}:${v.last?.points ?? ''}:${v.over ? 'over' : ''}`,
+    key: `rush:${secs}:${v.score}:${v.solved}:${v.combo}:${v.target.name}:${v.now.map(([a, b]) => `${a.toFixed(2)},${b.toFixed(2)}`).join(';')}:${v.last?.points ?? ''}:${v.over ? 'over' : ''}:${v.race ? `${v.race.final}${v.race.standings.map((x) => `${x.name}${x.score}${x.done ? 'd' : ''}`).join(',')}` : ''}`,
     draw: (g, w, h) => {
-      panel(g, w, h, v.over ? 'Quantum Rush  /  round over' : `Quantum Rush  /  target ${v.solved + 1}  /  par ${v.target.par}`, `Score ${v.score.toLocaleString('en-US')}`);
+      const title = v.race?.name ?? 'Quantum Rush';
+      panel(g, w, h, v.over ? `${title}  /  ${v.race && !v.race.final ? 'waiting for the others' : 'round over'}` : `${title}  /  target ${v.solved + 1}  /  par ${v.target.par}`, `Score ${v.score.toLocaleString('en-US')}`);
       if (v.over) {
         const cx = 520;
         text(g, `${v.score.toLocaleString('en-US')}`, cx, 250, INK, '700 120px', 'center');
@@ -734,9 +737,10 @@ export function rushFigure(v: RushView): Figure {
           g.fill();
           text(g, 'New best!', cx, 470, MINT, '700 32px', 'center');
         }
-        // the leaderboard: your five best rounds
-        text(g, 'Your best rounds', 1040, 140, DIM, '600 26px');
-        v.over.top.forEach((t, i) => {
+        // the leaderboard: everyone in the race, or your five best rounds
+        const rows = v.race ? v.race.standings.slice(0, 5).map((x) => ({ score: x.score, day: x.me ? 'You' : x.done ? x.name : `${x.name}, playing`, current: x.me })) : v.over.top;
+        text(g, v.race ? (v.race.final ? 'Final standings' : 'Standings so far') : 'Your best rounds', 1040, 140, DIM, '600 26px');
+        rows.forEach((t, i) => {
           const y = 200 + i * 62;
           roundRect(g, 1030, y - 40, 480, 52, 16);
           g.fillStyle = t.current ? 'rgba(61,220,151,0.16)' : '#232428';
@@ -745,7 +749,7 @@ export function rushFigure(v: RushView): Figure {
           text(g, t.score.toLocaleString('en-US'), 1100, y - 4, t.current ? MINT : INK, '700 28px');
           text(g, t.day, 1490, y - 4, DIM, '500 22px', 'right');
         });
-        text(g, 'Again plays another round. Faster solves score more; solving in a row multiplies.', w / 2, h - 50, DIM, '500 24px', 'center');
+        text(g, v.race ? 'Again starts another race for everyone in the room.' : 'Again plays another round. Faster solves score more; solving in a row multiplies.', w / 2, h - 50, DIM, '500 24px', 'center');
         return;
       }
       // the target, large
@@ -769,7 +773,8 @@ export function rushFigure(v: RushView): Figure {
         g.stroke();
         text(g, `|${k.toString(2).padStart(2, '0')}>`, x + 76, base + 42, INK, '600 28px', 'center');
       });
-      text(g, 'Bar height: amplitude. Colour: phase. Match both.', x0, h - 40, DIM, '500 22px');
+      if (v.race) text(g, v.race.standings.slice(0, 4).map((x, i) => `${i + 1}. ${x.me ? 'You' : x.name} ${x.score.toLocaleString('en-US')}${x.done ? ' (done)' : ''}`).join('     '), x0, h - 40, INK, '600 24px');
+      else text(g, 'Bar height: amplitude. Colour: phase. Match both.', x0, h - 40, DIM, '500 22px');
       // the clock
       const cx = 1330, cy = 330, r = 130;
       g.lineWidth = 18;
