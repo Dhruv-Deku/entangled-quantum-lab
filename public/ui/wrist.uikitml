@@ -1,0 +1,47 @@
+<!--
+  Wrist menu: turn the left palm up for the favourite gates on the selected
+  qubit. UIKit units are cm.
+-->
+<style>
+  .card {
+    flex-direction: column;
+    gap: 6;
+    padding-top: 10;
+    padding-bottom: 10;
+    padding-left: 10;
+    padding-right: 10;
+    background-color: #1b1c1f;
+    border-radius: 18;
+    border-width: 1;
+    border-color: #34363b;
+    align-items: center;
+  }
+  .sel { font-size: 11; font-weight: 700; color: #8a8d93; }
+  .row { flex-direction: row; gap: 6; }
+  .key {
+    width: 44;
+    height: 44;
+    border-radius: 22;
+    align-items: center;
+    justify-content: center;
+    background-color: #2f3135;
+    cursor: pointer;
+  }
+  .wide { width: 70; }
+  .k { font-size: 16; font-weight: 700; color: #e4e6eb; }
+  .ks { font-size: 12; font-weight: 700; color: #e4e6eb; }
+</style>
+<div class="card">
+  <div id="wr-sel" class="sel">q0</div>
+  <div class="row">
+    <div id="wr-h" class="key"><div class="k">H</div></div>
+    <div id="wr-x" class="key"><div class="k">X</div></div>
+    <div id="wr-z" class="key"><div class="k">Z</div></div>
+    <div id="wr-s" class="key"><div class="k">S</div></div>
+  </div>
+  <div class="row">
+    <div id="wr-m" class="key wide"><div class="ks">Measure</div></div>
+    <div id="wr-n" class="key wide"><div class="ks">Next q</div></div>
+    <div id="wr-u" class="key wide"><div class="ks">Undo</div></div>
+  </div>
+</div>

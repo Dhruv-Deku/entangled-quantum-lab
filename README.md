@@ -72,15 +72,15 @@ the Meta Immersive Web SDK (IWSDK), three.js and TypeScript.
 | ![A neutral atom is carried along the lane to its partner, the pair glow gold while the Rydberg interaction entangles them, and it is carried back](docs/screenshots/anim-atoms.gif) | ![The Looks panel beside the progress board: Glass, Frost, Smoke, Tinted (worn: the two orbs in coral and teal, tied by the gold thread) and Copper, locked until level 5](docs/screenshots/orb-looks.png) |
 
 **By the numbers:** 26 chapters, a 14-module course, 21 lessons, 12 puzzles, a
-daily challenge and Quantum Rush, a Play tab, 5 big-state views, 3 kinds of quantum computer
+daily challenge and Quantum Rush, a Play tab, 5 big-state views, 4 kinds of quantum computer
 in 3D at full size, a 49-qubit surface code, 34 achievements, 5 orb finishes, 25 Play tab items, daily quests,
-voice control, shared labs and classes, and 336 unit tests.
+voice control, shared labs and classes, and 340 unit tests.
 
 ## Contents
 
 - [Try it](#try-it)
 - [Part 1: Your hands are the quantum computer](#part-1-your-hands-are-the-quantum-computer)
-  - [Gestures](#gestures), [Gates you can see](#gates-you-can-see), [Circuit board](#circuit-board), [Sandbox](#sandbox), [Share links](#share-links)
+  - [Gestures](#gestures), [Hands: toss, wrist menu and spells](#hands-toss-wrist-menu-and-spells), [Gates you can see](#gates-you-can-see), [Circuit board](#circuit-board), [Sandbox](#sandbox), [Share links](#share-links)
 - [Part 2: Learn, from the first qubit to research topics](#part-2-learn-from-the-first-qubit-to-research-topics)
   - [Course](#course), [Learn](#learn), [Qubiting: five new lessons](#qubiting-five-new-lessons), [Notes](#notes), [The Mystery Qubit](#the-mystery-qubit), [QAOA: a variational algorithm](#qaoa-a-variational-algorithm), [Algorithm chapters](#algorithm-chapters), [Advanced chapters](#advanced-chapters), [The surface code](#the-surface-code), [The maths of every step](#the-maths-of-every-step)
 - [Part 3: Real quantum hardware](#part-3-real-quantum-hardware)
@@ -96,7 +96,7 @@ voice control, shared labs and classes, and 336 unit tests.
 ```sh
 npm install
 npm run dev        # managed browser with the Quest 3 emulator (IWER)
-npm test           # 336 unit tests: physics, three kinds of quantum computer, gestures, the course, 25 chapters, 15 lessons, puzzles, the daily challenge, achievements, builder, noise, chemistry, import, IBM compiling, Bell tests, error correction, benchmarking, voice, shared rooms and more
+npm test           # 340 unit tests: physics, four kinds of quantum computer, gestures, spells, the course, 25 chapters, 15 lessons, puzzles, the daily challenge, achievements, builder, noise, chemistry, import, IBM compiling, Bell tests, error correction, benchmarking, voice, shared rooms and more
 npm run typecheck
 npm run build
 ```
@@ -125,6 +125,9 @@ depends on a single input path.
 | Turn your wrist while holding | Continuous rotation (Ry), with a glowing trail | Ry- / Ry+ | hold ← → |
 | Open hand, fingers spread, palm toward an orb | Hadamard (superposition) | H | H |
 | Close your fist near an orb | Measure (collapse) | Measure | M |
+| Flick an orb and let go | Toss it: it lands on the desk, which measures it, then floats home | – | – |
+| Turn your left palm up | Wrist menu: H X Z S, Measure, Next qubit, Undo | – | – |
+| Pinch in the air and draw a circle, a Z or a stroke up | Spells: S, Z or X on the selected qubit | – | – |
 | Touch two held orbs together | CNOT (entangle); a gold thread appears | CNOT | C |
 | – | Pauli and phase gates | X Y Z S T | X Y Z S T |
 | – | 100 shots: probability rain | 100 shots | Space |
@@ -161,6 +164,28 @@ depends on a single input path.
 
 Gesture thresholds live in `src/gestures/config.ts` (with hysteresis, hold times
 and a shared cooldown, so fist, spread and pinch never trigger each other).
+
+### Hands: toss, wrist menu and spells
+
+| Toss an orb | The wrist menu | A circle spell |
+| --- | --- | --- |
+| ![q0 thrown up out of its place, flying above the desk with the gold thread still stretched to q1](docs/screenshots/toss-orb.png) | ![The wrist menu floating beside the desk: q0, the H X Z S keys, Measure, Next q and Undo](docs/screenshots/wrist-menu.png) | ![A circle of beads drawn in the air beside the orbs, turned white as the spell is recognised, and S, circle spell rising above them](docs/screenshots/circle-spell.png) |
+
+- **Toss the orbs**: let go of an orb with a flick and it keeps flying. It falls,
+  bounces on the desk (or the floor, if you miss) and rolls to a stop, and the
+  landing is a measurement: the impact looks at the qubit, so it collapses to 0
+  or 1 and its partner follows if they were entangled. A moment later it floats
+  back to its place.
+- **Wrist menu**: turn your left palm up and a small menu opens just above it,
+  facing you, with the selected qubit and the gates you use most: H, X, Z, S,
+  Measure, Next qubit and Undo. Poke it with your right hand; turn your palm over
+  and it is gone.
+- **Spells**: pinch away from the orbs and draw in the air; a trail of beads
+  follows your fingertip, and turns white when the shape is recognised. A circle casts S (a quarter turn of phase), a Z casts
+  Z and a straight stroke upward casts X, all on the selected qubit. The stroke is
+  flattened onto the plane you are facing and read by its shape (closed and turning
+  all the way round, three runs of direction, or one straight line up), so it
+  works at any size and in either direction (tests in `src/gestures/spells.test.ts`).
 
 ### Gates you can see
 

@@ -12,6 +12,7 @@ import { feedback } from '../lab/feedback';
 import { Qubit } from '../lab/components';
 import { lab } from '../lab/instance';
 import { LabSystem } from '../lab/lab-system';
+import { GestureSystem } from '../lab/gesture-system';
 import { MAX_ORBS } from '../lab/lab';
 import { loadSave, writeSave } from '../lab/save';
 import type { Op } from '../quantum/circuit';
@@ -99,6 +100,8 @@ const PLACEMENT = {
   'nav-panel': { pos: new Vector3(0.47, 0.26, -0.06), rot: new Euler(-0.12, (-32 * Math.PI) / 180, 0, 'YXZ') },
   // the decoder game's tap pad, right of the lattice
   'decoder-pad': { pos: new Vector3(0.17, 0.3, -0.15), rot: new Euler(-0.15, -0.3, 0, 'YXZ') },
+  // where the wrist menu shows for a screenshot without a tracked hand
+  'wrist-demo': { pos: new Vector3(-0.22, 0.12, 0.16), rot: new Euler(-0.5, 0.35, 0, 'YXZ') },
 } as const;
 
 const SLOTS = 7;
@@ -214,6 +217,9 @@ export class UISystem extends createSystem({
   private looksAsset: UIKitMLAsset | null = null;
   private codelabAsset: UIKitMLAsset | null = null;
   private decoderAsset: UIKitMLAsset | null = null;
+  private wristAsset: UIKitMLAsset | null = null;
+  /** Development: show the wrist menu at a fixed spot, without a tracked hand. */
+  wristForce = false;
   private dbgAsset: UIKitMLAsset | null = null;
   private classAsset: UIKitMLAsset | null = null;
   /** why the shared lab last refused an op (for the voice reply) */
@@ -359,12 +365,13 @@ export class UISystem extends createSystem({
     this.looksAsset = this.world.getSceneObject<UIKitMLAsset>('looks-panel') ?? null;
     this.codelabAsset = this.world.getSceneObject<UIKitMLAsset>('codelab-panel') ?? null;
     this.decoderAsset = this.world.getSceneObject<UIKitMLAsset>('decoder-panel') ?? null;
-    if (!this.decoderAsset || !this.codelabAsset || !this.looksAsset || !this.classAsset || !this.chapter || !this.dock || !this.code || !this.nav || !this.builderAsset || !this.notesAsset || !this.noiseAsset || !this.libAsset || !this.dbgAsset) return false;
+    this.wristAsset = this.world.getSceneObject<UIKitMLAsset>('wrist-panel') ?? null;
+    if (!this.wristAsset || !this.decoderAsset || !this.codelabAsset || !this.looksAsset || !this.classAsset || !this.chapter || !this.dock || !this.code || !this.nav || !this.builderAsset || !this.notesAsset || !this.noiseAsset || !this.libAsset || !this.dbgAsset) return false;
     this.code.visible = false;
 
     // panels take poke and ray input but must never capture the grab pointer,
     // or a hand reaching for an orb just above the dock grabs the dock instead
-    for (const panel of [this.chapter, this.dock, this.code, this.nav, this.builderAsset, this.notesAsset, this.noiseAsset, this.libAsset, this.dbgAsset, this.classAsset, this.looksAsset, this.codelabAsset, this.decoderAsset]) {
+    for (const panel of [this.chapter, this.dock, this.code, this.nav, this.builderAsset, this.notesAsset, this.noiseAsset, this.libAsset, this.dbgAsset, this.classAsset, this.looksAsset, this.codelabAsset, this.decoderAsset, this.wristAsset]) {
       panel.traverse((o) => {
         (o as unknown as { pointerEventsType: unknown }).pointerEventsType = { deny: 'grab' };
       });
@@ -409,6 +416,7 @@ export class UISystem extends createSystem({
       for (let c = 0; c < 5; c++) decIds.push(`dec-b-${r}-${c}`, `dec-l-${r}-${c}`);
     }
     for (const id of decIds) this.els.set(id, this.decoderAsset.requireElementById(id));
+    for (const id of ['wr-sel', 'wr-h', 'wr-x', 'wr-z', 'wr-s', 'wr-m', 'wr-n', 'wr-u']) this.els.set(id, this.wristAsset.requireElementById(id));
     const looksIds = ['looks-eyebrow', 'looks-close', 'looks-note'];
     for (let i = 0; i < ORB_SKINS.length; i++) looksIds.push(`looks-r-${i}`, `looks-sw-${i}`, `looks-n-${i}`, `looks-m-${i}`, `looks-b-${i}`, `looks-bl-${i}`);
     for (const id of looksIds) this.els.set(id, this.looksAsset.requireElementById(id));
@@ -618,6 +626,14 @@ export class UISystem extends createSystem({
     on('lab-step', () => this.runProgram(true));
     for (const k of LAB_KEYS) on(`lab-k-${k}`, () => this.labKey(k));
     for (let r = 0; r < 5; r++) for (let c = 0; c < 5; c++) on(`dec-b-${r}-${c}`, () => this.decoderTap(r, c));
+    // the wrist menu: favourite gates on the selected qubit
+    for (const g of ['h', 'x', 'z', 's'] as const) on(`wr-${g}`, () => lab.gate(g) && feedback('gate'));
+    on('wr-m', () => lab.measure() !== null && feedback('measure'));
+    on('wr-n', () => {
+      lab.select((lab.selected + 1) % lab.n);
+      feedback('select');
+    });
+    on('wr-u', () => lab.undo() && feedback('select'));
     ORB_SKINS.forEach((skin, i) => on(`looks-b-${i}`, () => this.wearSkin(skin.id)));
     // the finish saved with the profile
     this.world.getSystem(LabSystem)?.setSkin(this.currentSkin());
@@ -3546,7 +3562,7 @@ export class UISystem extends createSystem({
     const want = this.pokeOn ? near > 0.14 : near > 0.2;
     if (want === this.pokeOn) return;
     this.pokeOn = want;
-    for (const id of ['chapter-panel', 'gate-dock', 'code-panel', 'nav-panel', 'builder-panel', 'notes-panel', 'noise-panel', 'library-panel', 'debug-panel', 'class-panel', 'looks-panel', 'codelab-panel', 'decoder-panel']) {
+    for (const id of ['chapter-panel', 'gate-dock', 'code-panel', 'nav-panel', 'builder-panel', 'notes-panel', 'noise-panel', 'library-panel', 'debug-panel', 'class-panel', 'looks-panel', 'codelab-panel', 'decoder-panel', 'wrist-panel']) {
       const e = this.world.getSceneEntity(id);
       if (!e) continue;
       if (want && !e.hasComponent(PokeInteractable)) e.addComponent(PokeInteractable);
@@ -3623,6 +3639,21 @@ export class UISystem extends createSystem({
       this.builderAsset!.position.copy(PARKED);
     }
     this.placeBlend(this.code!, 'code-panel', 'code-zoom', this.zoomT, this.codeScale, this.codeOpenT);
+    // the wrist menu floats just above the upturned left palm, facing the player
+    const palm = this.world.getSystem(GestureSystem)?.palmUp;
+    if (palm || this.wristForce) {
+      const w = this.wristAsset!;
+      if (palm) w.position.copy(palm.center).addScaledVector(palm.normal, 0.06);
+      else this.place(w, 'wrist-demo');
+      this.player.head.getWorldPosition(this.p);
+      if (palm) w.lookAt(this.p);
+      w.visible = true;
+      this.text('wr-sel', `q${lab.selected}`);
+      this.els.get('wr-sel')?.setProperties({ color: qubitColor(lab.selected) });
+    } else {
+      this.wristAsset!.visible = false;
+      this.wristAsset!.position.copy(PARKED);
+    }
     if (this.game === 'decoder') {
       this.place(this.decoderAsset!, 'decoder-pad');
       this.decoderAsset!.visible = true;

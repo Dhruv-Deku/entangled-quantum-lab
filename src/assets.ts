@@ -61,6 +61,11 @@ export default defineAssets({
     type: AssetType.UIKitML,
     name: 'Decoder pad',
   },
+  'wrist-panel': {
+    url: publicAssetUrl('ui/wrist.uikitml'),
+    type: AssetType.UIKitML,
+    name: 'Wrist menu',
+  },
   'noise-panel': {
     url: publicAssetUrl('ui/noise.uikitml'),
     type: AssetType.UIKitML,

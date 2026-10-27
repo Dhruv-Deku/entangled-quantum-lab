@@ -292,6 +292,26 @@
       }
     },
     {
+      "id": "wrist-panel",
+      "name": "Wrist menu",
+      "content": {
+        "type": "asset",
+        "asset": "wrist-panel"
+      },
+      "transform": {
+        "position": [
+          0,
+          -50,
+          0
+        ],
+        "scale": 0.045
+      },
+      "components": {
+        "RayInteractable": {},
+        "PokeInteractable": {}
+      }
+    },
+    {
       "id": "decoder-panel",
       "name": "Decoder pad",
       "content": {

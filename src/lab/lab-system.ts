@@ -608,6 +608,11 @@ export class LabSystem extends createSystem({
     if (v) this.surface.set(v);
   }
 
+  /** Where orb i rests on the desk (workspace coordinates). */
+  homeOf(i: number, out: Vector3): Vector3 {
+    return this.layout(i, lab.n, out);
+  }
+
   /** Dress every orb in a finish. */
   setSkin(id: OrbSkinId): void {
     this.orbSkin = id;
