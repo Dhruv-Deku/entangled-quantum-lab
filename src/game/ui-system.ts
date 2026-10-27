@@ -41,6 +41,8 @@ import { explainStep, histogram, nextStop, stepTitle } from './debugger';
 import { nextView, STATE_VIEW_NAMES, type StateView } from '../quantum/state-views';
 import { assignmentProgress, kindOf, makeCode, parseCode, SharedRoom, type Progress, type Race, type Role, type RoomKind } from '../net/room';
 import { mulberry32 } from '../quantum/measure';
+import { computerCollapse, computerMove, collapse as tttCollapse, lastSquare, newGame as newTtt, place as tttPlaceMark, placeLast, SQUARE_NAMES, type Game as TttGame, type Player as TttPlayer } from './qttt';
+import { fireBomb, fireZeno, histogram as slitHistogram, runAtom, sampleSlit, SG_EXPERIMENTS, sgExpected, slitIntensity, ZENO_PASSES, type SlitSetup } from '../quantum/experiments';
 import { AutoTransport } from '../net/transport';
 import { openDailyDialog, openShareDialog, savedName } from '../lab/share-dialog';
 import { ACHIEVEMENTS, levelFor, Profile, xpFor, type ProgressContext } from './profile';
@@ -57,7 +59,7 @@ import { computerFlips, score as pennyScore, type PennyPhase, type PennyRecord }
 import { Ambient } from '../lab/ambient';
 import { bestStreak, dayKey, dailyNumber, emptyDaily, recordDaily, shareText, streak, type DailyRecord } from './daily';
 import { loadDaily, loadProfile, saveDaily, saveProfile } from '../lab/profile-store';
-import { albumFigure, questsFigure, spyFigure, profileFigure, rushFigure, type ProfileView, type RushView, type SurfaceView } from '../lab/figures';
+import { albumFigure, bombFigure, questsFigure, sgFigure, slitFigure, spyFigure, profileFigure, rushFigure, tttFigure, type BombStatus, type Figure, type ProfileView, type RushView, type SurfaceView } from '../lab/figures';
 import { listen } from '../lab/sonify';
 import { downloadSnapshot } from '../lab/snapshot';
 import { Banner } from '../lab/banner';
@@ -116,8 +118,10 @@ const LAB_LINES = 10;
 const LAB_KEYS = ['h', 'x', 'y', 'z', 's', 'sdg', 't', 'tdg', 'rx', 'ry', 'rz', 'cx', 'cz', 'swap', 'ccx', 'measure', 'q0', 'q1', 'q2', 'q3', 'q4', 'pi', 'pi2', 'pi4', 'mpi2', 'up', 'down', 'delete', 'clear', 'link', 'subqubit', 'addqubit', 'example', 'fromorbs'];
 const TABS = ['course', 'campaign', 'learn', 'puzzle', 'build', 'sandbox', 'play'] as const;
 /** The Play tab: arcade and showcase picks. */
-const PLAY = ['Code lab', 'First five minutes', 'Daily quests', 'Quantum Rush', 'Zen Rush', 'Rush versus', 'Class challenge', 'Daily', 'Spy game', 'Be the decoder', 'Grover maze', 'Teleporter', 'Shor in 3D', 'System Two', 'Photonic chip', 'Surface Code', 'Many worlds', 'Quantum dice', 'Penny flip', 'Schrodinger cat', 'State album', 'Giant sphere', 'Inside a qubit', 'Night sky', 'History', 'Ambient music'] as const;
-const PLAY_TAGS = ['qasm', 'tour', '3/day', '60s', 'zen', 'vs', 'class', 'day', 'BB84', 'd=3', '8', 'tp', '15', '3x', 'light',  '49q', 'H H', 'd8', 'coin', 'box', '15', '1 m', 'JJ', 'sky', '1981', 'hum'];
+type GameId = 'dice' | 'penny' | 'cat' | 'spy' | 'decoder' | 'grover' | 'teleport' | 'ttt' | 'slit' | 'sg' | 'bomb';
+
+const PLAY = ['Code lab', 'First five minutes', 'Daily quests', 'Quantum Rush', 'Zen Rush', 'Rush versus', 'Class challenge', 'Daily', 'Spy game', 'Be the decoder', 'Grover maze', 'Teleporter', 'Quantum tic-tac-toe', 'Double slit', 'Stern-Gerlach', 'Bomb tester', 'Shor in 3D', 'System Two', 'Photonic chip', 'Surface Code', 'Many worlds', 'Quantum dice', 'Penny flip', 'Schrodinger cat', 'State album', 'Giant sphere', 'Inside a qubit', 'Night sky', 'History', 'Ambient music'] as const;
+const PLAY_TAGS = ['qasm', 'tour', '3/day', '60s', 'zen', 'vs', 'class', 'day', 'BB84', 'd=3', '8', 'tp', 'X O', '2 slit', 'Ag', 'EV', '15', '3x', 'light',  '49q', 'H H', 'd8', 'coin', 'box', '15', '1 m', 'JJ', 'sky', '1981', 'hum'];
 
 /** Where hidden panels park, out of reach of every pointer. */
 const PARKED = new Vector3(0, -50, 0);
@@ -442,7 +446,7 @@ export class UISystem extends createSystem({
       } else campaign.next();
       feedback('select');
     });
-    for (let i = 0; i < 3; i++) on(`choice-${i}`, () => (this.game === 'spy' ? this.spyAnswer(i) : feedback(campaign.answer(i) ? 'success' : 'reject')));
+    for (let i = 0; i < 3; i++) on(`choice-${i}`, () => (this.game === 'spy' ? this.spyAnswer(i) : this.game === 'ttt' || this.game === 'slit' || this.game === 'sg' || this.game === 'bomb' ? this.modeChoice(i) : feedback(campaign.answer(i) ? 'success' : 'reject')));
     on('btn-replay', () => {
       if (this.rush || this.rushOver || this.racePending) return this.endRush(true);
       if (this.game) return this.endGame(true);
@@ -1392,7 +1396,7 @@ export class UISystem extends createSystem({
       return toggle(this.albumOpen, 'album-open', this.albumOpen ? `Your State Album: ${this.albumCount()} of ${ALBUM.length}. Make a state on the orbs to collect it.` : 'Album closed.');
     }
     this.endRush(false);
-    const games: Record<string, 'dice' | 'penny' | 'cat' | 'spy' | 'decoder' | 'grover' | 'teleport'> = { 'Quantum dice': 'dice', 'Penny flip': 'penny', 'Schrodinger cat': 'cat', 'Spy game': 'spy', 'Be the decoder': 'decoder', 'Grover maze': 'grover', Teleporter: 'teleport' };
+    const games: Record<string, GameId> = { 'Quantum dice': 'dice', 'Penny flip': 'penny', 'Schrodinger cat': 'cat', 'Spy game': 'spy', 'Be the decoder': 'decoder', 'Grover maze': 'grover', Teleporter: 'teleport', 'Quantum tic-tac-toe': 'ttt', 'Double slit': 'slit', 'Stern-Gerlach': 'sg', 'Bomb tester': 'bomb' };
     if (games[item]) return this.startGame(games[item]);
     this.endGame(false);
     if (item === 'Daily') return this.startDaily();
@@ -1420,7 +1424,7 @@ export class UISystem extends createSystem({
   private albumOpen = false;
   private readonly ambient = new Ambient();
   private ambientTimer = 0;
-  private game: 'dice' | 'penny' | 'cat' | 'spy' | 'decoder' | 'grover' | 'teleport' | null = null;
+  private game: GameId | null = null;
   private pennyPhase: PennyPhase = 'first';
   private penny: PennyRecord = { you: 0, computer: 0 };
   private pennyLast: { flipped: boolean; outcome: 0 | 1 } | null = null;
@@ -1442,6 +1446,14 @@ export class UISystem extends createSystem({
         return this.game === 'grover';
       case 'Teleporter':
         return this.game === 'teleport';
+      case 'Quantum tic-tac-toe':
+        return this.game === 'ttt';
+      case 'Double slit':
+        return this.game === 'slit';
+      case 'Stern-Gerlach':
+        return this.game === 'sg';
+      case 'Bomb tester':
+        return this.game === 'bomb';
       case 'Shor in 3D':
         return this.shorOn;
       case 'System Two':
@@ -1496,7 +1508,7 @@ export class UISystem extends createSystem({
     }
   }
 
-  private startGame(g: 'dice' | 'penny' | 'cat' | 'spy' | 'decoder' | 'grover' | 'teleport'): void {
+  private startGame(g: GameId): void {
     this.profileOpen = this.libOpen = this.albumOpen = false;
     if (this.code) this.code.visible = false;
     this.setView(null);
@@ -1523,6 +1535,10 @@ export class UISystem extends createSystem({
     } else if (g === 'teleport') {
       campaign.enterSandbox(3, []);
       this.teleportNew();
+    } else if (g === 'ttt' || g === 'slit' || g === 'sg' || g === 'bomb') {
+      campaign.enterSandbox(1, []);
+      this.game = g;
+      this.modeStart(g);
     } else {
       campaign.enterSandbox(3, []);
       this.groverNew();
@@ -1540,6 +1556,11 @@ export class UISystem extends createSystem({
     ls?.spy.hide();
     if (ls) ls.grover.root.visible = false;
     if (ls) ls.teleporter.root.visible = false;
+    if (ls) {
+      for (const r of [ls.ttt.root, ls.slits.root, ls.sg.root, ls.bombs.root]) r.visible = false;
+      ls.orbsHidden = false;
+    }
+    this.slitStream = this.sgStream = false;
     ls?.showSurfacePuzzle(null);
     if (render) this.render(campaign.view);
   }
@@ -1551,6 +1572,7 @@ export class UISystem extends createSystem({
     if (this.game === 'decoder') return this.decoderNext();
     if (this.game === 'grover') return this.groverNext();
     if (this.game === 'teleport') return this.teleportNext();
+    if (this.game === 'ttt' || this.game === 'slit' || this.game === 'sg' || this.game === 'bomb') return this.modeNext();
     if (this.game === 'dice') {
       // three Hadamards and three measurements: a fair number from 1 to 8
       lab.reset(3);
@@ -1592,6 +1614,7 @@ export class UISystem extends createSystem({
 
   private updateGame(dt: number): void {
     const ls = this.world.getSystem(LabSystem);
+    if (this.game === 'ttt' || this.game === 'slit' || this.game === 'sg' || this.game === 'bomb') this.modeUpdate(dt);
     if (this.game === 'teleport' && this.tele.phase === 'flying' && ls?.teleporter.arrived) {
       this.tele.phase = 'fix';
       this.renderGameCard();
@@ -1620,6 +1643,7 @@ export class UISystem extends createSystem({
 
   private renderGameCard(): void {
     for (let i = 0; i < 5; i++) this.els.get(`pip-${i}`)?.setProperties({ display: 'none' });
+    if (this.game === 'ttt' || this.game === 'slit' || this.game === 'sg' || this.game === 'bomb') return this.renderModeCard();
     const asking = this.game === 'spy' && this.spyPhase === 'guess';
     this.els.get('choices')?.setProperties({ display: asking ? 'flex' : 'none' });
     if (asking) {
@@ -1673,6 +1697,489 @@ export class UISystem extends createSystem({
       this.text('goal-text', opened ? 'Tap New cat' : 'Tap Open, or close your fist');
       this.text('btn-next-label', opened ? 'New cat' : 'Open');
     }
+  }
+
+
+  // ---- new modes: quantum tic-tac-toe, the double slit, Stern-Gerlach and the bomb tester
+
+  private tttGame: TttGame = newTtt();
+  private tttSel: number | null = null;
+  private tttVs: 'computer' | 'friend' = 'computer';
+  /** Seconds until the computer acts (negative: not its turn). */
+  private tttWait = -1;
+  private tttScore = { x: 0, o: 0, draws: 0 };
+  private tttLog: string[] = [];
+  private slitSetup: SlitSetup = 'both';
+  private slitStream = false;
+  private slitT = 0;
+  private slitAcc = 0;
+  private slitHits: number[] = [];
+  private sgExp = 0;
+  private sgStream = false;
+  private sgT = 0;
+  private sgAcc = 0;
+  private bombSet: { live: boolean; status: BombStatus }[] = [];
+  private bombIdx = 0;
+  private bombPhotons = 0;
+  private bombLast = '';
+  private bombZeno = false;
+  private bombNextAt = -1;
+  private modeCardTimer = 0;
+  private modeFig: { at: number; key: string; fig: Figure } | null = null;
+
+  private modeStart(g: 'ttt' | 'slit' | 'sg' | 'bomb'): void {
+    const ls = this.world.getSystem(LabSystem);
+    if (!ls) return;
+    ls.orbsHidden = true;
+    ls.ttt.root.visible = g === 'ttt';
+    ls.slits.root.visible = g === 'slit';
+    ls.sg.root.visible = g === 'sg';
+    ls.bombs.root.visible = g === 'bomb';
+    if (g === 'ttt') {
+      ls.cellTap = (sq) => this.tttTap(sq);
+      this.tttNew();
+    } else if (g === 'slit') {
+      this.slitSet(this.slitSetup);
+    } else if (g === 'sg') {
+      this.sgSet(this.sgExp);
+    } else {
+      this.bombRound();
+    }
+    this.use(g === 'ttt' ? 'ttt' : `exp-open:${g}`);
+  }
+
+  /** The card's main button. */
+  private modeNext(): void {
+    if (this.game === 'ttt') {
+      this.tttNew();
+      return feedback('select');
+    }
+    if (this.game === 'slit') {
+      if (this.slitHits.length >= 2500) this.slitSet(this.slitSetup);
+      this.slitStream = !this.slitStream;
+      if (this.slitStream) this.slitT = 0;
+    } else if (this.game === 'sg') {
+      const c = this.world.getSystem(LabSystem)?.sg.counts;
+      if (c && c.up + c.down + c.stopped >= 800) this.sgSet(this.sgExp);
+      this.sgStream = !this.sgStream;
+      if (this.sgStream) this.sgT = 0;
+    } else if (this.game === 'bomb') {
+      if (this.bombIdx >= this.bombSet.length) {
+        this.bombRound();
+        return feedback('select');
+      }
+      this.bombFire();
+      return;
+    }
+    feedback('select');
+    this.renderGameCard();
+  }
+
+  /** The card's choice buttons. */
+  private modeChoice(i: number): void {
+    if (this.game === 'ttt') {
+      const g = this.tttGame;
+      if (g.pending && this.tttHuman(g.pending.chooser)) return this.tttTap(g.marks[g.pending.mark].squares[i] ?? -1);
+      if (!g.marks.length && i < 2) {
+        this.tttVs = i === 0 ? 'computer' : 'friend';
+        feedback('select');
+        return this.renderGameCard();
+      }
+      return;
+    }
+    if (this.game === 'slit') {
+      this.slitSet((['both', 'watched', 'one'] as const)[i]);
+      this.slitStream = true;
+      this.slitT = 0;
+    } else if (this.game === 'sg') {
+      this.sgSet(i);
+      this.sgStream = true;
+      this.sgT = 0;
+    } else if (this.game === 'bomb') {
+      if (i === 0) this.bombCallDud();
+      else if (i === 1 && this.bombZeno) this.bombZenoTest();
+      return;
+    }
+    feedback('select');
+    this.renderGameCard();
+  }
+
+  private modeUpdate(dt: number): void {
+    const ls = this.world.getSystem(LabSystem);
+    if (!ls) return;
+    let dirty = false;
+    if (this.game === 'ttt') {
+      const g = this.tttGame;
+      ls.ttt.set({ marks: g.marks, board: g.board, selected: this.tttSel, options: g.pending && this.tttHuman(g.pending.chooser) ? g.marks[g.pending.mark].squares : [], line: g.over?.line ?? null });
+      if (this.tttWait >= 0) {
+        this.tttWait -= dt;
+        if (this.tttWait < 0) this.tttComputer();
+      }
+    } else if (this.game === 'slit' && this.slitStream) {
+      // a few slow photons you can follow, then faster and faster
+      this.slitT += dt;
+      const rate = this.slitT < 4 ? 3 : Math.min(90, 3 + (this.slitT - 4) * 14);
+      this.slitAcc += dt * rate;
+      while (this.slitAcc >= 1) {
+        this.slitAcc -= 1;
+        const x = sampleSlit(this.slitSetup, Math.random);
+        this.slitHits.push(x);
+        ls.slits.fire(x, rate < 8, Math.random);
+      }
+      if (this.slitHits.length >= 300) this.use('exp:slit');
+      if (this.slitHits.length >= 2500) this.slitStream = false;
+      dirty = true;
+    } else if (this.game === 'sg' && this.sgStream) {
+      this.sgT += dt;
+      const rate = this.sgT < 5 ? 4 : Math.min(45, 4 + (this.sgT - 5) * 9);
+      this.sgAcc += dt * rate;
+      const stages = SG_EXPERIMENTS[this.sgExp].stages;
+      while (this.sgAcc >= 1) {
+        this.sgAcc -= 1;
+        ls.sg.fire(runAtom(stages, Math.random), rate < 10);
+      }
+      const c = ls.sg.counts;
+      if (c.up + c.down >= 100) this.use('exp:sg');
+      if (c.up + c.down + c.stopped >= 800) this.sgStream = false;
+      dirty = true;
+    } else if (this.game === 'bomb' && this.bombNextAt > 0 && this.clockNow() >= this.bombNextAt) {
+      this.bombNextAt = -1;
+      this.bombIdx++;
+      if (this.bombIdx < this.bombSet.length) ls.bombs.newBomb(`Bomb ${this.bombIdx + 1} of ${this.bombSet.length}`, 'live or dud?');
+      else {
+        const saved = this.bombSet.filter((b) => b.status === 'live').length;
+        this.banner.show('Bomb tester', `${saved} live bomb${saved === 1 ? '' : 's'} found untouched`, `${this.bombSet.filter((b) => b.status === 'boom').length} lost, ${this.bombSet.filter((b) => b.status === 'dud').length} duds called right`);
+        if (saved) this.world.getSystem(LabSystem)?.celebrate(false);
+        this.quest('puzzle');
+      }
+      this.renderGameCard();
+    }
+    this.modeCardTimer += dt;
+    if (dirty && this.modeCardTimer > 0.3) {
+      this.modeCardTimer = 0;
+      this.renderGameCard();
+    }
+  }
+
+  /** The board's figure for the mode (redrawn at most five times a second while particles stream). */
+  private modeFigure(): Figure | null {
+    const now = this.clockNow();
+    const stamp = `${this.game}`;
+    if (this.modeFig && this.modeFig.key === stamp && now - this.modeFig.at < 0.2 && (this.game === 'slit' || this.game === 'sg')) return this.modeFig.fig;
+    let fig: Figure | null = null;
+    if (this.game === 'ttt') fig = tttFigure({ status: this.tttStatus(), vs: this.tttVs, score: this.tttScore, log: this.tttLog });
+    else if (this.game === 'slit') {
+      const setup = this.slitSetup;
+      fig = slitFigure({ setup, hist: slitHistogram(this.slitHits, 48), curve: Array.from({ length: 121 }, (_, i) => slitIntensity(-1 + (2 * i) / 120, setup)), hits: this.slitHits.length });
+    } else if (this.game === 'sg') {
+      const e = SG_EXPERIMENTS[this.sgExp];
+      const c = this.world.getSystem(LabSystem)?.sg.counts ?? { up: 0, down: 0, stopped: 0 };
+      fig = sgFigure({ name: e.name, up: c.up, down: c.down, stopped: c.stopped, expectUp: sgExpected(e.stages).up, note: this.sgNote() });
+    } else if (this.game === 'bomb') fig = bombFigure({ bombs: this.bombSet.map((b, i) => ({ status: b.status, current: i === this.bombIdx })), photons: this.bombPhotons, zeno: this.bombZeno, last: this.bombLast });
+    this.modeFig = fig ? { at: now, key: stamp, fig } : null;
+    return fig;
+  }
+
+  /** Choice buttons on the card: a label each (null hides it), the active one in blue. */
+  private modeChoices(labels: (string | null)[], active = -1): void {
+    this.els.get('choices')?.setProperties({ display: labels.some((l) => l) ? 'flex' : 'none' });
+    for (let i = 0; i < 3; i++) {
+      const l = labels[i] ?? null;
+      this.els.get(`choice-${i}`)?.setProperties({ display: l ? 'flex' : 'none' });
+      if (!l) continue;
+      this.text(`choice-${i}-l`, l);
+      this.bg(`choice-${i}`, i === active ? C.primary : '#2d2f33');
+      this.els.get(`choice-${i}-l`)?.setProperties({ color: C.text });
+    }
+  }
+
+  private renderModeCard(): void {
+    this.els.get('btn-notes')?.setProperties({ display: 'none' });
+    this.els.get('btn-lib')?.setProperties({ display: 'none' });
+    this.text('btn-replay-label', 'Done');
+    this.bg('btn-next', C.primary);
+    this.bg('goal-dot', C.current);
+    if (this.game === 'ttt') return this.renderTttCard();
+    if (this.game === 'slit') {
+      const n = this.slitHits.length;
+      const titles: Record<SlitSetup, [string, string]> = {
+        both: ['Both slits, nobody watching', 'One photon at a time goes through a plate with two slits. Each lands in one spot, but dot by dot the screen fills with stripes: each photon passed through both slits as a wave and interfered with itself.'],
+        watched: ['Watch which slit', 'A ring at each slit says which one every photon took. Now each photon goes through just one, and the stripes vanish: knowing the path destroys the interference.'],
+        one: ['One slit', 'Cover one slit: a single broad bump, no stripes. Opening a second slit makes dark places where light used to land.'],
+      };
+      this.text('chapter-eyebrow', `Play  /  Double slit  /  ${n.toLocaleString('en-US')} photons`);
+      this.text('chapter-title', titles[this.slitSetup][0]);
+      this.text('chapter-body', titles[this.slitSetup][1]);
+      this.text('goal-text', this.slitStream ? 'Firing, faster and faster' : n >= 2500 ? 'Screen full: Fire starts again' : 'Tap Fire, or pick a setup');
+      this.text('btn-next-label', this.slitStream ? 'Pause' : 'Fire');
+      return this.modeChoices(['Both slits', 'Watch them', 'One slit'], ['both', 'watched', 'one'].indexOf(this.slitSetup));
+    }
+    if (this.game === 'sg') {
+      const e = SG_EXPERIMENTS[this.sgExp];
+      const c = this.world.getSystem(LabSystem)?.sg.counts ?? { up: 0, down: 0, stopped: 0 };
+      const titles = ['Two spots, never a smear', 'Measure again: same answer', 'Measuring X scrambles Z'];
+      this.text('chapter-eyebrow', `Play  /  Stern-Gerlach  /  ${e.name}  /  ${c.up + c.down + c.stopped} atoms`);
+      this.text('chapter-title', titles[this.sgExp]);
+      this.text('chapter-body', this.sgNote());
+      this.text('goal-text', this.sgStream ? 'Atoms flying' : 'Tap Fire, or pick an experiment');
+      this.text('btn-next-label', this.sgStream ? 'Pause' : 'Fire');
+      return this.modeChoices(SG_EXPERIMENTS.map((x) => x.name), this.sgExp);
+    }
+    // the bomb tester
+    const done = this.bombIdx >= this.bombSet.length;
+    const saved = this.bombSet.filter((b) => b.status === 'live').length;
+    this.text('chapter-eyebrow', done ? 'Play  /  Bomb tester  /  round over' : `Play  /  Bomb tester  /  bomb ${this.bombIdx + 1} of ${this.bombSet.length}`);
+    this.text('chapter-title', done ? `${saved} live bomb${saved === 1 ? '' : 's'} found untouched` : 'Is this bomb live?');
+    this.text(
+      'chapter-body',
+      done
+        ? 'Every one found by D was proven live without a single photon touching it. That is an interaction-free measurement.'
+        : this.bombLast || 'A live bomb goes off if one photon touches its trigger; a dud lets light pass. Send photons through the interferometer: if the dark detector D ever clicks, the bomb is live, and it never went off.',
+    );
+    this.text('goal-text', done ? 'Tap New round' : `Photons fired: ${this.bombPhotons}`);
+    this.text('btn-next-label', done ? 'New round' : 'Fire a photon');
+    this.modeChoices(done ? [] : ['Call it a dud', this.bombZeno ? 'Zeno test' : null]);
+  }
+
+  // ---- quantum tic-tac-toe
+
+  private tttHuman(p: TttPlayer): boolean {
+    return this.tttVs === 'friend' || p === 'X';
+  }
+
+  private tttNew(): void {
+    this.tttGame = newTtt();
+    this.tttSel = null;
+    this.tttWait = -1;
+    this.tttLog = [];
+    this.renderGameCard();
+  }
+
+  /** A square was tapped, by ray or by finger. */
+  private tttTap(sq: number): void {
+    if (this.game !== 'ttt') return;
+    const g = this.tttGame;
+    if (g.over) return feedback('reject');
+    if (g.pending) {
+      if (!this.tttHuman(g.pending.chooser) || !g.marks[g.pending.mark].squares.includes(sq)) return feedback('reject');
+      return this.tttMeasure(sq);
+    }
+    if (!this.tttHuman(g.turn) || sq < 0) return feedback('reject');
+    if (lastSquare(g) === sq) {
+      const who = g.turn;
+      placeLast(g, sq);
+      this.tttLog.push(`${who}${g.marks.length}: ${SQUARE_NAMES[sq]} (the last square)`);
+      return this.tttAfter();
+    }
+    if (g.board[sq] >= 0) return feedback('reject');
+    if (this.tttSel === null || this.tttSel === sq) {
+      this.tttSel = this.tttSel === sq ? null : sq;
+      feedback('select');
+      return this.renderGameCard();
+    }
+    const a = this.tttSel;
+    this.tttSel = null;
+    this.tttPlace(a, sq);
+  }
+
+  private tttPlace(a: number, b: number): void {
+    const g = this.tttGame;
+    const who = g.turn;
+    const r = tttPlaceMark(g, a, b);
+    if (!r) return feedback('reject');
+    this.tttLog.push(`${who}${g.marks.length}: ${SQUARE_NAMES[a]} + ${SQUARE_NAMES[b]}${r === 'loop' ? '  (a loop)' : ''}`);
+    feedback(r === 'loop' ? 'gate' : 'select');
+    if (r === 'loop') this.world.getSystem(LabSystem)?.rushFx.pop('Loop', 'now it is measured', '#e2b04a');
+    this.tttAfter();
+  }
+
+  private tttMeasure(sq: number): void {
+    const g = this.tttGame;
+    const mark = g.marks[g.pending!.mark];
+    const order = tttCollapse(g, sq);
+    if (!order) return;
+    this.world.getSystem(LabSystem)?.ttt.popCollapse(order.map((mi) => g.marks[mi].at ?? 0));
+    this.tttLog.push(`${mark.player}${mark.n} measured: ${SQUARE_NAMES[sq]}${order.length > 1 ? `, ${order.length - 1} more forced` : ''}`);
+    feedback('measure');
+    this.tttAfter();
+  }
+
+  /** After a move or a collapse: the end of the game, or the computer's turn. */
+  private tttAfter(): void {
+    const g = this.tttGame;
+    if (g.over) {
+      const w = g.over.winner;
+      if (w === 'X') this.tttScore.x++;
+      else if (w === 'O') this.tttScore.o++;
+      else this.tttScore.draws++;
+      const lost = this.tttVs === 'computer' && w === 'O';
+      if (w && !lost) {
+        this.world.getSystem(LabSystem)?.celebrate(true);
+        if (this.tttVs === 'computer') this.use('ttt:win');
+        this.quest('puzzle');
+      }
+      feedback(lost ? 'reject' : 'success');
+    } else if (g.pending ? !this.tttHuman(g.pending.chooser) : !this.tttHuman(g.turn)) this.tttWait = 0.9;
+    this.renderGameCard();
+  }
+
+  private tttComputer(): void {
+    const g = this.tttGame;
+    if (g.over) return;
+    if (g.pending) return this.tttMeasure(computerCollapse(g, g.pending.chooser, Math.random));
+    const mv = computerMove(g, Math.random);
+    if (typeof mv === 'number') {
+      placeLast(g, mv);
+      this.tttLog.push(`O${g.marks.length}: ${SQUARE_NAMES[mv]} (the last square)`);
+      return this.tttAfter();
+    }
+    this.tttPlace(mv[0], mv[1]);
+  }
+
+  private tttStatus(): string {
+    const g = this.tttGame;
+    const name = (p: TttPlayer) => (this.tttVs === 'computer' ? (p === 'X' ? 'You' : 'The computer') : p);
+    if (g.over) return g.over.winner ? `${name(g.over.winner)} won${this.tttVs === 'computer' && g.over.winner === 'X' ? '!' : ''}` : 'A draw';
+    if (g.pending) return this.tttHuman(g.pending.chooser) ? `${this.tttVs === 'computer' ? 'You' : g.pending.chooser} measure the loop` : 'The computer measures the loop';
+    if (!this.tttHuman(g.turn)) return 'The computer is thinking';
+    return this.tttVs === 'computer' ? 'Your move' : `${g.turn} to move`;
+  }
+
+  private renderTttCard(): void {
+    const g = this.tttGame;
+    const sc = this.tttScore;
+    this.text('chapter-eyebrow', `Play  /  Quantum tic-tac-toe  /  ${this.tttVs === 'computer' ? `you ${sc.x} : ${sc.o} computer` : `X ${sc.x} : ${sc.o} O`}`);
+    this.text('chapter-title', this.tttStatus());
+    this.text('btn-next-label', 'New game');
+    let body: string;
+    let goal: string;
+    let choices: (string | null)[] = [];
+    let active = -1;
+    if (g.over) {
+      body = `${g.over.note} Every spooky mark ended up in exactly one square: the loops were measured.`;
+      goal = 'Tap New game';
+      this.bg('goal-dot', g.over.winner === 'O' && this.tttVs === 'computer' ? '#ff8a7a' : C.done);
+    } else if (g.pending) {
+      const m = g.marks[g.pending.mark];
+      const [a, b] = m.squares;
+      body = `${m.player}${m.n} closed a loop of entangled squares, so the loop is measured. ${this.tttHuman(g.pending.chooser) ? 'Choose' : 'The computer chooses'} where ${m.player}${m.n} lands, ${SQUARE_NAMES[a]} or ${SQUARE_NAMES[b]}; every mark tied to it is forced into a square of its own.`;
+      goal = this.tttHuman(g.pending.chooser) ? 'Tap a gold square, or a button' : 'Watch the collapse';
+      if (this.tttHuman(g.pending.chooser)) choices = [`${m.player}${m.n} to ${SQUARE_NAMES[a]}`, `${m.player}${m.n} to ${SQUARE_NAMES[b]}`];
+    } else if (lastSquare(g) !== null && this.tttHuman(g.turn)) {
+      body = 'One square left: tap it for an ordinary, classical mark.';
+      goal = 'Tap the last square';
+    } else if (this.tttSel !== null) {
+      body = `First square: ${SQUARE_NAMES[this.tttSel]}. Tap a second: your mark will be in both at once, entangled.`;
+      goal = 'Tap a second square';
+    } else {
+      body = 'Tap two squares for a spooky mark: it is in both at once until a loop of entangled squares is measured. Three classical marks in a row win.';
+      goal = this.tttHuman(g.turn) ? 'Tap two squares' : 'The computer is moving';
+      if (!g.marks.length) {
+        choices = ['Play the computer', 'Two players'];
+        active = this.tttVs === 'computer' ? 0 : 1;
+      }
+    }
+    this.text('chapter-body', body);
+    this.text('goal-text', goal);
+    this.modeChoices(choices, active);
+  }
+
+  // ---- the double slit and Stern-Gerlach
+
+  private slitSet(setup: SlitSetup): void {
+    this.slitSetup = setup;
+    this.slitHits = [];
+    this.slitAcc = 0;
+    const ls = this.world.getSystem(LabSystem);
+    ls?.slits.clear();
+    ls?.slits.setSetup(setup);
+  }
+
+  private sgSet(i: number): void {
+    this.sgExp = i;
+    this.sgAcc = 0;
+    this.world.getSystem(LabSystem)?.sg.setExperiment(SG_EXPERIMENTS[i].stages);
+  }
+
+  private sgNote(): string {
+    return [
+      'Each silver atom is a tiny magnet. If its tilt could be anything, the beam would smear into a band (grey). It lands in exactly two spots: measured along Z, spin is only ever up or down.',
+      'Keep only the atoms that went up and send them through a second Z magnet: every one goes up again. Ask the same question twice and you get the same answer.',
+      'Put an X magnet in between and keep its +x atoms: the last Z magnet splits them half and half again. Learning X erased what Z said: both cannot be known at once.',
+    ][this.sgExp];
+  }
+
+  // ---- the bomb tester
+
+  private bombRound(): void {
+    let live: boolean[] = [];
+    do live = Array.from({ length: 6 }, () => Math.random() < 0.5);
+    while (live.filter(Boolean).length < 2 || live.filter(Boolean).length > 4);
+    this.bombSet = live.map((l) => ({ live: l, status: 'unknown' as BombStatus }));
+    this.bombIdx = 0;
+    this.bombPhotons = 0;
+    this.bombLast = '';
+    this.bombNextAt = -1;
+    this.world.getSystem(LabSystem)?.bombs.newBomb('Bomb 1 of 6', 'live or dud?');
+    this.renderGameCard();
+  }
+
+  private bombBusy(): boolean {
+    return this.bombIdx >= this.bombSet.length || this.bombNextAt > 0 || !!this.world.getSystem(LabSystem)?.bombs.busy;
+  }
+
+  private bombDone(status: BombStatus, text: string): void {
+    this.bombSet[this.bombIdx].status = status;
+    this.bombLast = text;
+    this.bombNextAt = this.clockNow() + 1.8;
+    if (status === 'live') {
+      this.use('bomb:safe');
+      this.world.getSystem(LabSystem)?.celebrate(false);
+      feedback('success');
+    } else feedback(status === 'dud' ? 'success' : 'reject');
+    if (!this.bombZeno && (status === 'live' || status === 'boom')) {
+      this.bombZeno = true;
+      this.bombLast += ' New: the Zeno test.';
+    }
+    this.renderGameCard();
+  }
+
+  private bombFire(): void {
+    if (this.bombBusy()) return;
+    const b = this.bombSet[this.bombIdx];
+    const outcome = fireBomb(b.live, Math.random);
+    this.bombPhotons++;
+    this.use('exp:bomb');
+    feedback('gate');
+    this.world.getSystem(LabSystem)?.bombs.fire(b.live, outcome, () => {
+      if (outcome === 'D') return this.bombDone('live', 'D clicked: this bomb is live, and it never went off. The photon reached D only because the bomb could have looked.');
+      if (outcome === 'boom') return this.bombDone('boom', 'Boom: the photon took the lower arm and set the bomb off.');
+      this.bombLast = 'C: no news. A dud always sends the photon to C, and so does a live bomb a quarter of the time. Fire again, or call it a dud.';
+      feedback('select');
+      this.renderGameCard();
+    });
+    this.renderGameCard();
+  }
+
+  private bombCallDud(): void {
+    if (this.bombBusy()) return;
+    const b = this.bombSet[this.bombIdx];
+    this.world.getSystem(LabSystem)?.bombs.newBomb(b.live ? 'It was live!' : 'A dud', b.live ? 'D just had not clicked yet' : 'well called');
+    this.bombDone(b.live ? 'wrong' : 'dud', b.live ? 'It was live: D just had not clicked yet. Luckily nobody tested it the classical way.' : 'A dud, well called: C every time is what a dud does.');
+  }
+
+  private bombZenoTest(): void {
+    if (this.bombBusy()) return;
+    const b = this.bombSet[this.bombIdx];
+    const r = fireZeno(b.live, Math.random);
+    this.bombPhotons++;
+    feedback('gate');
+    this.world.getSystem(LabSystem)?.bombs.zeno(b.live, r.result, r.pass, ZENO_PASSES, () => {
+      if (r.result === 'live') return this.bombDone('live', `Zeno: ${ZENO_PASSES} passes, and the bomb's looking kept the photon from turning. Live, and never touched.`);
+      if (r.result === 'dud') return this.bombDone('dud', `Zeno: with nothing looking, ${ZENO_PASSES} small turns added up to a full flip. A dud, for certain.`);
+      this.bombDone('boom', `Boom on pass ${r.pass}: each pass has a small chance of the bomb seeing the photon.`);
+    });
+    this.renderGameCard();
   }
 
   // ---- daily quests
@@ -3307,7 +3814,7 @@ export class UISystem extends createSystem({
     }
     // today's quests, or the spy game's photons
     const questsFig = this.questsOpen ? this.questsFigureNow() : null;
-    const spyFig = this.game === 'spy' && this.spyRound && this.spyPhase !== 'flying' ? spyFigure({ ...this.spyRound, eve: this.spyPhase === 'result' ? this.spyRound.eve : null, record: this.spyRecord }) : null;
+    const spyFig = this.game === 'spy' && this.spyRound && this.spyPhase !== 'flying' ? spyFigure({ ...this.spyRound, eve: this.spyPhase === 'result' ? this.spyRound.eve : null, record: this.spyRecord }) : this.modeFigure();
     if (questsFig || spyFig) {
       labSys.hardwareWanted = false;
       labSys.showHardware(null);

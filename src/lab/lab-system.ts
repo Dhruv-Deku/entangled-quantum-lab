@@ -5,6 +5,7 @@ import {
   MeshBasicMaterial,
   SphereGeometry,
   OneHandGrabbable,
+  PokeInteractable,
   Pressed,
   Quaternion,
   RayInteractable,
@@ -13,12 +14,16 @@ import {
   type Entity,
 } from '@iwsdk/core';
 import { blochVector } from '../quantum/bloch';
+import { Interferometer } from './bomb-3d';
+import { SlitBench } from './double-slit-3d';
+import { TicTacToeBoard } from './qttt-3d';
+import { SgBench } from './stern-gerlach-3d';
 import type { Op } from '../quantum/circuit';
 import { mixedness, pairStrength } from '../quantum/entanglement';
 import { decompose, gateMatrix, type Vec3 } from '../quantum/gates';
 import { gateLabel } from './gate-label';
 import { QState } from '../quantum/state';
-import { Qubit, VirtualRoom } from './components';
+import { BoardCell, Qubit, VirtualRoom } from './components';
 import { lab } from './instance';
 import { partialState, type LabEvent } from './lab';
 import { RainVisual } from './rain';
@@ -86,6 +91,7 @@ interface Anim {
 export class LabSystem extends createSystem({
   qubits: { required: [Qubit] },
   pressed: { required: [Qubit, Pressed] },
+  cells: { required: [BoardCell, Pressed] },
   rooms: { required: [VirtualRoom] },
 }) {
   private workspace!: Entity;
@@ -138,6 +144,15 @@ export class LabSystem extends createSystem({
   teleporter!: Teleporter;
   private shor!: ShorVisual;
   private systemTwo!: SystemTwo;
+  /** New modes: quantum tic-tac-toe, the double slit, Stern-Gerlach and the bomb tester. */
+  ttt!: TicTacToeBoard;
+  slits!: SlitBench;
+  sg!: SgBench;
+  bombs!: Interferometer;
+  /** A tic-tac-toe square was tapped. */
+  cellTap: ((square: number) => void) | null = null;
+  /** These modes have the desk to themselves: the orbs step aside. */
+  orbsHidden = false;
   private night = false;
   private trophies!: TrophyShelf;
   /** The Surface Code chapter's lattice, floating between the orb and the board. */
@@ -292,6 +307,27 @@ export class LabSystem extends createSystem({
     this.grover = new GroverDoors();
     this.grover.env = env;
     ws.add(this.grover.root);
+    // quantum tic-tac-toe: a tilted stand of nine tappable tiles where the orbs were
+    this.ttt = new TicTacToeBoard();
+    this.ttt.root.position.set(0, 0.09, -0.04);
+    this.ttt.root.rotation.x = -0.95;
+    const tttEntity = this.world.createTransformEntity(this.ttt.root, { parent: this.workspace });
+    this.ttt.tiles.forEach((tile, i) => {
+      const pos = tile.position.clone();
+      const e = this.world.createTransformEntity(tile, { parent: tttEntity });
+      tile.position.copy(pos);
+      e.addComponent(BoardCell, { index: i });
+      e.addComponent(RayInteractable);
+      e.addComponent(PokeInteractable);
+    });
+    this.ttt.root.position.set(0, 0.09, -0.04);
+    this.slits = new SlitBench();
+    ws.add(this.slits.root);
+    this.sg = new SgBench();
+    ws.add(this.sg.root);
+    this.bombs = new Interferometer();
+    ws.add(this.bombs.root);
+    for (const r of [this.slits.root, this.sg.root, this.bombs.root]) useStudio(r, env, 0.8);
     this.sky = new NightSky();
     this.scene.add(this.sky.root);
     // the trophy shelf stands upper right, above the navigator, while the progress board is up
@@ -312,6 +348,9 @@ export class LabSystem extends createSystem({
 
     this.queries.pressed.subscribe('qualify', (entity) => {
       lab.select(entity.getValue(Qubit, 'index') ?? 0);
+    });
+    this.queries.cells.subscribe('qualify', (entity) => {
+      if (this.ttt.root.visible) this.cellTap?.(entity.getValue(BoardCell, 'index') ?? 0);
     });
 
     // passthrough: hide the virtual room and re-seat the workspace in front of the player
@@ -668,6 +707,10 @@ export class LabSystem extends createSystem({
       this.systemTwo.update(dt);
     }
     if (this.grover.root.visible) this.grover.update(dt);
+    if (this.ttt.root.visible) this.ttt.update(dt);
+    if (this.slits.root.visible) this.slits.update(dt);
+    if (this.sg.root.visible) this.sg.update(dt);
+    if (this.bombs.root.visible) this.bombs.update(dt);
     if (this.cat.root.visible) {
       // the cat follows q0: still in superposition, or measured
       const p1 = lab.history.state.prob1(0);
@@ -743,6 +786,7 @@ export class LabSystem extends createSystem({
       o.visual.setBloch(this.blochCache[q]);
       o.visual.setHeight(o.entity.object3D!.position.y);
       o.visual.update(dt);
+      o.entity.object3D!.visible = !this.orbsHidden;
     }
     for (const [key, t] of this.threads) {
       const [a, b] = key.split('-').map(Number);
@@ -751,8 +795,9 @@ export class LabSystem extends createSystem({
       const strength = this.strengths.get(key) ?? 0;
       t.set(this.va.copy(oa.position), this.vb.copy(ob.position), strength);
       t.update(dt, strength);
+      if (this.orbsHidden) t.mesh.visible = false;
     }
-    this.group.set(this.groupMembers.map((q) => this.orbs[q].entity.object3D!.position));
+    this.group.set(this.orbsHidden ? [] : this.groupMembers.map((q) => this.orbs[q].entity.object3D!.position));
     this.rain.update(dt);
     this.bolt.update(dt);
     // sparks: one at a time is plenty; an arc up and over between the two orbs

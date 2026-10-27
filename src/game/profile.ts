@@ -106,6 +106,9 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'decoder', title: 'Human decoder', text: 'Win three rounds of Be the decoder.', done: (s) => used(s, 'decoder:3') },
   { id: 'quests', title: 'Quest master', text: 'Finish nine daily quests.', done: (s) => used(s, 'quests:9') },
   { id: 'rival', title: 'Rival', text: 'Win a Rush versus or a class challenge.', done: (s) => used(s, 'race:win') },
+  { id: 'ttt', title: 'Spooky noughts', text: 'Beat the computer at quantum tic-tac-toe.', done: (s) => used(s, 'ttt:win') },
+  { id: 'bomb', title: 'Without touching', text: 'Prove a bomb is live without setting it off.', done: (s) => used(s, 'bomb:safe') },
+  counter('experiments', 'Experimenter', 'Run the double slit, Stern-Gerlach and the bomb tester.', (s) => ['slit', 'sg', 'bomb'].filter((m) => used(s, `exp:${m}`)).length, () => 3),
   counter('wonders', 'Explorer', 'Try the dice, the cat, the giant sphere, inside a qubit, the night sky and the history gallery.', (s) => WONDERS.filter((w) => used(s, w)).length, () => WONDERS.length),
 ];
 

@@ -148,6 +148,10 @@ export function parseVoice(text: string): VoiceCommand | null {
     [/inside (a |the )?qubit|transmon|josephson/, 'Inside a qubit'],
     [/night|stars|\bsky\b/, 'Night sky'],
     [/history|timeline/, 'History'],
+    [/tic.?tac|noughts|naughts/, 'Quantum tic-tac-toe'],
+    [/double slit|two slits|young/, 'Double slit'],
+    [/stern|gerlach|silver atoms/, 'Stern-Gerlach'],
+    [/\bbombs?\b|elitzur|vaidman/, 'Bomb tester'],
     [/ambient|music/, 'Ambient music'],
   ];
   for (const [re, item] of play) if (re.test(s)) return { type: 'play', item };

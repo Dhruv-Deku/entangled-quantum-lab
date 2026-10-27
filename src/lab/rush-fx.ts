@@ -60,6 +60,8 @@ export class RushFx {
       this.ticks.setColorAt(i, LIVE);
     }
     this.ticks.frustumCulled = false;
+    // the ring shows only while a round's clock runs (pop-ups alone do not bring it)
+    this.ticks.visible = false;
     this.root.add(this.ticks);
     this.root.visible = false;
   }

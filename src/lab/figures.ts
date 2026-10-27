@@ -996,3 +996,189 @@ export function questsFigure(day: string, quests: { text: string; have: number; 
     },
   };
 }
+
+// ---------------------------------------------------------------- new modes: tic-tac-toe and three experiments
+
+export interface TttView {
+  status: string;
+  vs: 'computer' | 'friend';
+  score: { x: number; o: number; draws: number };
+  log: string[];
+}
+
+/** Quantum tic-tac-toe: the rules in three lines, whose move it is, and the moves so far. */
+export function tttFigure(v: TttView): Figure {
+  return {
+    key: `ttt:${v.status}:${v.vs}:${v.score.x}/${v.score.o}/${v.score.draws}:${v.log.join('|')}`,
+    draw: (g, w, h) => {
+      panel(g, w, h, 'Quantum tic-tac-toe', v.vs === 'computer' ? `You (X) ${v.score.x} : ${v.score.o} Computer (O)` : `X ${v.score.x} : ${v.score.o} O`);
+      text(g, v.status, 44, 128, INK, '700 38px');
+      const rules = [
+        ['1', 'Each move puts a spooky mark in two squares at once. The two squares are now entangled: a gold thread.'],
+        ['2', 'Close a loop of entangled squares and it is measured: the other player picks where the newest mark lands, and every mark tied to it is forced into one square.'],
+        ['3', 'Three classical marks in a row win. Two rows in one collapse? The row finished first wins.'],
+      ];
+      let y = 196;
+      for (const [n, r] of rules) {
+        dot(g, 62, y - 9, 17, '#26272b');
+        text(g, n, 62, y - 1, GOLD, '700 22px', 'center');
+        for (const line of wrap(g, r, '500 24px', 860)) {
+          text(g, line, 96, y, DIM, '500 24px');
+          y += 32;
+        }
+        y += 18;
+      }
+      text(g, 'Moves', 1040, 128, DIM, '600 24px');
+      const shown = v.log.slice(-9);
+      shown.forEach((m, i) => text(g, m, 1040, 172 + i * 44, i === shown.length - 1 ? INK : DIM, '600 24px'));
+    },
+  };
+}
+
+export interface SlitView {
+  setup: 'both' | 'watched' | 'one';
+  hist: number[];
+  /** The prediction for this setup, sampled across the screen. */
+  curve: number[];
+  hits: number;
+}
+
+/** The double slit: hits per stripe of the screen, against the wave prediction. */
+export function slitFigure(v: SlitView): Figure {
+  return {
+    key: `slit:${v.setup}:${v.hits}`,
+    draw: (g, w, h) => {
+      const name = v.setup === 'both' ? 'Both slits open, nobody watching' : v.setup === 'watched' ? 'Both slits open, a detector watching each' : 'One slit open';
+      panel(g, w, h, `Double slit  /  ${name}`, `${v.hits.toLocaleString('en-US')} photons`);
+      const x0 = 70, y0 = 110, pw = w - 140, ph = h - 230;
+      const top = Math.max(1, ...v.hist);
+      const bw = pw / v.hist.length;
+      v.hist.forEach((c, i) => {
+        const bh = (c / top) * ph;
+        roundRect(g, x0 + i * bw + 2, y0 + ph - bh, bw - 4, Math.max(2, bh), 4);
+        g.fillStyle = 'rgba(143,183,255,0.75)';
+        g.fill();
+      });
+      // the prediction, scaled to the tallest bar
+      const peak = Math.max(1e-9, ...v.curve);
+      g.beginPath();
+      v.curve.forEach((c, i) => {
+        const x = x0 + (i / (v.curve.length - 1)) * pw, yy = y0 + ph - (c / peak) * ph * 0.98;
+        if (i) g.lineTo(x, yy);
+        else g.moveTo(x, yy);
+      });
+      g.lineWidth = 3;
+      g.setLineDash([10, 8]);
+      g.strokeStyle = INK;
+      g.stroke();
+      g.setLineDash([]);
+      g.strokeStyle = LINE;
+      g.beginPath();
+      g.moveTo(x0, y0 + ph);
+      g.lineTo(x0 + pw, y0 + ph);
+      g.stroke();
+      text(g, 'left of the screen', x0, y0 + ph + 34, DIM, '500 20px');
+      text(g, 'right', x0 + pw, y0 + ph + 34, DIM, '500 20px', 'right');
+      const note =
+        v.hits < 60
+          ? 'Each photon lands in one spot. Keep firing: a pattern builds up.'
+          : v.setup === 'both'
+            ? 'Stripes: each photon went through both slits as a wave and interfered with itself. Dashed: the wave prediction.'
+            : v.setup === 'watched'
+              ? 'Knowing which slit each photon took destroys the interference: one broad bump, no stripes.'
+              : 'One slit: a single broad bump. Open the second and dark stripes appear where there was light.';
+      text(g, note, 44, h - 40, v.hits < 60 ? DIM : INK, '600 24px');
+    },
+  };
+}
+
+export interface SgView {
+  name: string;
+  up: number;
+  down: number;
+  stopped: number;
+  expectUp: number;
+  note: string;
+}
+
+/** Stern-Gerlach: the counts at the screen against the quantum prediction. */
+export function sgFigure(v: SgView): Figure {
+  return {
+    key: `sg:${v.name}:${v.up}:${v.down}:${v.stopped}`,
+    draw: (g, w, h) => {
+      const reached = v.up + v.down;
+      panel(g, w, h, `Stern-Gerlach  /  ${v.name}`, `${(reached + v.stopped).toLocaleString('en-US')} atoms`);
+      const rows: [string, number, number][] = [
+        ['up', v.up, v.expectUp],
+        ['down', v.down, 1 - v.expectUp],
+      ];
+      rows.forEach(([label, n, want], i) => {
+        const y = 150 + i * 92;
+        const frac = reached ? n / reached : 0;
+        text(g, label, 60, y + 10, INK, '700 32px');
+        roundRect(g, 200, y - 26, 760, 46, 23);
+        g.fillStyle = '#232428';
+        g.fill();
+        if (frac > 0) {
+          roundRect(g, 200, y - 26, Math.max(46, 760 * frac), 46, 23);
+          g.fillStyle = SOFT_BLUE;
+          g.fill();
+        }
+        // the prediction: a tick on the bar
+        g.fillStyle = INK;
+        g.fillRect(200 + 760 * want - 2, y - 34, 4, 62);
+        text(g, `${n}  (${Math.round(frac * 100)}%)`, 990, y + 10, INK, '600 28px');
+        text(g, `quantum: ${Math.round(want * 100)}%`, 1270, y + 10, DIM, '500 24px');
+      });
+      text(g, `Stopped on the way: ${v.stopped}`, 60, 360, DIM, '600 24px');
+      wrap(g, v.note, '600 25px', w - 120).forEach((line, i) => text(g, line, 60, 430 + i * 36, INK, '600 25px'));
+    },
+  };
+}
+
+export type BombStatus = 'unknown' | 'live' | 'boom' | 'dud' | 'wrong';
+
+export interface BombView {
+  bombs: { status: BombStatus; current: boolean }[];
+  photons: number;
+  zeno: boolean;
+  last: string;
+}
+
+/** The bomb tester: six bombs and what you found, and the odds that make it work. */
+export function bombFigure(v: BombView): Figure {
+  return {
+    key: `bomb:${v.bombs.map((b) => `${b.status}${b.current ? '*' : ''}`).join(',')}:${v.photons}:${v.zeno}:${v.last}`,
+    draw: (g, w, h) => {
+      const saved = v.bombs.filter((b) => b.status === 'live').length, lost = v.bombs.filter((b) => b.status === 'boom').length;
+      panel(g, w, h, 'The bomb tester  /  Elitzur-Vaidman', `${saved} certified live  /  ${lost} lost`);
+      const look: Record<BombStatus, [string, string]> = { unknown: ['?', DIM], live: ['live, safe', MINT], boom: ['boom', CORAL], dud: ['dud', INK], wrong: ['was live!', CORAL] };
+      v.bombs.forEach((b, i) => {
+        const x = 70 + i * 160, y = 100;
+        roundRect(g, x, y, 140, 120, 24);
+        g.fillStyle = b.current ? 'rgba(45,127,249,0.16)' : '#232428';
+        g.fill();
+        if (b.current) {
+          g.lineWidth = 3;
+          g.strokeStyle = BLUE;
+          g.stroke();
+        }
+        dot(g, x + 70, y + 46, 22, b.status === 'boom' ? 'rgba(255,138,122,0.35)' : '#141517');
+        text(g, look[b.status][0], x + 70, y + 104, look[b.status][1], '700 22px', 'center');
+      });
+      const odds: [string, string, string][] = [
+        ['A dud', 'C 100%', 'both halves meet again and interfere: always the bright port'],
+        ['A live bomb', 'boom 50%   C 25%   D 25%', 'it looks: the photon was there (boom), or now surely is not'],
+        ['D clicks', 'the bomb is live', 'and it never went off: found without being touched'],
+      ];
+      if (v.zeno) odds.push(['Zeno, 10 passes', 'live and safe 78%', 'the bomb looks on every pass, which stops the photon turning']);
+      odds.forEach(([a, b, c], i) => {
+        const y = 290 + i * 50;
+        text(g, a, 70, y, INK, '700 24px');
+        text(g, b, 330, y, i === 2 ? MINT : SOFT_BLUE, '700 24px');
+        text(g, c, 720, y, DIM, '500 22px');
+      });
+      text(g, v.last || `Photons fired: ${v.photons}`, 70, h - 36, INK, '600 24px');
+    },
+  };
+}

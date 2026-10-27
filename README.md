@@ -73,8 +73,8 @@ the Meta Immersive Web SDK (IWSDK), three.js and TypeScript.
 
 **By the numbers:** 26 chapters, a 14-module course, 21 lessons, 12 puzzles, a
 daily challenge and Quantum Rush, a Play tab, 5 big-state views, 4 kinds of quantum computer
-in 3D at full size, a 49-qubit surface code, 35 achievements, 5 orb finishes, 27 Play tab items, daily quests,
-voice control, shared labs and classes, and 343 unit tests.
+in 3D at full size, a 49-qubit surface code, 38 achievements, 5 orb finishes, 31 Play tab items, quantum tic-tac-toe, the double slit, Stern-Gerlach and the bomb tester, daily quests,
+voice control, shared labs and classes, and 354 unit tests.
 
 ## Contents
 
@@ -88,7 +88,7 @@ voice control, shared labs and classes, and 343 unit tests.
 - [Part 4: Tools for exploring](#part-4-tools-for-exploring)
   - [Build: circuit builder](#build-circuit-builder), [Code window: tabs, zoom, simplify](#code-window-tabs-zoom-simplify), [Step debugger](#step-debugger), [Big-state views](#big-state-views), [Many worlds](#many-worlds), [Library, import and custom gates](#library-import-and-custom-gates), [Voice commands](#voice-commands), [Listen to a state](#listen-to-a-state), [Snapshot](#snapshot)
 - [Part 5: Together, and every day](#part-5-together-and-every-day)
-  - [Code Lab: write your own programs](#code-lab-write-your-own-programs), [Games that teach](#games-that-teach-spies-decoders-mazes-and-quests), [New worlds](#new-worlds-light-teleportation-shor-and-a-modular-machine), [The Play tab: ten wonders](#the-play-tab-ten-wonders), [Quantum Rush](#quantum-rush), [Race your friends](#race-your-friends-rush-versus-and-the-class-challenge), [Shared lab](#shared-lab), [Classroom and certificate](#classroom-and-certificate), [Daily challenge, achievements and levels](#daily-challenge-achievements-and-levels), [Trophies and celebrations](#trophies-and-celebrations), [Orb finishes](#orb-finishes), [Puzzles](#puzzles)
+  - [Code Lab: write your own programs](#code-lab-write-your-own-programs), [Games that teach](#games-that-teach-spies-decoders-mazes-and-quests), [New worlds](#new-worlds-light-teleportation-shor-and-a-modular-machine), [New modes](#new-modes-quantum-tic-tac-toe-and-three-famous-experiments), [The Play tab: ten wonders](#the-play-tab-ten-wonders), [Quantum Rush](#quantum-rush), [Race your friends](#race-your-friends-rush-versus-and-the-class-challenge), [Shared lab](#shared-lab), [Classroom and certificate](#classroom-and-certificate), [Daily challenge, achievements and levels](#daily-challenge-achievements-and-levels), [Trophies and celebrations](#trophies-and-celebrations), [Orb finishes](#orb-finishes), [Puzzles](#puzzles)
 - [Under the hood](#under-the-hood)
 
 ## Try it
@@ -96,7 +96,7 @@ voice control, shared labs and classes, and 343 unit tests.
 ```sh
 npm install
 npm run dev        # managed browser with the Quest 3 emulator (IWER)
-npm test           # 343 unit tests: physics, four kinds of quantum computer, gestures, spells, the course, 25 chapters, 15 lessons, puzzles, the daily challenge, achievements, builder, noise, chemistry, import, IBM compiling, Bell tests, error correction, benchmarking, voice, shared rooms and more
+npm test           # 354 unit tests: physics, four kinds of quantum computer, gestures, spells, the course, 25 chapters, 15 lessons, puzzles, the daily challenge, achievements, builder, noise, chemistry, import, IBM compiling, Bell tests, error correction, benchmarking, voice, shared rooms and more
 npm run typecheck
 npm run build
 ```
@@ -928,6 +928,56 @@ missing, and Run points at the first one.
   racks of control electronics with status lights at both ends, and a light bar
   along the top.
 
+### New modes: quantum tic-tac-toe and three famous experiments
+
+| Quantum tic-tac-toe | The double slit, one photon at a time |
+| --- | --- |
+| ![Quantum tic-tac-toe on a tilted stand of nine tiles: five spooky marks, X1 to X5 and O2, O4, each in two squares joined by a gold thread, with the card reading O to move](docs/screenshots/quantum-tic-tac-toe.png) | ![The double slit from the side: the photon source, the plate with two slits and the dark screen striped with photon hits, and the board's histogram following the dashed wave prediction](docs/screenshots/double-slit.png) |
+| **Stern-Gerlach: Z, X, Z** | **The bomb tester** |
+| ![Silver atoms from a copper oven through three magnets labelled Z, X and Z, two spots on the screen, and the board showing 57 up and 49 down against the quantum 50 / 50](docs/screenshots/stern-gerlach.png) | ![A Mach-Zehnder interferometer on an optical breadboard: the laser, two beam splitters, two mirrors, a bomb on the lower arm, and one photon travelling both arms at once as two half-bright beads](docs/screenshots/bomb-tester.png) |
+
+Four new Play tab items. Each has the desk to itself (the orbs step aside), a
+3D build you can walk around, a board figure that explains what you see, and
+the card to drive it. The physics is in `src/quantum/experiments.ts` and the
+game in `src/game/qttt.ts`, both tested.
+
+- **Quantum tic-tac-toe** (Allan Goff's rules), against the computer or a
+  friend. Every move is a spooky mark in two squares at once, and a gold thread
+  joins the two halves: they are entangled. Close a loop of entangled squares
+  and it is measured: the other player chooses where the newest mark lands, and
+  every mark tied to it is forced into a square of its own, the tiles popping
+  one after another. Tap the tiles themselves, by ray or with a finger. Two rows
+  in one collapse? The row finished first wins. The computer opponent knows a
+  loop hands its rival the choice and only closes one when every outcome is
+  good for it.
+- **Double slit**: photons one at a time from a source at the front, through a
+  plate with two slits, onto a dark screen. Each lands as one dot; while they
+  are slow you can watch ripples spread from both slits and overlap, then the
+  stream speeds up and stripes appear, matching the wave prediction on the
+  board. **Watch them** puts a ring at each slit that says which one every photon
+  took, and the stripes vanish (below); **One slit** shows a single bump.
+- **Stern-Gerlach**: silver atoms from a copper oven through real magnet shapes
+  (a pointed pole and a grooved one). One Z magnet gives two spots and never
+  the classical smear (the grey band); Z then Z keeps every atom up; Z, X, Z
+  splits them half and half again, because measuring X erased what Z said.
+  Counts on the screen and the board, against the quantum prediction.
+- **Bomb tester** (Elitzur-Vaidman): six bombs, some live (a single photon on
+  the trigger sets them off) and some duds. Fire photons through a Mach-Zehnder
+  interferometer: each splits into two half-bright beads, one per arm. A dud
+  lets them meet again and the photon always reaches the bright port C; a live
+  bomb looks, and either goes off or leaves the photon in the other arm, which
+  can then reach the dark port D. **D clicking proves the bomb is live, and it
+  never went off.** After your first result the **Zeno test** unlocks: ten quick
+  passes with the bomb looking every time certify a live bomb safely 78% of
+  the time, and a dud always.
+
+![The double slit watched: a ring at each slit, the screen showing one broad band with no stripes, and the board's histogram a single bump](docs/screenshots/double-slit-watched.png)
+
+Three achievements come with them: **Spooky noughts** (beat the computer),
+**Without touching** (prove a bomb live without setting it off) and
+**Experimenter** (run all three experiments). Voice works too: "tic tac toe",
+"double slit", "Stern-Gerlach", "bomb tester".
+
 ### The Play tab: ten wonders
 
 The navigator's **Play** tab gathers the things to do just for fun. Each one
@@ -1085,7 +1135,7 @@ course) the board shows a **certificate**, and the 2D page can save it as a PNG.
   shorter sequence exists. Solving it extends a streak, and on the 2D page the
   result comes as one line to copy and paste: "Entangled daily #25: 2 moves
   (par 2), 3 of 3 stars. Streak: 1 day."
-- **Achievements**: 35 of them, from "First move" and "Spooky action" (your
+- **Achievements**: 38 of them, from "First move" and "Spooky action" (your
   first Bell pair) to "All for one" (a five-qubit GHZ state), "Rainmaker"
   (1,000 shots), "Beyond classical" (the Bell Test), "Below threshold" (the
   surface code), "Many worlds" (watching paths cancel), "Rush hour" and "On
