@@ -450,7 +450,7 @@ export class UISystem extends createSystem({
     for (let i = 0; i < 6; i++) classIds.push(`cl-r-${i}`, `cl-n-${i}`, `cl-f-${i}`, `cl-s-${i}`);
     for (const id of classIds) this.els.set(id, this.classAsset.requireElementById(id));
     // development: the UI and the lab model, for driving scenes from the managed browser
-    if (import.meta.env.DEV) Object.assign(globalThis as object, { __entangledUI: this, __entangledQ: { lab, campaign } });
+    if (import.meta.env.DEV) Object.assign(globalThis as object, { __entangledUI: this, __entangledQ: { lab, campaign }, __entangledSettings: settings, __entangledPlay: PLAY });
     const labIds = ['lab-eyebrow', 'lab-step', 'lab-run', 'lab-close', 'lab-status'];
     for (let i = 0; i < LAB_LINES; i++) labIds.push(`lab-r-${i}`, `lab-n-${i}`, `lab-t-${i}`);
     for (const k of LAB_KEYS) labIds.push(`lab-k-${k}`);
@@ -648,8 +648,8 @@ export class UISystem extends createSystem({
     this.cleanupFuncs.push(addIbmButton());
     // a job submitted before a reload: keep waiting for it
     const pending = loadPending();
-    const settings = loadSettings();
-    if (pending && settings) this.ibmJob = { ...pending, client: new IbmClient(settings), ideal: null, sim: null, polling: false };
+    const ibm = loadSettings();
+    if (pending && ibm) this.ibmJob = { ...pending, client: new IbmClient(ibm), ideal: null, sim: null, polling: false };
     on('code-zoom', () => this.toggleZoom());
     on('code-up', () => this.pageCode(-1));
     on('code-down', () => this.pageCode(1));

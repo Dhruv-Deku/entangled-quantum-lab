@@ -48,12 +48,12 @@ export class LookSelectSystem extends createSystem({}) {
   private readonly c = new Vector3();
 
   init(): void {
-    const track = new Mesh(new RingGeometry(0.012, 0.016, 40), new MeshBasicMaterial({ color: '#e4e6eb', transparent: true, opacity: 0.55, depthTest: false, depthWrite: false }));
+    const track = new Mesh(new RingGeometry(0.011, 0.017, 40), new MeshBasicMaterial({ color: '#e4e6eb', transparent: true, opacity: 0.7, depthTest: false, depthWrite: false }));
     track.renderOrder = 30;
     this.root.add(track);
     const fillMat = new MeshBasicMaterial({ color: '#2d7ff9', depthTest: false, depthWrite: false });
     for (let k = 1; k <= STEPS; k++) {
-      const m = new Mesh(new RingGeometry(0.012, 0.016, 40, 1, Math.PI / 2, (2 * Math.PI * k) / STEPS), fillMat);
+      const m = new Mesh(new RingGeometry(0.011, 0.017, 40, 1, Math.PI / 2, (2 * Math.PI * k) / STEPS), fillMat);
       m.renderOrder = 31;
       m.visible = false;
       this.fills.push(m);

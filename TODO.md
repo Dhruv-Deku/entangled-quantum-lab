@@ -53,5 +53,6 @@ Deadline Nov 18, 2026 (ours: Nov 17). Feature freeze Nov 14. Cut from the bottom
 
 ## Ship
 - [ ] Volunteer test on a real Quest (Week 2)
-- [ ] Hosted build (GitHub Pages or Vercel)
-- [ ] Demo video under 3 minutes, Devpost write-up, README with gesture table
+- [ ] Hosted build: the GitHub Pages workflow is ready (manual run, see docs/SUBMISSION.md); needs a public repo or a paid plan
+- [ ] Demo video under 3 minutes (shot list in docs/SUBMISSION.md)
+- [x] Devpost write-up drafted in docs/SUBMISSION.md; README with gesture table

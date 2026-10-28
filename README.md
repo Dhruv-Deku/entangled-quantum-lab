@@ -48,10 +48,16 @@ the Meta Immersive Web SDK (IWSDK), three.js and TypeScript.
   penny flip, a State Album of fifteen famous states to collect, a room-sized
   Bloch sphere to sit inside, a transmon qubit up close, a night sky, a history
   gallery from 1981 to Willow, and ambient music that follows the state.
-- **A reason to come back.** Quantum Rush, an arcade round where you build
-  target states against the clock with combos; a daily challenge whose par is
-  provably optimal; streaks, 28 achievements, levels, and orb finishes you
-  unlock as you level up.
+- **A reason to come back.** Today, five minutes of spaced repetition a day;
+  Quantum Rush, an arcade round where you build target states against the
+  clock with combos; a daily challenge whose par is provably optimal; streaks,
+  40 achievements, levels, and orb finishes you unlock as you level up.
+- **Your room is part of it.** The lab sits on your real table, the double
+  slit uses your real wall as its screen (the stripes follow your wall's
+  distance), and the lab can be pinned to its spot in your room.
+- **Made for everyone, on any headset.** Look to select, gaze and pinch, high
+  contrast, captions for every sound and voice for every gate; a compact
+  layout keeps every panel inside a narrow field of view.
 
 ## Highlights
 
@@ -73,11 +79,54 @@ the Meta Immersive Web SDK (IWSDK), three.js and TypeScript.
 
 **By the numbers:** 26 chapters, a 14-module course, 21 lessons, 12 puzzles, a
 daily challenge and Quantum Rush, a Play tab, 5 big-state views, 4 kinds of quantum computer
-in 3D at full size, a 49-qubit surface code, 38 achievements, 5 orb finishes, 31 Play tab items, quantum tic-tac-toe, the double slit, Stern-Gerlach and the bomb tester, daily quests,
-voice control, shared labs and classes, and 354 unit tests.
+in 3D at full size, a 49-qubit surface code, 40 achievements, 5 orb finishes, 31 Play tab items, Today (five minutes of spaced repetition), the lab on your real table, the double slit on your wall, look to select, a compact field-of-view layout, quantum tic-tac-toe, the double slit, Stern-Gerlach and the bomb tester, daily quests,
+voice control, shared labs and classes, and 376 unit tests.
+
+## Your room, every day, and everyone
+
+| Today: five minutes a day | The double slit on your real wall |
+| --- | --- |
+| ![The Today card asking how many 1s come from measuring the plus state, the right answer in mint, and the board above: today's three cards, the memory bars box by box, this week's dots and what comes back tomorrow](docs/screenshots/today.png) | ![Left: the slit bench on the real table, the card reading Photons crossing your room, and the screen on the wall ahead. Right, closer: the screen striped with photon dots under the label Your wall, 0.6 m away, stripes 2.3 cm apart, and the histogram below](docs/screenshots/wall-slit.png) |
+| **Settings: your room, the view and access** | **A compact layout for a narrow view** |
+| ![The Settings panel: Lab on my table, Pin the lab here, Wall as a screen, Field of view, Look to select, Dwell time, High contrast, Reduce motion, Sound captions and Wrist menu](docs/screenshots/settings.png) | ![Under the emulated Meta VR Glasses view. Left, the wide layout: the chapter card and the dock reach the edges of the view. Right, compact: the card, the navigator and the dock swing in around the orbs, well inside it](docs/screenshots/glasses-compact.png) |
+
+- **Today** (first item on the Play tab, or say "my five minutes"): a session
+  the length of a bus ride. Cards you have met come back just before you would
+  forget them (Leitner boxes at 1, 2, 4, 8 and 16 days), up to three new ideas
+  join, and at least one card asks you to build a state with your hands,
+  checked live. Right first time sends a card further into the future; a miss
+  brings it back tomorrow. The board shows today's cards, your quantum memory
+  box by box, this week and what tomorrow brings. 24 cards, from the plus
+  state to Stern-Gerlach; `src/game/today.ts`, tested over a simulated month.
+- **On your real table.** In passthrough, plane and mesh detection find a
+  table-height surface under your hands, and the desk (orbs and panels) moves
+  onto it, where your hands already are. Tables behind you, off to the side or
+  beyond seated reach are ignored, so it never asks you to stand up.
+- **Your wall is the screen.** In the double slit, **My wall** sends every
+  photon across the room to the real wall ahead. The stripes on a wall L metres
+  away are lambda L / d apart (a red laser through slits 16 microns apart), so
+  a wall twice as far gives stripes twice as wide; the label says how far your
+  wall is and how wide its stripes are. No wall found: a virtual screen 2.2 m
+  out.
+- **Pin the lab here.** A persistent spatial anchor brings the lab back to the
+  same spot in your room next session.
+- **Look to select.** Rest your gaze on any button or orb: a ring fills, and
+  when it closes the button is pressed. Gaze and pinch also works on headsets
+  that track eyes (IWSDK gaze tracking). With voice for every gate, the lab
+  works without hands.
+- **Field of view.** The panels stand up to 50 degrees either side, which a
+  Quest shows at a glance but Meta VR Glasses (about 37 degrees each side) do
+  not. The compact layout swings every panel wider than 25 degrees in toward
+  the middle around your head, at the same distance and still facing you; Auto
+  picks it from the headset's projection.
+- **And:** high contrast (white text, bright edges, darker panels), reduce
+  motion, captions for every sound cue, and a left- or right-handed wrist
+  menu. Every setting also works by voice: "settings", "pin the lab", "high
+  contrast", "look to select", "captions".
 
 ## Contents
 
+- [Your room, every day, and everyone](#your-room-every-day-and-everyone)
 - [Try it](#try-it)
 - [Part 1: Your hands are the quantum computer](#part-1-your-hands-are-the-quantum-computer)
   - [Gestures](#gestures), [Hands: toss, wrist menu and spells](#hands-toss-wrist-menu-and-spells), [Gates you can see](#gates-you-can-see), [Circuit board](#circuit-board), [Sandbox](#sandbox), [Share links](#share-links)
@@ -96,7 +145,7 @@ voice control, shared labs and classes, and 354 unit tests.
 ```sh
 npm install
 npm run dev        # managed browser with the Quest 3 emulator (IWER)
-npm test           # 354 unit tests: physics, four kinds of quantum computer, gestures, spells, the course, 25 chapters, 15 lessons, puzzles, the daily challenge, achievements, builder, noise, chemistry, import, IBM compiling, Bell tests, error correction, benchmarking, voice, shared rooms and more
+npm test           # 376 unit tests: physics, four kinds of quantum computer, gestures, spells, the course, 25 chapters, 15 lessons, puzzles, the daily challenge, achievements, builder, noise, chemistry, import, IBM compiling, Bell tests, error correction, benchmarking, voice, shared rooms and more
 npm run typecheck
 npm run build
 ```
@@ -1135,7 +1184,7 @@ course) the board shows a **certificate**, and the 2D page can save it as a PNG.
   shorter sequence exists. Solving it extends a streak, and on the 2D page the
   result comes as one line to copy and paste: "Entangled daily #25: 2 moves
   (par 2), 3 of 3 stars. Streak: 1 day."
-- **Achievements**: 38 of them, from "First move" and "Spooky action" (your
+- **Achievements**: 40 of them, from "First move" and "Spooky action" (your
   first Bell pair) to "All for one" (a five-qubit GHZ state), "Rainmaker"
   (1,000 shots), "Beyond classical" (the Bell Test), "Below threshold" (the
   surface code), "Many worlds" (watching paths cancel), "Rush hour" and "On

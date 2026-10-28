@@ -158,7 +158,7 @@ export class FridgeVisual {
       const u = k / 120;
       coil.push(polar(u * Math.PI * 2 * 7, 0.045, cTop + (cBottom - cTop) * u));
     }
-    kit.tube(new CatmullRomCurve3(coil), 0.0045, f.steel, 480, 6);
+    kit.tube(new CatmullRomCurve3(coil), 0.0045, f.steel, 260, 5);
     // step heat exchangers: a stack of silver discs above the mixing chamber
     for (let k = 0; k < 5; k++) kit.cyl(0.05, 0.012, f.steel, P(0, STAGES[3].y - 0.03 - k * 0.022, 0), 32);
     kit.cyl(0.06, 0.06, f.steel, P(0, STAGES[4].y + 0.04, 0), 32); // the mixing chamber itself
@@ -207,7 +207,7 @@ export class FridgeVisual {
       const r = ringOf(k);
       const kind = k < qubits ? 'drive' : k < 2 * qubits ? 'flux' : k === 2 * qubits ? 'in' : k === 2 * qubits + 1 ? 'out' : 'spare';
       const curve = lineCurve(a, r, -1.3 + (k / (nLines - 1)) * 2.6);
-      kit.tube(curve, 0.0042, coax, 260, 6);
+      kit.tube(curve, 0.0042, coax, 110, 5);
       // a bulkhead connector at every plate it passes, attenuators on the way down
       for (const s of [{ y: FLANGE_Y }, ...STAGES]) kit.cyl(0.009, 0.03, f.steel, polar(a, r, s.y), 6);
       if (kind !== 'out') for (const i of [1, 2, 4]) kit.cyl(0.0085, 0.045, atten, polar(a, r, STAGES[i].y - 0.045), 12);
