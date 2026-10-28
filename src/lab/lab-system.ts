@@ -662,7 +662,6 @@ export class LabSystem extends createSystem({
     if (shown.stand) shown.stand.visible = g > 0.02;
   }
 
-  /** A celebration bursting out of the orbs (smaller for an achievement). */
   /** Show a sound caption. */
   caption(text: string): void {
     this.captions.show(text);
@@ -674,6 +673,7 @@ export class LabSystem extends createSystem({
     this.partner.say(text, at);
   }
 
+  /** A celebration bursting out of the orbs (smaller for an achievement). */
   celebrate(big = true): void {
     // reduce motion: the sound and the banner say it; no confetti
     if (settings.reduceMotion) return;

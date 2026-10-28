@@ -172,6 +172,18 @@ its proxy; both run with `npm run dev`. Everything else works from the link.
    builds, and prints the link.
 4. Open the link on a Quest and run through the testing steps above.
 
+## Video: a B-roll cut to start from
+
+`entangled-demo-broll.mp4` (in the project folder next to the repository, not
+committed) is about 90 seconds of real emulator footage, edited: a title card,
+twelve captioned shots in story order (first launch, superposition,
+entanglement with Ket explaining, measurement, 100 shots, Today, Ket's hint,
+the double slit on the wall, look to select, quantum tic-tac-toe, the bomb
+tester, the full-size machine) and an end card, over a quiet synthesized
+pad. Record a voice-over following the "Say" column below, replace the pad
+with it (or keep the pad low under your voice), and add Quest footage if you
+can borrow a headset. It is real gameplay, as the rules ask.
+
 ## Video shot list (under 3:00)
 
 Record on a Quest if one can be borrowed (Quest casting or the built-in
