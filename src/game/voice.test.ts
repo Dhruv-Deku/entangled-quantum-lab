@@ -122,4 +122,17 @@ group('voice: the Play tab', () => {
     for (const [s, item] of cases) expect(parseVoice(s), s).toEqual({ type: 'play', item });
     expect(parseVoice('quantum rush')).toEqual({ type: 'rush' });
   });
+
+  it('reaches every setting by voice: the room and accessibility', () => {
+    expect(parseVoice('settings')).toEqual({ type: 'settings' });
+    expect(parseVoice('open the settings')).toEqual({ type: 'settings' });
+    expect(parseVoice('pin the lab here')).toEqual({ type: 'pin', on: true });
+    expect(parseVoice('unpin the lab')).toEqual({ type: 'pin', on: false });
+    expect(parseVoice('high contrast')).toEqual({ type: 'contrast' });
+    expect(parseVoice('turn on look to select')).toEqual({ type: 'look' });
+    expect(parseVoice('show captions')).toEqual({ type: 'captions' });
+    expect(parseVoice('put the double slit on my wall')).toEqual({ type: 'wall' });
+    // the play list still wins for its own names
+    expect(parseVoice('show me the double slit')).toEqual({ type: 'play', item: 'Double slit' });
+  });
 });

@@ -1,3 +1,4 @@
+import { settings } from '../game/settings';
 import { createSystem, GrabSystem, Grabbed, InstancedMesh, Matrix4, MeshBasicMaterial, SphereGeometry, Vector3, type Entity } from '@iwsdk/core';
 import { DEFAULT_GESTURES, withSensitivity } from '../gestures/config';
 import { J, JOINTS } from '../gestures/hand';
@@ -191,8 +192,8 @@ export class GestureSystem extends createSystem({
       this.trailMat.opacity = 0.9 * this.trailFade;
     }
 
-    // the left palm turned up opens the wrist menu (with a little hysteresis)
-    const left = this.trackers.left.state;
+    // the palm turned up opens the wrist menu (left by default; Settings can swap hands), with a little hysteresis
+    const left = this.trackers[settings.wristHand].state;
     const ny = left.frame ? left.frame.normal[1] : -1;
     this.palmLatch = !!left.frame && !left.pinching && !left.fist && (this.palmLatch ? ny > 0.5 : ny > 0.75);
     this.palmUp = this.palmLatch && left.frame ? { center: new Vector3(...left.frame.center), normal: new Vector3(...left.frame.normal) } : null;

@@ -59,7 +59,11 @@ function tone(freq: number, start: number, dur: number, type: OscillatorType = '
   osc.stop(t0 + dur + 0.02);
 }
 
+/** Told about every cue as it plays (sound captions listen here). */
+export const cueListeners: ((cue: Cue) => void)[] = [];
+
 export function feedback(cue: Cue): void {
+  for (const l of cueListeners) l(cue);
   switch (cue) {
     case 'gate':
       tone(660, 0, 0.35, 'sine', 0.6);

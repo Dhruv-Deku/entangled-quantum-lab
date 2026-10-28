@@ -18,6 +18,12 @@ import { Interferometer } from './bomb-3d';
 import { SlitBench } from './double-slit-3d';
 import { TicTacToeBoard } from './qttt-3d';
 import { SgBench } from './stern-gerlach-3d';
+import { LabAnchor } from './anchor';
+import { pickDesk, pickWall, readRoom, type Surface } from './room';
+import { WallScreen } from './wall-slit';
+import { CaptionStrip } from './captions';
+import { LookSelectSystem } from './look-select';
+import { horizontalFov, saveSettings, settings } from '../game/settings';
 import type { Op } from '../quantum/circuit';
 import { mixedness, pairStrength } from '../quantum/entanglement';
 import { decompose, gateMatrix, type Vec3 } from '../quantum/gates';
@@ -153,6 +159,29 @@ export class LabSystem extends createSystem({
   cellTap: ((square: number) => void) | null = null;
   /** These modes have the desk to themselves: the orbs step aside. */
   orbsHidden = false;
+  /** The real room: detected tables, floor, walls and furniture (empty until the headset reports them). */
+  surfaces: Surface[] = [];
+  private roomTimer = 0;
+  private fovTimer = 0;
+  /** The desk sits on a real table this session (and which one). */
+  onRealDesk = false;
+  deskLabel: string | null = null;
+  /** A real table has been looked for since the room arrived (once a session; Recenter tries again). */
+  private deskTried = false;
+  /** The pinned lab: a persistent anchor where the desk was left, followed while `followPin`. */
+  readonly anchor = new LabAnchor();
+  private followPin = false;
+  private pinWait = 0;
+  /** Per-eye horizontal field of view of this headset, degrees (null until known). */
+  fovDegrees: number | null = null;
+  /** Room events for the UI to announce. */
+  onRoom: ((msg: string) => void) | null = null;
+  /** The double slit at room scale: the wall in front is the screen. */
+  wallScreen!: WallScreen;
+  /** The board steps aside (the wall screen needs the view past it). */
+  boardHidden = false;
+  /** Sound captions, low in the middle of the view. */
+  private captions!: CaptionStrip;
   private night = false;
   private trophies!: TrophyShelf;
   /** The Surface Code chapter's lattice, floating between the orb and the board. */
@@ -328,6 +357,18 @@ export class LabSystem extends createSystem({
     this.bombs = new Interferometer();
     ws.add(this.bombs.root);
     for (const r of [this.slits.root, this.sg.root, this.bombs.root]) useStudio(r, env, 0.8);
+    this.wallScreen = new WallScreen();
+    this.scene.add(this.wallScreen.root);
+    this.captions = new CaptionStrip();
+    this.captions.mesh.position.set(0, 0.235, -0.1);
+    this.captions.mesh.rotation.x = -0.2;
+    ws.add(this.captions.mesh);
+    // look to select: the orbs (and the tic-tac-toe tiles) are targets too
+    const looks = () => [
+      ...(this.orbsHidden ? [] : this.orbs.map((o, i) => ({ object: o.entity.object3D!, press: () => lab.select(i), radius: ORB_RADIUS }))),
+      ...(this.ttt.root.visible ? this.ttt.tiles.map((t, i) => ({ object: t, press: () => this.cellTap?.(i), deep: true })) : []),
+    ];
+    LookSelectSystem.providers.push(looks);
     this.sky = new NightSky();
     this.scene.add(this.sky.root);
     // the trophy shelf stands upper right, above the navigator, while the progress board is up
@@ -361,8 +402,19 @@ export class LabSystem extends createSystem({
         const passthrough = immersive && (blend === 'alpha-blend' || blend === 'additive');
         this.passthrough = passthrough;
         this.syncRoom();
-        if (immersive) this.placePending = true;
-        else {
+        if (immersive) {
+          this.placePending = true;
+          this.deskTried = false;
+          this.pinWait = 0;
+          // the pinned lab: ask the headset for the anchor, and follow it once found
+          const session = this.world.xrSession;
+          this.followPin = !!settings.pinned && !!session;
+          if (settings.pinned && session) this.anchor.restore(session, settings.pinned);
+        } else {
+          this.anchor.reset();
+          this.followPin = false;
+          this.onRealDesk = false;
+          this.deskLabel = null;
           this.placePending = false;
           ws.position.copy(DESK);
           ws.rotation.set(0, 0, 0);
@@ -371,7 +423,11 @@ export class LabSystem extends createSystem({
     );
   }
 
-  /** Put the desk workspace a comfortable seated reach below and in front of the head. */
+  /**
+   * Put the desk workspace in front of the head: on your real table when the
+   * headset has found one within reach, otherwise a comfortable seated reach
+   * below the head.
+   */
   private placeWorkspaceFromHead(): void {
     const head = this.player.head;
     head.updateWorldMatrix(true, false);
@@ -381,6 +437,19 @@ export class LabSystem extends createSystem({
     if (fwd.lengthSq() < 1e-4) fwd.set(0, 0, -1);
     fwd.normalize();
     const ws = this.workspace.object3D!;
+    const desk = settings.realDesk ? pickDesk(this.surfaces, pos, fwd) : null;
+    if (desk) {
+      // on the real table: at its height, on its near side, facing the player
+      ws.position.copy(desk.spot);
+      const toHead = new Vector3(pos.x - desk.spot.x, 0, pos.z - desk.spot.z);
+      ws.rotation.set(0, toHead.lengthSq() > 1e-4 ? Math.atan2(toHead.x, toHead.z) : Math.atan2(-fwd.x, -fwd.z), 0);
+      if (!this.onRealDesk) this.onRoom?.(`The lab is on your real ${desk.surface.label === 'other' ? 'table' : desk.surface.label}`);
+      this.onRealDesk = true;
+      this.deskLabel = desk.surface.label;
+      return;
+    }
+    this.onRealDesk = false;
+    this.deskLabel = null;
     ws.position.copy(pos).addScaledVector(fwd, 0.4);
     ws.position.y = pos.y - 0.42;
     ws.rotation.set(0, Math.atan2(-fwd.x, -fwd.z), 0);
@@ -580,7 +649,14 @@ export class LabSystem extends createSystem({
   }
 
   /** A celebration bursting out of the orbs (smaller for an achievement). */
+  /** Show a sound caption. */
+  caption(text: string): void {
+    this.captions.show(text);
+  }
+
   celebrate(big = true): void {
+    // reduce motion: the sound and the banner say it; no confetti
+    if (settings.reduceMotion) return;
     this.confetti.burst(new Vector3(0, ORB_HEIGHT, -0.03), big);
   }
 
@@ -658,15 +734,138 @@ export class LabSystem extends createSystem({
     for (const o of this.orbs) o.visual.applySkin(id);
   }
 
-  /** Recentre the desk in front of the player (also used by the recenter button). */
+  /** Recentre the desk in front of the player (also used by the recenter button); a pinned lab stays put until next time. */
   recenter(): void {
     this.placePending = true;
+    this.followPin = false;
+  }
+
+  /** Whether this headset can pin the lab (persistent anchors). */
+  canPin(): boolean {
+    return LabAnchor.supported(this.world.xrSession);
+  }
+
+  /** A pin asked for from a button: anchors are made inside the next XR frame. */
+  private pinJob: ((ok: boolean) => void) | null = null;
+
+  /** Pin the lab where it is now: it comes back to this spot next session. */
+  pinHere(): Promise<boolean> {
+    if (!this.canPin()) return Promise.resolve(false);
+    this.pinJob?.(false);
+    return new Promise((resolve) => (this.pinJob = resolve));
+  }
+
+  private async pinNow(frame: XRFrame, ref: XRReferenceSpace): Promise<boolean> {
+    const ws = this.workspace.object3D!;
+    ws.updateWorldMatrix(true, false);
+    const pos = new Vector3(), quat = new Quaternion();
+    ws.getWorldPosition(pos);
+    ws.getWorldQuaternion(quat);
+    // the anchor is made now, inside this frame; the old pin is forgotten after
+    const old = settings.pinned;
+    const uuid = await this.anchor.pin(frame, ref, pos, quat);
+    if (!uuid) return false;
+    if (old && old !== uuid) await LabAnchor.forget(this.world.xrSession, old);
+    settings.pinned = uuid;
+    saveSettings();
+    this.followPin = true;
+    return true;
+  }
+
+  async unpin(): Promise<void> {
+    await this.anchor.unpin(this.world.xrSession, settings.pinned);
+    settings.pinned = null;
+    saveSettings();
+    this.followPin = false;
+  }
+
+  /** The double slit at room scale: photons cross the room to the wall ahead (or a virtual screen); false: back to the desk. */
+  useWall(on: boolean): void {
+    if (!on) {
+      this.slits.useWall(null);
+      this.wallScreen.root.visible = false;
+      this.boardHidden = false;
+      return;
+    }
+    const slits = this.slits.slitsWorld(new Vector3());
+    const ws = this.workspace.object3D!;
+    const dir = new Vector3(0, 0, -1).applyQuaternion(ws.getWorldQuaternion(new Quaternion()));
+    const wall = settings.wallScreen ? pickWall(this.surfaces, slits, dir) : null;
+    this.player.head.updateWorldMatrix(true, false);
+    const headY = this.player.head.matrixWorld.elements[13];
+    // the pattern rises toward eye level with distance, so the beam never climbs steeply to a close wall
+    const reach = wall ? wall.distance : 2.2;
+    const eye = (headY > 0.5 ? headY : 1.2) + 0.05;
+    this.wallScreen.place(slits, dir, wall, Math.min(eye, slits.y + reach * 0.35));
+    this.wallScreen.root.visible = true;
+    this.slits.useWall(this.wallScreen);
+    this.boardHidden = true;
+  }
+
+  /** The room, twice a second: planes and meshes; a real table the first time one turns up; the pinned spot; the field of view. */
+  private updateRoom(delta: number): void {
+    const session = this.world.xrSession;
+    if (!session) return;
+    const ref = this.xrManager?.getReferenceSpace();
+    const frame = this.xrFrame;
+    if (this.pinJob && frame && ref) {
+      const done = this.pinJob;
+      this.pinJob = null;
+      void this.pinNow(frame, ref).then(done, () => done(false));
+    }
+    // the pinned lab follows its anchor (tracking corrections included)
+    if (this.followPin && frame && ref) {
+      const pos = new Vector3(), quat = new Quaternion();
+      if (this.anchor.pose(frame, ref, pos, quat)) {
+        const ws = this.workspace.object3D!;
+        ws.position.copy(pos);
+        ws.quaternion.copy(quat);
+        this.placePending = false;
+      } else {
+        this.pinWait += delta;
+        if (this.anchor.lost || this.pinWait > 6) {
+          this.followPin = false;
+          this.onRoom?.('The pinned spot was not found here: the lab is in front of you');
+        }
+      }
+    }
+    this.fovTimer += delta;
+    if (this.fovTimer > 1 && frame && ref) {
+      this.fovTimer = 0;
+      const pose = frame.getViewerPose(ref);
+      const v = pose?.views[0];
+      if (v) this.fovDegrees = horizontalFov(v.projectionMatrix);
+    }
+    this.roomTimer += delta;
+    if (this.roomTimer < 0.5) return;
+    this.roomTimer = 0;
+    this.surfaces = readRoom(frame, ref);
+    if (this.surfaces.length && !this.deskTried && !this.followPin && settings.realDesk) {
+      this.deskTried = true;
+      this.player.head.updateWorldMatrix(true, false);
+      const head = new Vector3().setFromMatrixPosition(this.player.head.matrixWorld);
+      const fwd = new Vector3(0, 0, -1).applyQuaternion(this.player.head.getWorldQuaternion(new Quaternion()));
+      if (pickDesk(this.surfaces, head, fwd)) this.placePending = true;
+    }
+    if (import.meta.env.DEV)
+      (globalThis as { __entangledRoom?: unknown }).__entangledRoom = {
+        surfaces: this.surfaces.map((x) => ({ label: x.label, horizontal: x.horizontal, n: [+x.normal.x.toFixed(2), +x.normal.y.toFixed(2), +x.normal.z.toFixed(2)], c: [+x.center.x.toFixed(2), +x.center.y.toFixed(2), +x.center.z.toFixed(2)], size: x.size.map((v) => +v.toFixed(2)) })),
+        onRealDesk: this.onRealDesk,
+        desk: this.deskLabel,
+        fov: this.fovDegrees,
+        pinned: settings.pinned,
+        following: this.followPin,
+      };
   }
 
   update(delta: number): void {
     // development: slow motion (window.__entangledSlowmo), for recording the animations frame by frame
     const slow = import.meta.env.DEV ? ((globalThis as { __entangledSlowmo?: number }).__entangledSlowmo ?? 1) : 1;
     const dt = Math.min(delta, 0.05) * slow;
+    this.updateRoom(Math.min(delta, 0.1));
+    this.board.root.visible = !this.boardHidden;
+    if (this.wallScreen.root.visible) this.wallScreen.update(dt);
+    this.captions.update(dt);
     // one machine at a time: the device where the chip floats, its surroundings where the fridge stands
     const device = this.hardwareWanted, room = !!this.pulseView;
     this.chip.root.visible = device && this.machine === 'superconducting';

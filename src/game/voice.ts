@@ -21,6 +21,8 @@ export type VoiceCommand =
   | { type: 'assign'; module: number; on: boolean }
   | { type: 'share' | 'leave' | 'classroom' }
   | { type: 'listen' | 'daily' | 'profile' | 'snapshot' }
+  | { type: 'settings' | 'contrast' | 'look' | 'captions' | 'wall' }
+  | { type: 'pin'; on: boolean }
   | { type: 'machine'; id: 'superconducting' | 'ions' | 'atoms' | 'photons' }
   | { type: 'compare' }
   | { type: 'fullsize'; on: boolean }
@@ -127,6 +129,13 @@ export function parseVoice(text: string): VoiceCommand | null {
   if (/superconduct/.test(s)) return { type: 'machine', id: 'superconducting' };
   if (/photon|photonic|light chip|optical computer/.test(s)) return { type: 'machine', id: 'photons' };
   if (/trophies|achievements|my (progress|profile|level)/.test(s)) return { type: 'profile' };
+  if (/^(open |show )?(the )?(settings|preferences|accessibility)$/.test(s)) return { type: 'settings' };
+  if (/\bunpin\b/.test(s)) return { type: 'pin', on: false };
+  if (/\bpin (the lab|it|this)\b/.test(s)) return { type: 'pin', on: true };
+  if (/high contrast|more contrast/.test(s)) return { type: 'contrast' };
+  if (/look to (select|click|press)|gaze (select|click)|eye (select|control)/.test(s)) return { type: 'look' };
+  if (/captions?|subtitles/.test(s)) return { type: 'captions' };
+  if (/(on|use|onto) (my|the) wall|wall (screen|mode)/.test(s)) return { type: 'wall' };
   if (/snapshot|(take|save) a (picture|photo)|screenshot/.test(s)) return { type: 'snapshot' };
   if (/^(undo|go back|take that back)/.test(s)) return { type: 'undo' };
   if (/^redo/.test(s)) return { type: 'redo' };
@@ -243,6 +252,18 @@ export function describe(c: VoiceCommand): string {
       return 'your progress';
     case 'snapshot':
       return 'save a picture of the circuit';
+    case 'settings':
+      return 'settings';
+    case 'pin':
+      return c.on ? 'pin the lab here' : 'unpin the lab';
+    case 'contrast':
+      return 'high contrast';
+    case 'look':
+      return 'look to select';
+    case 'captions':
+      return 'sound captions';
+    case 'wall':
+      return 'the double slit on your wall';
     case 'machine':
       return c.id === 'ions' ? 'the trapped-ion computer' : c.id === 'atoms' ? 'the neutral-atom computer' : c.id === 'photons' ? 'the photonic chip' : 'the superconducting chip';
     case 'compare':

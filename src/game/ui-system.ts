@@ -6,6 +6,7 @@ import {
   Quaternion,
   Vector3,
   VisibilityState,
+  type Object3D,
   type UIKitMLAsset,
 } from '@iwsdk/core';
 import { feedback } from '../lab/feedback';
@@ -63,6 +64,12 @@ import { albumFigure, bombFigure, questsFigure, sgFigure, slitFigure, spyFigure,
 import { listen } from '../lab/sonify';
 import { downloadSnapshot } from '../lab/snapshot';
 import { Banner } from '../lab/banner';
+import { DWELL_SECONDS, layoutFor, saveSettings, settings, type FovLayout } from './settings';
+import { compactPlacement } from './fov-layout';
+import { setContrast } from '../lab/contrast';
+import { cueListeners } from '../lab/feedback';
+import { CUE_CAPTIONS } from '../lab/captions';
+import { LookSelectSystem, type LookTarget } from '../lab/look-select';
 import { compareFigure } from '../lab/figures';
 import { compileFor, comparePlatforms, formatTime, machineQubits, PLATFORMS, platformSchedule, runPlatform, type PlatformId, type PlatformResult } from '../quantum/platforms';
 import { toQasm } from '../quantum/export';
@@ -122,6 +129,10 @@ type GameId = 'dice' | 'penny' | 'cat' | 'spy' | 'decoder' | 'grover' | 'telepor
 
 const PLAY = ['Code lab', 'First five minutes', 'Daily quests', 'Quantum Rush', 'Zen Rush', 'Rush versus', 'Class challenge', 'Daily', 'Spy game', 'Be the decoder', 'Grover maze', 'Teleporter', 'Quantum tic-tac-toe', 'Double slit', 'Stern-Gerlach', 'Bomb tester', 'Shor in 3D', 'System Two', 'Photonic chip', 'Surface Code', 'Many worlds', 'Quantum dice', 'Penny flip', 'Schrodinger cat', 'State album', 'Giant sphere', 'Inside a qubit', 'Night sky', 'History', 'Ambient music'] as const;
 const PLAY_TAGS = ['qasm', 'tour', '3/day', '60s', 'zen', 'vs', 'class', 'day', 'BB84', 'd=3', '8', 'tp', 'X O', '2 slit', 'Ag', 'EV', '15', '3x', 'light',  '49q', 'H H', 'd8', 'coin', 'box', '15', '1 m', 'JJ', 'sky', '1981', 'hum'];
+
+/** The settings panel's tiles, in order. */
+const SETTING_KEYS = ['desk', 'pin', 'wall', 'fov', 'look', 'dwell', 'contrast', 'motion', 'captions', 'wrist'] as const;
+type SettingKey = (typeof SETTING_KEYS)[number];
 
 /** Where hidden panels park, out of reach of every pointer. */
 const PARKED = new Vector3(0, -50, 0);
@@ -223,6 +234,16 @@ export class UISystem extends createSystem({
   private codelabAsset: UIKitMLAsset | null = null;
   private decoderAsset: UIKitMLAsset | null = null;
   private wristAsset: UIKitMLAsset | null = null;
+  /** Settings: the room, the view and accessibility. */
+  private settingsAsset: UIKitMLAsset | null = null;
+  private settingsOpen = false;
+  private settingsTimer = 0;
+  /** Every button and what it does, for look to select. */
+  private readonly clickables = new Map<Object3D, () => void>();
+  /** Compact placements for a narrow field of view, worked out once per panel spot. */
+  private readonly compactSpots = new Map<string, { pos: Vector3; rot: Euler }>();
+  /** The double slit sends its photons to the wall in front of you. */
+  private slitWall = false;
   /** Development: show the wrist menu at a fixed spot, without a tracked hand. */
   wristForce = false;
   private dbgAsset: UIKitMLAsset | null = null;
@@ -371,12 +392,13 @@ export class UISystem extends createSystem({
     this.codelabAsset = this.world.getSceneObject<UIKitMLAsset>('codelab-panel') ?? null;
     this.decoderAsset = this.world.getSceneObject<UIKitMLAsset>('decoder-panel') ?? null;
     this.wristAsset = this.world.getSceneObject<UIKitMLAsset>('wrist-panel') ?? null;
-    if (!this.wristAsset || !this.decoderAsset || !this.codelabAsset || !this.looksAsset || !this.classAsset || !this.chapter || !this.dock || !this.code || !this.nav || !this.builderAsset || !this.notesAsset || !this.noiseAsset || !this.libAsset || !this.dbgAsset) return false;
+    this.settingsAsset = this.world.getSceneObject<UIKitMLAsset>('settings-panel') ?? null;
+    if (!this.settingsAsset || !this.wristAsset || !this.decoderAsset || !this.codelabAsset || !this.looksAsset || !this.classAsset || !this.chapter || !this.dock || !this.code || !this.nav || !this.builderAsset || !this.notesAsset || !this.noiseAsset || !this.libAsset || !this.dbgAsset) return false;
     this.code.visible = false;
 
     // panels take poke and ray input but must never capture the grab pointer,
     // or a hand reaching for an orb just above the dock grabs the dock instead
-    for (const panel of [this.chapter, this.dock, this.code, this.nav, this.builderAsset, this.notesAsset, this.noiseAsset, this.libAsset, this.dbgAsset, this.classAsset, this.looksAsset, this.codelabAsset, this.decoderAsset, this.wristAsset]) {
+    for (const panel of [this.chapter, this.dock, this.code, this.nav, this.builderAsset, this.notesAsset, this.noiseAsset, this.libAsset, this.dbgAsset, this.classAsset, this.looksAsset, this.codelabAsset, this.decoderAsset, this.wristAsset, this.settingsAsset]) {
       panel.traverse((o) => {
         (o as unknown as { pointerEventsType: unknown }).pointerEventsType = { deny: 'grab' };
       });
@@ -385,7 +407,7 @@ export class UISystem extends createSystem({
     const ids = ['chapter-eyebrow', 'chapter-title', 'chapter-body', 'goal-dot', 'goal-text', 'btn-next', 'btn-next-label', 'btn-replay', 'btn-replay-label', 'btn-notes', 'pip-0', 'pip-1', 'pip-2', 'pip-3', 'pip-4', 'choices'];
     for (let i = 0; i < 3; i++) ids.push(`choice-${i}`, `choice-${i}-k`, `choice-${i}-l`);
     for (const id of ids) this.els.set(id, this.chapter.requireElementById(id));
-    const navIds = ['tab-course', 'tab-course-l', 'tab-campaign', 'tab-campaign-l', 'tab-learn', 'tab-learn-l', 'tab-puzzle', 'tab-puzzle-l', 'tab-build', 'tab-build-l', 'tab-sandbox', 'tab-sandbox-l', 'tab-play', 'tab-play-l', 'nav-progress', 'nav-progress-2', 'nav-me'];
+    const navIds = ['tab-course', 'tab-course-l', 'tab-campaign', 'tab-campaign-l', 'tab-learn', 'tab-learn-l', 'tab-puzzle', 'tab-puzzle-l', 'tab-build', 'tab-build-l', 'tab-sandbox', 'tab-sandbox-l', 'tab-play', 'tab-play-l', 'nav-progress', 'nav-progress-2', 'nav-me', 'nav-set'];
     for (let i = 0; i < NAV_SLOTS; i++) navIds.push(`n-${i}`, `n-${i}-n`, `n-${i}-l`);
     for (const id of navIds) this.els.set(id, this.nav.requireElementById(id));
     const dockIds = ['g-h', 'g-x', 'g-y', 'g-z', 'g-s', 'g-t', 'g-rl', 'g-rr', 'a-cnot', 'a-swap', 'a-measure', 'a-shots', 'a-export', 't-prev', 't-next', 'dock-status', 'a-voice', 'a-voice-l', 'a-debug', 'a-debug-l', 'a-view', 'a-view-l', 'a-share', 'a-share-l', 'a-listen', 'a-listen-l'];
@@ -422,6 +444,9 @@ export class UISystem extends createSystem({
     }
     for (const id of decIds) this.els.set(id, this.decoderAsset.requireElementById(id));
     for (const id of ['wr-sel', 'wr-h', 'wr-x', 'wr-z', 'wr-s', 'wr-m', 'wr-n', 'wr-u']) this.els.set(id, this.wristAsset.requireElementById(id));
+    const stIds = ['st-eyebrow', 'st-close', 'st-note'];
+    for (const k of SETTING_KEYS) stIds.push(`st-${k}`, `st-${k}-m`, `st-${k}-b`, `st-${k}-bl`);
+    for (const id of stIds) this.els.set(id, this.settingsAsset.requireElementById(id));
     const looksIds = ['looks-eyebrow', 'looks-close', 'looks-note'];
     for (let i = 0; i < ORB_SKINS.length; i++) looksIds.push(`looks-r-${i}`, `looks-sw-${i}`, `looks-n-${i}`, `looks-m-${i}`, `looks-b-${i}`, `looks-bl-${i}`);
     for (const id of looksIds) this.els.set(id, this.looksAsset.requireElementById(id));
@@ -434,6 +459,7 @@ export class UISystem extends createSystem({
       const handler = () => fn();
       el.addEventListener('click', handler);
       this.cleanupFuncs.push(() => el.removeEventListener('click', handler));
+      this.clickables.set(el as unknown as Object3D, handler);
     };
     on('btn-next', () => {
       // Quantum Rush: Skip during a round, Again after it
@@ -630,10 +656,13 @@ export class UISystem extends createSystem({
 
     this.builder = new BuilderPanel(this.builderAsset, campaign.build, () => feedback('select'));
     this.notes = new NotesPanel(this.notesAsset, () => undefined, () => this.toggleZoom());
-    on('btn-notes', () => (campaign.mode === 'sandbox' ? this.toggleNoise() : this.toggleNotes()));
+    on('btn-notes', () => (this.game === 'slit' ? this.toggleSlitWall() : campaign.mode === 'sandbox' ? this.toggleNoise() : this.toggleNotes()));
     on('btn-lib', () => this.toggleLibrary());
     on('lib-close', () => this.toggleLibrary());
     on('looks-close', () => this.toggleProfile(false));
+    on('nav-set', () => this.toggleSettings());
+    on('st-close', () => this.toggleSettings(false));
+    for (const k of SETTING_KEYS) on(`st-${k}-b`, () => this.settingAction(k));
     on('code-edit', () => this.openCodeLab(true));
     on('lab-close', () => this.closeCodeLab());
     on('lab-run', () => this.runProgram(false));
@@ -731,7 +760,185 @@ export class UISystem extends createSystem({
     this.builder.render(!this.immersive);
     this.render(campaign.view);
     this.renderDock();
+    this.bindAccess();
     return true;
+  }
+
+  // ---- settings: the room, the view and accessibility
+
+  /** Room messages, sound captions, look to select and high contrast. */
+  private bindAccess(): void {
+    const ls = this.world.getSystem(LabSystem);
+    if (ls) ls.onRoom = (msg) => this.flash(msg);
+    const caption = (cue: Parameters<typeof feedback>[0]) => {
+      const text = CUE_CAPTIONS[cue];
+      if (settings.captions && text) this.world.getSystem(LabSystem)?.caption(text);
+    };
+    cueListeners.push(caption);
+    this.cleanupFuncs.push(() => cueListeners.splice(cueListeners.indexOf(caption), 1));
+    const provide = () => this.lookTargets();
+    LookSelectSystem.providers.push(provide);
+    this.cleanupFuncs.push(() => LookSelectSystem.providers.splice(LookSelectSystem.providers.indexOf(provide), 1));
+    if (settings.contrast) setContrast(this.panels(), true);
+  }
+
+  private panels(): (UIKitMLAsset | null)[] {
+    return [this.chapter, this.dock, this.code, this.nav, this.builderAsset, this.notesAsset, this.noiseAsset, this.libAsset, this.dbgAsset, this.classAsset, this.looksAsset, this.codelabAsset, this.decoderAsset, this.wristAsset, this.settingsAsset];
+  }
+
+  /** Buttons you can see now, for look to select (panels parked out of sight and hidden elements do not count). */
+  private lookTargets(): LookTarget[] {
+    const out: LookTarget[] = [];
+    for (const [el, press] of this.clickables) {
+      const vis = (el as unknown as { isVisible?: { peek(): boolean } }).isVisible;
+      if (vis && !vis.peek()) continue;
+      // UIKit elements draw through their panel (their own meshes stay invisible): check the panel and what holds it
+      let o: Object3D | null = el.parent;
+      let shown = true;
+      while (o) {
+        if (!('isVisible' in o) && !o.visible) {
+          shown = false;
+          break;
+        }
+        o = o.parent;
+      }
+      if (shown) out.push({ object: el, press });
+    }
+    return out;
+  }
+
+  private toggleSettings(open = !this.settingsOpen): void {
+    this.settingsOpen = open;
+    if (open) {
+      this.libOpen = this.dbgOpen = this.classOpen = false;
+      this.profileOpen = false;
+      this.certOn = false;
+      if (this.notes?.open) this.notes.close();
+      this.noiseOpen = false;
+      this.renderSettings();
+    }
+    feedback('select');
+  }
+
+  /** The layout for this headset: compact on a narrow field of view (or when chosen). */
+  private layout(): 'wide' | 'compact' {
+    const narrowDevice = typeof navigator !== 'undefined' && /glasses/i.test(navigator.userAgent);
+    return layoutFor(settings.fov, narrowDevice ? 70 : (this.world.getSystem(LabSystem)?.fovDegrees ?? null));
+  }
+
+  private settingAction(k: SettingKey): void {
+    const ls = this.world.getSystem(LabSystem);
+    switch (k) {
+      case 'desk':
+        settings.realDesk = !settings.realDesk;
+        ls?.recenter();
+        this.flash(settings.realDesk ? 'Looking for your table: the lab moves onto it when one is within reach' : 'The lab floats in front of you');
+        break;
+      case 'pin':
+        if (!ls) break;
+        if (settings.pinned) {
+          void ls.unpin().then(() => {
+            this.flash('Unpinned: the lab starts in front of you');
+            this.renderSettings();
+          });
+        } else if (!ls.canPin()) {
+          this.flash('Pinning needs a headset with spatial anchors (Quest, in the headset)');
+          return feedback('reject');
+        } else {
+          void ls.pinHere().then((ok) => {
+            this.flash(ok ? 'Pinned: the lab comes back to this spot next time' : 'The headset could not pin the lab here');
+            this.renderSettings();
+          });
+        }
+        break;
+      case 'wall':
+        settings.wallScreen = !settings.wallScreen;
+        if (this.game === 'slit' && this.slitWall) {
+          ls?.useWall(true);
+          this.slitSet(this.slitSetup);
+        }
+        break;
+      case 'fov': {
+        const order: FovLayout[] = ['auto', 'wide', 'compact'];
+        settings.fov = order[(order.indexOf(settings.fov) + 1) % order.length];
+        break;
+      }
+      case 'look':
+        settings.lookSelect = !settings.lookSelect;
+        this.flash(settings.lookSelect ? `Look to select: rest your gaze on a button for ${DWELL_SECONDS[settings.dwell]} s` : 'Look to select off');
+        break;
+      case 'dwell':
+        settings.dwell = settings.dwell === 'normal' ? 'slow' : settings.dwell === 'slow' ? 'fast' : 'normal';
+        break;
+      case 'contrast':
+        settings.contrast = !settings.contrast;
+        setContrast(this.panels(), settings.contrast);
+        break;
+      case 'motion':
+        settings.reduceMotion = !settings.reduceMotion;
+        break;
+      case 'captions':
+        settings.captions = !settings.captions;
+        if (settings.captions) ls?.caption('Captions on: every sound shows here');
+        break;
+      case 'wrist':
+        settings.wristHand = settings.wristHand === 'left' ? 'right' : 'left';
+        break;
+    }
+    saveSettings();
+    feedback('select');
+    this.renderSettings();
+  }
+
+  private renderSettings(): void {
+    if (!this.settingsAsset) return;
+    const ls = this.world.getSystem(LabSystem);
+    const inXr = !!this.world.xrSession;
+    const onOff = (k: SettingKey, on: boolean, label = on ? 'On' : 'Off') => {
+      this.text(`st-${k}-bl`, label);
+      this.bg(`st-${k}-b`, on ? C.primary : C.primaryIdle);
+      this.els.get(`st-${k}-bl`)?.setProperties({ color: on ? '#ffffff' : C.text });
+    };
+    const meta = (k: SettingKey, text: string) => this.text(`st-${k}-m`, text);
+    const surfaces = ls?.surfaces.length ?? 0;
+    meta('desk', !settings.realDesk ? 'Off: the lab floats in front of you' : ls?.onRealDesk ? `On your real ${ls.deskLabel === 'other' ? 'table' : ls.deskLabel}` : !inXr ? 'In the headset, with passthrough' : surfaces ? 'No table within reach yet' : 'Waiting for the room scan');
+    onOff('desk', settings.realDesk);
+    meta('pin', settings.pinned ? 'Pinned: back to this spot next time' : ls?.canPin() ? 'Comes back to this spot next time' : 'In the headset: spatial anchors');
+    onOff('pin', !!settings.pinned, settings.pinned ? 'Unpin' : 'Pin');
+    meta('wall', settings.wallScreen ? 'Double slit photons land on your real wall' : 'Off: a virtual screen instead');
+    onOff('wall', settings.wallScreen);
+    const fov = ls?.fovDegrees;
+    meta('fov', `${this.layout() === 'compact' ? 'Compact' : 'Wide'} layout${fov ? `, ${Math.round(fov)} deg per eye` : ''}`);
+    onOff('fov', settings.fov !== 'auto', settings.fov === 'auto' ? 'Auto' : settings.fov === 'wide' ? 'Wide' : 'Compact');
+    meta('look', 'Rest your gaze on a button or an orb to press it');
+    onOff('look', settings.lookSelect);
+    meta('dwell', `How long to look: ${DWELL_SECONDS[settings.dwell]} s`);
+    onOff('dwell', false, settings.dwell === 'normal' ? 'Normal' : settings.dwell === 'slow' ? 'Slow' : 'Fast');
+    meta('contrast', 'White text, bright edges, darker panels');
+    onOff('contrast', settings.contrast);
+    meta('motion', 'No confetti, calmer celebrations');
+    onOff('motion', settings.reduceMotion);
+    meta('captions', 'Every sound cue shown as words');
+    onOff('captions', settings.captions);
+    meta('wrist', `Turn your ${settings.wristHand} palm up for the menu`);
+    onOff('wrist', false, settings.wristHand === 'left' ? 'Left' : 'Right');
+    this.text('st-eyebrow', inXr ? `Room: ${surfaces} surface${surfaces === 1 ? '' : 's'} found` : 'Room, view and access');
+  }
+
+  /** The double slit: photons to the wall in front of you, or back to the desk screen. */
+  private toggleSlitWall(): void {
+    this.slitWall = !this.slitWall;
+    const ls = this.world.getSystem(LabSystem);
+    ls?.useWall(this.slitWall);
+    this.slitSet(this.slitSetup);
+    this.slitStream = true;
+    this.slitT = 0;
+    if (this.slitWall && ls) {
+      const w = ls.wallScreen;
+      this.flash(w.real ? `Your wall is ${w.distance.toFixed(1)} m away: watch the photons cross the room` : 'No wall in front: a screen 2.2 m out instead');
+    }
+    feedback('select');
+    this.renderGameCard();
   }
 
   private text(id: string, text: string): void {
@@ -967,6 +1174,7 @@ export class UISystem extends createSystem({
   private toggleProfile(open = !this.profileOpen): void {
     this.profileOpen = open;
     if (open) {
+      this.settingsOpen = false;
       this.libOpen = this.dbgOpen = this.classOpen = false;
       this.certOn = false;
       if (this.code) this.code.visible = false;
@@ -1559,7 +1767,9 @@ export class UISystem extends createSystem({
     if (ls) {
       for (const r of [ls.ttt.root, ls.slits.root, ls.sg.root, ls.bombs.root]) r.visible = false;
       ls.orbsHidden = false;
+      if (this.slitWall) ls.useWall(false);
     }
+    this.slitWall = false;
     this.slitStream = this.sgStream = false;
     ls?.showSurfacePuzzle(null);
     if (render) this.render(campaign.view);
@@ -1910,8 +2120,10 @@ export class UISystem extends createSystem({
       this.text('chapter-eyebrow', `Play  /  Double slit  /  ${n.toLocaleString('en-US')} photons`);
       this.text('chapter-title', titles[this.slitSetup][0]);
       this.text('chapter-body', titles[this.slitSetup][1]);
-      this.text('goal-text', this.slitStream ? 'Firing, faster and faster' : n >= 2500 ? 'Screen full: Fire starts again' : 'Tap Fire, or pick a setup');
+      this.text('goal-text', this.slitStream ? (this.slitWall ? 'Photons crossing your room' : 'Firing, faster and faster') : n >= 2500 ? 'Screen full: Fire starts again' : this.slitWall ? 'Tap Fire: the screen is your wall' : 'Tap Fire, or My wall for room scale');
       this.text('btn-next-label', this.slitStream ? 'Pause' : 'Fire');
+      this.els.get('btn-notes')?.setProperties({ display: 'flex' });
+      this.text('btn-notes-label', this.slitWall ? 'Desk screen' : 'My wall');
       return this.modeChoices(['Both slits', 'Watch them', 'One slit'], ['both', 'watched', 'one'].indexOf(this.slitSetup));
     }
     if (this.game === 'sg') {
@@ -2699,6 +2911,26 @@ export class UISystem extends createSystem({
       case 'snapshot':
         this.snapshot();
         return true;
+      case 'settings':
+        this.toggleSettings();
+        return true;
+      case 'pin':
+        if (!!settings.pinned === c.on) return true;
+        this.settingAction('pin');
+        return true;
+      case 'contrast':
+        this.settingAction('contrast');
+        return true;
+      case 'look':
+        this.settingAction('look');
+        return true;
+      case 'captions':
+        this.settingAction('captions');
+        return true;
+      case 'wall':
+        if (this.game !== 'slit') this.startPlay(PLAY.indexOf('Double slit'));
+        if (!this.slitWall) this.toggleSlitWall();
+        return true;
       case 'machine':
         if (!this.code?.visible || this.codeFormat !== 'chip') {
           this.codeFormat = 'chip';
@@ -3481,10 +3713,10 @@ export class UISystem extends createSystem({
       this.text(`n-${i}-n`, 'play' in it ? PLAY_TAGS[at] : stars ? `${stars}/3` : String(at + 1));
       this.els.get(`n-${i}-n`)?.setProperties({ color: it.current ? '#18191b' : it.done ? C.done : stars ? '#c9ccd1' : '#6b6e75' });
     }
-    this.text('nav-progress', `${v.coursed.length}/${v.courseCount} course   ${v.completed.length}/${v.chapterCount} chapters   ${v.learned.length}/${v.lessonCount} lessons`);
+    this.text('nav-progress', `${v.coursed.length}/${v.courseCount} course  ${v.completed.length}/${v.chapterCount} chapters  ${v.learned.length}/${v.lessonCount} lessons`);
     const ctx = this.progressContext();
     const lvl = levelFor(xpFor(this.profile.data, ctx));
-    this.text('nav-progress-2', `Level ${lvl.level}  /  ${Object.keys(this.profile.data.unlocked).length} of ${ACHIEVEMENTS.length}`);
+    this.text('nav-progress-2', `Level ${lvl.level}  ${Object.keys(this.profile.data.unlocked).length}/${ACHIEVEMENTS.length}`);
   }
 
   private renderDock(): void {
@@ -4280,7 +4512,13 @@ export class UISystem extends createSystem({
   private place(obj: { position: Vector3; quaternion: Quaternion; scale: Vector3 }, key: keyof typeof PLACEMENT): void {
     const ws = this.world.getSystem(LabSystem)?.workspaceObject;
     if (!ws) return;
-    const { pos, rot } = PLACEMENT[key];
+    let spot: { pos: Vector3; rot: Euler } = PLACEMENT[key];
+    if (this.layout() === 'compact') {
+      let c = this.compactSpots.get(key);
+      if (!c) this.compactSpots.set(key, (c = compactPlacement(spot.pos, spot.rot)));
+      spot = c;
+    }
+    const { pos, rot } = spot;
     ws.updateWorldMatrix(true, false);
     this.p.copy(pos).applyMatrix4(ws.matrixWorld);
     ws.matrixWorld.decompose(this.s, this.q, this.s);
@@ -4435,6 +4673,20 @@ export class UISystem extends createSystem({
     } else {
       this.noiseAsset!.visible = false;
       this.noiseAsset!.position.copy(PARKED);
+    }
+    // settings stand in front of the board; another window opening there closes them
+    if (this.settingsOpen && (this.notes!.open || this.libOpen || this.noiseOpen || this.profileOpen || this.dbgOpen || this.classOpen)) this.settingsOpen = false;
+    if (this.settingsOpen) {
+      this.place(this.settingsAsset!, 'notes-panel');
+      this.settingsAsset!.visible = true;
+      this.settingsTimer += delta;
+      if (this.settingsTimer > 1) {
+        this.settingsTimer = 0;
+        this.renderSettings();
+      }
+    } else {
+      this.settingsAsset!.visible = false;
+      this.settingsAsset!.position.copy(PARKED);
     }
     this.place(this.nav!, 'nav-panel');
     // development: slow motion (window.__entangledSlowmo) slows the chapters' own clocks too, as it does the 3D

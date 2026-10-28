@@ -61,6 +61,11 @@ export default defineAssets({
     type: AssetType.UIKitML,
     name: 'Decoder pad',
   },
+  'settings-panel': {
+    url: publicAssetUrl('ui/settings.uikitml'),
+    type: AssetType.UIKitML,
+    name: 'Settings',
+  },
   'wrist-panel': {
     url: publicAssetUrl('ui/wrist.uikitml'),
     type: AssetType.UIKitML,

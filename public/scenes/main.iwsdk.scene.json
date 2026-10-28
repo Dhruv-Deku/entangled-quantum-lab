@@ -372,6 +372,26 @@
       }
     },
     {
+      "id": "settings-panel",
+      "name": "Settings",
+      "content": {
+        "type": "asset",
+        "asset": "settings-panel"
+      },
+      "transform": {
+        "position": [
+          0,
+          -50,
+          0
+        ],
+        "scale": 0.06
+      },
+      "components": {
+        "RayInteractable": {},
+        "PokeInteractable": {}
+      }
+    },
+    {
       "id": "debug-panel",
       "name": "Debugger",
       "content": {

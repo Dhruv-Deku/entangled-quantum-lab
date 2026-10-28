@@ -1,6 +1,7 @@
 import { CircleGeometry, Color, Euler, Group, InstancedMesh, Matrix4, Mesh, MeshBasicMaterial, SphereGeometry, TorusGeometry, Vector3 } from '@iwsdk/core';
 import type { SlitSetup } from '../quantum/experiments';
 import { Kit, finishes } from './machine-kit';
+import type { WallScreen } from './wall-slit';
 import { GLOW } from './visuals';
 
 const Y = 0.06;
@@ -41,6 +42,11 @@ export class SlitBench {
   private readonly ringMat: MeshBasicMaterial[] = [];
   private readonly cover: Mesh;
   private readonly m = new Matrix4();
+  /** The desk screen: hidden while photons go to the wall instead. */
+  private readonly screen = new Group();
+  /** Room scale: the real wall in front is the screen. */
+  private wall: WallScreen | null = null;
+  private readonly tmp = new Vector3();
 
   constructor() {
     this.root.name = 'DoubleSlit';
@@ -60,16 +66,19 @@ export class SlitBench {
     kit.box(2 * half, 0.012, 0.005, f.dark, new Vector3(0, Y + h / 2 + 0.006, BARRIER_Z));
     kit.box(0.008, Y - h / 2, 0.02, f.brushed, new Vector3(-half + 0.01, (Y - h / 2) / 2, BARRIER_Z));
     kit.box(0.008, Y - h / 2, 0.02, f.brushed, new Vector3(half - 0.01, (Y - h / 2) / 2, BARRIER_Z));
-    // the screen: dark, in a steel frame, on two feet
-    const sy = 0.02 + SCREEN_H / 2;
-    kit.box(SCREEN_W, SCREEN_H, 0.004, f.black, new Vector3(0, sy, SCREEN_Z));
-    kit.box(SCREEN_W + 0.012, 0.006, 0.008, f.steel, new Vector3(0, sy + SCREEN_H / 2 + 0.003, SCREEN_Z));
-    kit.box(SCREEN_W + 0.012, 0.006, 0.008, f.steel, new Vector3(0, sy - SCREEN_H / 2 - 0.003, SCREEN_Z));
-    kit.box(0.006, SCREEN_H, 0.008, f.steel, new Vector3(-SCREEN_W / 2 - 0.003, sy, SCREEN_Z));
-    kit.box(0.006, SCREEN_H, 0.008, f.steel, new Vector3(SCREEN_W / 2 + 0.003, sy, SCREEN_Z));
-    kit.box(0.04, 0.02, 0.04, f.brushed, new Vector3(-0.13, 0.01, SCREEN_Z));
-    kit.box(0.04, 0.02, 0.04, f.brushed, new Vector3(0.13, 0.01, SCREEN_Z));
     kit.build(this.root);
+    // the screen: dark, in a steel frame, on two feet
+    const sk = new Kit();
+    const sy = 0.02 + SCREEN_H / 2;
+    sk.box(SCREEN_W, SCREEN_H, 0.004, f.black, new Vector3(0, sy, SCREEN_Z));
+    sk.box(SCREEN_W + 0.012, 0.006, 0.008, f.steel, new Vector3(0, sy + SCREEN_H / 2 + 0.003, SCREEN_Z));
+    sk.box(SCREEN_W + 0.012, 0.006, 0.008, f.steel, new Vector3(0, sy - SCREEN_H / 2 - 0.003, SCREEN_Z));
+    sk.box(0.006, SCREEN_H, 0.008, f.steel, new Vector3(-SCREEN_W / 2 - 0.003, sy, SCREEN_Z));
+    sk.box(0.006, SCREEN_H, 0.008, f.steel, new Vector3(SCREEN_W / 2 + 0.003, sy, SCREEN_Z));
+    sk.box(0.04, 0.02, 0.04, f.brushed, new Vector3(-0.13, 0.01, SCREEN_Z));
+    sk.box(0.04, 0.02, 0.04, f.brushed, new Vector3(0.13, 0.01, SCREEN_Z));
+    sk.build(this.screen);
+    this.root.add(this.screen);
     // a cover over the right slit (one slit open)
     this.cover = new Mesh(new CircleGeometry(0.012, 24), new MeshBasicMaterial({ color: '#2a2c30' }));
     this.cover.position.set(SLIT_X, Y, BARRIER_Z + 0.004);
@@ -109,8 +118,24 @@ export class SlitBench {
     this.root.visible = false;
   }
 
+  /** Send the photons to a screen on the wall (null: back to the desk screen). */
+  useWall(wall: WallScreen | null): void {
+    this.wall = wall;
+    this.screen.visible = !wall;
+    this.hits.visible = !wall;
+    if (wall) wall.setup = this.setup;
+    this.clear();
+  }
+
+  /** Where the slits are, in world space (the photons leave from here). */
+  slitsWorld(out: Vector3): Vector3 {
+    this.root.updateWorldMatrix(true, false);
+    return out.set(0, Y, BARRIER_Z).applyMatrix4(this.root.matrixWorld);
+  }
+
   setSetup(s: SlitSetup): void {
     this.setup = s;
+    if (this.wall) this.wall.setup = s;
     this.cover.visible = s === 'one';
     for (const r of this.rings) r.visible = s === 'watched';
   }
@@ -118,6 +143,7 @@ export class SlitBench {
   clear(): void {
     this.hitCount = 0;
     this.hits.count = 0;
+    this.wall?.clear();
     for (const f of this.flights) f.bead.visible = false;
     this.flights.length = 0;
   }
@@ -136,6 +162,11 @@ export class SlitBench {
   }
 
   private land(x: number, y: number): void {
+    if (this.wall) {
+      this.wall.land(x, y);
+      this.hitCount = this.wall.hitCount;
+      return;
+    }
     if (this.hitCount >= MAX_HITS) return;
     this.m.makeTranslation(x * (SCREEN_W / 2 - 0.004), 0.02 + SCREEN_H / 2 + y * (SCREEN_H / 2 - 0.004), SCREEN_Z + 0.0025);
     this.hits.setMatrixAt(this.hitCount++, this.m);
@@ -169,8 +200,8 @@ export class SlitBench {
           }
           if (!f.seen) this.ripple();
         }
-        const u = Math.min(1, (f.t - 0.3) / 0.35);
-        const end = new Vector3(f.x * (SCREEN_W / 2), 0.02 + SCREEN_H / 2 + f.y * (SCREEN_H / 2), SCREEN_Z + 0.003);
+        const u = Math.min(1, (f.t - 0.3) / (this.wall ? 0.6 : 0.35));
+        const end = this.wall ? this.root.worldToLocal(this.wall.worldPoint(f.x, Math.max(-1, Math.min(1, f.y * 2.1)), this.tmp)) : new Vector3(f.x * (SCREEN_W / 2), 0.02 + SCREEN_H / 2 + f.y * (SCREEN_H / 2), SCREEN_Z + 0.003);
         p.set(f.seen * SLIT_X, Y, BARRIER_Z).lerp(end, u);
         // unwatched, the photon is a wave in between: only the ripples show it
         f.bead.visible = !!f.seen || u > 0.9;
@@ -184,8 +215,8 @@ export class SlitBench {
     for (const r of this.ripples) {
       if (r.t < 0) continue;
       r.t += dt;
-      const u = r.t / 0.5;
-      const s = 0.01 + u * (BARRIER_Z - SCREEN_Z);
+      const u = r.t / (this.wall ? 0.8 : 0.5);
+      const s = 0.01 + u * (this.wall ? this.wall.distance : BARRIER_Z - SCREEN_Z);
       r.mesh.scale.setScalar(s);
       (r.mesh.material as MeshBasicMaterial).opacity = 0.5 * (1 - u);
       if (u >= 1) {

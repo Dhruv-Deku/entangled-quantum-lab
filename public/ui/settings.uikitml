@@ -1,0 +1,109 @@
+<!--
+  Settings: your room, the view and accessibility, in front of the board.
+  Two columns of tiles; each tile names a setting, says what it does now, and
+  has one button. UIKit units are cm.
+-->
+<style>
+  .card {
+    flex-direction: column;
+    width: 470;
+    gap: 8;
+    padding-top: 18;
+    padding-bottom: 16;
+    padding-left: 18;
+    padding-right: 18;
+    background-color: #1b1c1f;
+    border-radius: 26;
+    border-width: 1;
+    border-color: #34363b;
+  }
+  .head { flex-direction: row; justify-content: space-between; align-items: center; padding-left: 4; padding-right: 2; }
+  .titles { flex-direction: column; gap: 2; }
+  .eyebrow { font-size: 11; font-weight: 600; color: #8a8d93; }
+  .title { font-size: 20; font-weight: 700; color: #f2f3f5; }
+  .section { font-size: 11; font-weight: 700; color: #8a8d93; padding-left: 4; padding-top: 4; }
+  .grid { flex-direction: row; flex-wrap: wrap; gap: 6; }
+  .tile {
+    width: 210;
+    height: 54;
+    flex-direction: row;
+    align-items: center;
+    gap: 6;
+    padding-left: 11;
+    padding-right: 7;
+    border-radius: 14;
+    background-color: #242528;
+  }
+  .names { flex-direction: column; flex-grow: 1; flex-shrink: 1; gap: 2; }
+  .name { font-size: 12; font-weight: 700; color: #e4e6eb; }
+  .meta { font-size: 9; line-height: 1.3; color: #8a8d93; }
+  .btn {
+    height: 28;
+    min-width: 58;
+    padding-left: 10;
+    padding-right: 10;
+    border-radius: 14;
+    align-items: center;
+    justify-content: center;
+    background-color: #34363b;
+    cursor: pointer;
+  }
+  .bt { font-size: 11; font-weight: 700; color: #e4e6eb; }
+  .note { font-size: 10; line-height: 1.4; color: #8a8d93; padding-left: 4; padding-right: 4; }
+</style>
+<div class="card">
+  <div class="head">
+    <div class="titles">
+      <div id="st-eyebrow" class="eyebrow">Room, view and access</div>
+      <div class="title">Settings</div>
+    </div>
+    <div id="st-close" class="btn"><div class="bt">Close</div></div>
+  </div>
+  <div class="section">Your room</div>
+  <div class="grid">
+    <div id="st-desk" class="tile">
+      <div class="names"><div class="name">Lab on my table</div><div id="st-desk-m" class="meta">-</div></div>
+      <div id="st-desk-b" class="btn"><div id="st-desk-bl" class="bt">On</div></div>
+    </div>
+    <div id="st-pin" class="tile">
+      <div class="names"><div class="name">Pin the lab here</div><div id="st-pin-m" class="meta">-</div></div>
+      <div id="st-pin-b" class="btn"><div id="st-pin-bl" class="bt">Pin</div></div>
+    </div>
+    <div id="st-wall" class="tile">
+      <div class="names"><div class="name">Wall as a screen</div><div id="st-wall-m" class="meta">-</div></div>
+      <div id="st-wall-b" class="btn"><div id="st-wall-bl" class="bt">On</div></div>
+    </div>
+    <div id="st-fov" class="tile">
+      <div class="names"><div class="name">Field of view</div><div id="st-fov-m" class="meta">-</div></div>
+      <div id="st-fov-b" class="btn"><div id="st-fov-bl" class="bt">Auto</div></div>
+    </div>
+  </div>
+  <div class="section">Access</div>
+  <div class="grid">
+    <div id="st-look" class="tile">
+      <div class="names"><div class="name">Look to select</div><div id="st-look-m" class="meta">-</div></div>
+      <div id="st-look-b" class="btn"><div id="st-look-bl" class="bt">Off</div></div>
+    </div>
+    <div id="st-dwell" class="tile">
+      <div class="names"><div class="name">Dwell time</div><div id="st-dwell-m" class="meta">-</div></div>
+      <div id="st-dwell-b" class="btn"><div id="st-dwell-bl" class="bt">1 s</div></div>
+    </div>
+    <div id="st-contrast" class="tile">
+      <div class="names"><div class="name">High contrast</div><div id="st-contrast-m" class="meta">-</div></div>
+      <div id="st-contrast-b" class="btn"><div id="st-contrast-bl" class="bt">Off</div></div>
+    </div>
+    <div id="st-motion" class="tile">
+      <div class="names"><div class="name">Reduce motion</div><div id="st-motion-m" class="meta">-</div></div>
+      <div id="st-motion-b" class="btn"><div id="st-motion-bl" class="bt">Off</div></div>
+    </div>
+    <div id="st-captions" class="tile">
+      <div class="names"><div class="name">Sound captions</div><div id="st-captions-m" class="meta">-</div></div>
+      <div id="st-captions-b" class="btn"><div id="st-captions-bl" class="bt">Off</div></div>
+    </div>
+    <div id="st-wrist" class="tile">
+      <div class="names"><div class="name">Wrist menu</div><div id="st-wrist-m" class="meta">-</div></div>
+      <div id="st-wrist-b" class="btn"><div id="st-wrist-bl" class="bt">Left</div></div>
+    </div>
+  </div>
+  <div id="st-note" class="note">Every setting also works by voice: say "settings", "pin the lab", "high contrast" or "look to select".</div>
+</div>
