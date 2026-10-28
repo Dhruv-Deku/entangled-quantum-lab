@@ -26,6 +26,10 @@ export interface Settings {
   captions: boolean;
   /** Which palm opens the wrist menu. */
   wristHand: 'left' | 'right';
+  /** Ket, the lab partner, explains and helps. */
+  partner: boolean;
+  /** Ket reads its words aloud. */
+  speak: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -39,6 +43,8 @@ export const DEFAULT_SETTINGS: Settings = {
   reduceMotion: false,
   captions: false,
   wristHand: 'left',
+  partner: true,
+  speak: false,
 };
 
 export const DWELL_SECONDS: Record<DwellSpeed, number> = { slow: 1.6, normal: 1.0, fast: 0.6 };
@@ -57,7 +63,7 @@ export function parseSettings(raw: string | null): Settings {
   }
   if (!data || typeof data !== 'object') return out;
   const d = data as Record<string, unknown>;
-  for (const k of ['realDesk', 'wallScreen', 'lookSelect', 'contrast', 'reduceMotion', 'captions'] as const) if (typeof d[k] === 'boolean') out[k] = d[k] as boolean;
+  for (const k of ['realDesk', 'wallScreen', 'lookSelect', 'contrast', 'reduceMotion', 'captions', 'partner', 'speak'] as const) if (typeof d[k] === 'boolean') out[k] = d[k] as boolean;
   if (typeof d.pinned === 'string' && d.pinned.length > 0 && d.pinned.length < 200) out.pinned = d.pinned;
   if (d.fov === 'auto' || d.fov === 'wide' || d.fov === 'compact') out.fov = d.fov;
   if (d.dwell === 'slow' || d.dwell === 'normal' || d.dwell === 'fast') out.dwell = d.dwell;

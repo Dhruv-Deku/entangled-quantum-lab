@@ -12,9 +12,9 @@ import {
 import { feedback } from '../lab/feedback';
 import { Qubit } from '../lab/components';
 import { lab } from '../lab/instance';
-import { LabSystem } from '../lab/lab-system';
+import { KET_HOME, LabSystem } from '../lab/lab-system';
 import { GestureSystem } from '../lab/gesture-system';
-import { MAX_ORBS } from '../lab/lab';
+import { MAX_ORBS, type LabEvent } from '../lab/lab';
 import { loadSave, writeSave } from '../lab/save';
 import type { Op } from '../quantum/circuit';
 import { simplify } from '../quantum/optimize';
@@ -69,6 +69,7 @@ import { compactPlacement } from './fov-layout';
 import { setContrast } from '../lab/contrast';
 import { cueListeners } from '../lab/feedback';
 import { CUE_CAPTIONS } from '../lab/captions';
+import { answerTopic, classify, describeState, explainOp, moveWords, nextMove, type Line as KetLine } from './partner';
 import { finishSession, loadMemory, mastery, parOf as cardPar, planSession, review, saveMemory, sessionStreak, shuffledChoices, tomorrow, addDays, type MemoryState, type RecallCard } from './today';
 import { memoryFigure, type MemoryView } from '../lab/figures';
 import { countMoves } from './puzzles';
@@ -111,6 +112,8 @@ const PLACEMENT = {
   'notes-panel': { pos: new Vector3(0, 0.3, -0.17), rot: new Euler(-0.1, 0, 0, 'YXZ') },
   // the debugger and class panel hang from their top edge (anchor-y: top), just under the raised board
   'under-board': { pos: new Vector3(0, 0.332, -0.17), rot: new Euler(-0.1, 0, 0, 'YXZ') },
+  // settings: in front of the board, high enough that its twelve tiles clear the orbs
+  'settings-panel': { pos: new Vector3(0, 0.37, -0.18), rot: new Euler(-0.08, 0, 0, 'YXZ') },
   // upper right, opposite the chapter card and above the dock
   'nav-panel': { pos: new Vector3(0.47, 0.26, -0.06), rot: new Euler(-0.12, (-32 * Math.PI) / 180, 0, 'YXZ') },
   // the decoder game's tap pad, right of the lattice
@@ -136,7 +139,7 @@ const PLAY = ['Today', 'Code lab', 'First five minutes', 'Daily quests', 'Quantu
 const PLAY_TAGS = ['5 min', 'qasm', 'tour', '3/day', '60s', 'zen', 'vs', 'class', 'day', 'BB84', 'd=3', '8', 'tp', 'X O', '2 slit', 'Ag', 'EV', '15', '3x', 'light',  '49q', 'H H', 'd8', 'coin', 'box', '15', '1 m', 'JJ', 'sky', '1981', 'hum'];
 
 /** The settings panel's tiles, in order. */
-const SETTING_KEYS = ['desk', 'pin', 'wall', 'fov', 'look', 'dwell', 'contrast', 'motion', 'captions', 'wrist'] as const;
+const SETTING_KEYS = ['desk', 'pin', 'wall', 'fov', 'look', 'dwell', 'contrast', 'motion', 'captions', 'wrist', 'partner', 'speak'] as const;
 type SettingKey = (typeof SETTING_KEYS)[number];
 
 /** Where hidden panels park, out of reach of every pointer. */
@@ -262,6 +265,18 @@ export class UISystem extends createSystem({
   private todayEnd = 0;
   private todayDone = false;
   private todayCardTimer = 0;
+  /** Ket used a hint on this Today card (it then comes back tomorrow). */
+  private todayHinted = false;
+  /** Ket: when it last spoke, the last step it could explain, and how long since you last did something. */
+  private ketAt = -99;
+  private ketLast: { op: Op; before: QState; after: QState } | null = null;
+  private ketOpAt = 0;
+  private ketUndos = 0;
+  /** The task and step Ket last helped with, so it offers each hint once. */
+  private ketHelped = '';
+  private ketGreeted = false;
+  private ketTargetCache: { key: string; state: QState } | null = null;
+  private ketCompact: Vector3 | null = null;
   /** Development: show the wrist menu at a fixed spot, without a tracked hand. */
   wristForce = false;
   private dbgAsset: UIKitMLAsset | null = null;
@@ -367,6 +382,7 @@ export class UISystem extends createSystem({
           feedback('reject');
         }
         if (e.type === 'select' || e.type === 'reset' || e.type === 'seek' || e.type === 'op') this.renderDock();
+        this.ketHears(e);
         if (e.type === 'reset' && campaign.mode === 'sandbox') this.render(campaign.view);
         // achievements count what happens on the orbs
         if (e.type === 'op') {
@@ -906,6 +922,16 @@ export class UISystem extends createSystem({
       case 'wrist':
         settings.wristHand = settings.wristHand === 'left' ? 'right' : 'left';
         break;
+      case 'partner':
+        settings.partner = !settings.partner;
+        if (ls) ls.partner.root.visible = settings.partner;
+        if (settings.partner) this.ketSay({ text: "I'm back. Ask me what just happened, or what to do next.", point: null }, true);
+        break;
+      case 'speak':
+        settings.speak = !settings.speak;
+        if (settings.speak) this.ketSay({ text: 'I will read my words aloud.', point: null }, true);
+        else if (typeof speechSynthesis !== 'undefined') speechSynthesis.cancel();
+        break;
     }
     saveSettings();
     feedback('select');
@@ -944,6 +970,10 @@ export class UISystem extends createSystem({
     onOff('captions', settings.captions);
     meta('wrist', `Turn your ${settings.wristHand} palm up for the menu`);
     onOff('wrist', false, settings.wristHand === 'left' ? 'Left' : 'Right');
+    meta('partner', settings.partner ? 'Explains each move, hints when stuck' : 'Off: say "Ket" to bring it back');
+    onOff('partner', settings.partner);
+    meta('speak', 'Ket reads its words aloud');
+    onOff('speak', settings.speak);
     this.text('st-eyebrow', inXr ? `Room: ${surfaces} surface${surfaces === 1 ? '' : 's'} found` : 'Room, view and access');
   }
 
@@ -2329,6 +2359,139 @@ export class UISystem extends createSystem({
     this.modeChoices(choices, active);
   }
 
+  // ---- Ket, the lab partner
+
+  /** Say a line (unless Ket is off, or spoke a moment ago and this can wait). */
+  private ketSay(line: KetLine, urgent = false): void {
+    if (!settings.partner) return;
+    const now = this.clockNow();
+    if (!urgent && now - this.ketAt < 4) return;
+    this.ketAt = now;
+    this.world.getSystem(LabSystem)?.partnerSay(line.text, line.point);
+    if (settings.speak && typeof speechSynthesis !== 'undefined') {
+      try {
+        speechSynthesis.cancel();
+        const u = new SpeechSynthesisUtterance(line.text.replace(/\|(\w+)>/g, 'ket $1'));
+        u.rate = 1.05;
+        speechSynthesis.speak(u);
+      } catch {
+        // no speech on this browser: the card still shows the words
+      }
+    }
+  }
+
+  /** Ket explains moves while you build freely or make a state for Today; chapters and games narrate themselves. */
+  private ketExplains(): boolean {
+    if (this.rush || this.racePending) return false;
+    return campaign.mode === 'sandbox' && (!this.game || this.game === 'today') && !(this.game === 'today' && this.todayCurrent?.kind !== 'make');
+  }
+
+  private ketHears(e: LabEvent): void {
+    if (e.type === 'op' && !e.live) {
+      this.ketOpAt = this.clockNow();
+      const after = lab.history.state.clone();
+      this.ketLast = { op: e.op, before: e.before, after };
+      if (this.ketExplains()) {
+        const line = explainOp(e.op, e.before, after);
+        if (line) this.ketSay(line);
+      }
+    }
+    if (e.type === 'seek') this.ketUndos++;
+    if (e.type === 'reset') {
+      this.ketUndos = 0;
+      this.ketOpAt = this.clockNow();
+    }
+  }
+
+  /** The state the current task asks for, if it is a "make this state" task: a puzzle, the daily, or a Today card. */
+  private ketTarget(): { key: string; state: QState } | null {
+    let key = '', make: (() => QState) | null = null;
+    if (this.game === 'today') {
+      const card = this.todayCurrent;
+      if (card?.kind === 'make' && this.todayTarget && !this.todayAnswer) {
+        key = `today:${card.id}`;
+        const t = this.todayTarget;
+        make = () => t;
+      }
+    } else if (!this.game && campaign.mode === 'puzzle') {
+      const v = campaign.view;
+      const ch = v.chapter;
+      if (ch?.solution && !v.chapterDone && !v.stepDone) {
+        key = `puzzle:${v.puzzleIndex}:${ch.title}`;
+        make = () => runOps(ch.qubits, [...(ch.setup ?? []), ...ch.solution!], () => 0.5).state;
+      }
+    }
+    if (!make) return null;
+    if (this.ketTargetCache?.key !== key) this.ketTargetCache = { key, state: make() };
+    return this.ketTargetCache;
+  }
+
+  /** Every frame: say hello once, and notice when you are stuck. */
+  private ketUpdate(): void {
+    if (!settings.partner || this.rush) return;
+    const now = this.clockNow();
+    if (!this.ketGreeted && now > 6) {
+      this.ketGreeted = true;
+      this.ketSay({ text: "Hi, I'm Ket, your lab partner. Ask me 'what just happened?' or 'what should I do?' any time.", point: null }, true);
+      return;
+    }
+    const idle = now - this.ketOpAt;
+    const target = this.ketTarget();
+    if (target) {
+      const stuck = idle > 20 || this.ketUndos >= 3;
+      const key = `${target.key}:${lab.history.length}`;
+      if (stuck && this.ketHelped !== key && lab.state.n === target.state.n) {
+        this.ketHelped = key;
+        this.ketUndos = 0;
+        const move = nextMove(lab.state, target.state, lab.state.n <= 2 ? 4 : 3);
+        if (move) {
+          if (this.game === 'today') this.todayHinted = true;
+          this.ketSay(moveWords(move), true);
+        }
+      }
+      return;
+    }
+    // a chapter or lesson step you have been on a while
+    const v = campaign.view;
+    if ((v.mode === 'campaign' || v.mode === 'learn' || v.mode === 'course') && !this.game && !v.intro && !v.stepDone && !v.chapterDone && idle > 45) {
+      const key = `${v.mode}:${v.chapterIndex}:${v.lessonIndex}:${v.courseIndex}:${v.stepIndex}`;
+      if (this.ketHelped !== key) {
+        this.ketHelped = key;
+        this.ketSay({ text: "Stuck? Say 'show me' and I'll do this step, or ask me 'what should I do?'", point: null }, true);
+      }
+    }
+  }
+
+  /** A spoken question for Ket. */
+  private ketAnswer(text: string): void {
+    const kind = classify(text);
+    if (!settings.partner) {
+      settings.partner = true;
+      saveSettings();
+      const ls = this.world.getSystem(LabSystem);
+      if (ls) ls.partner.root.visible = true;
+    }
+    if (kind === 'what-happened') {
+      const last = this.ketLast;
+      const line = last ? explainOp(last.op, last.before, last.after) : null;
+      return this.ketSay(line ?? describeState(lab.state), true);
+    }
+    if (kind === 'state') return this.ketSay(describeState(lab.state), true);
+    if (kind === 'hint') {
+      const target = this.ketTarget();
+      if (target) {
+        const move = nextMove(lab.state, target.state, lab.state.n <= 2 ? 4 : 3);
+        if (move && this.game === 'today') this.todayHinted = true;
+        return this.ketSay(move ? moveWords(move) : { text: 'You are already there: that is the state.', point: null }, true);
+      }
+      const v = campaign.view;
+      const goal = v.step && !v.chapterDone ? (typeof v.step.goal === 'function' ? null : v.step.goal) : null;
+      return this.ketSay({ text: goal ? `The task: ${goal}. Say 'show me' and I'll do it with you.` : 'Try the Play tab: Today takes five minutes, or pick a chapter.', point: null }, true);
+    }
+    const topic = answerTopic(text);
+    this.ketSay(topic ?? { text: 'I can tell you what just happened, what to do next, what the state is, or explain ideas like entanglement, superposition, measurement and phase.', point: null }, true);
+  }
+
   // ---- Today: five minutes of spaced repetition
 
   private todayBegin(): void {
@@ -2349,6 +2512,7 @@ export class UISystem extends createSystem({
     const card = this.todayCurrent;
     this.todayAnswer = null;
     this.todayShown = false;
+    this.todayHinted = false;
     this.todayTarget = card?.kind === 'make' ? runOps(card.qubits!, card.solution!, () => 0.5).state : null;
     campaign.enterSandbox(card?.kind === 'make' ? card.qubits! : 1, []);
     this.renderGameCard();
@@ -2417,7 +2581,7 @@ export class UISystem extends createSystem({
   private todayUpdate(dt: number): void {
     const card = this.todayCurrent;
     if (card?.kind === 'make' && !this.todayAnswer && this.todayTarget && lab.state.n === this.todayTarget.n && lab.state.fidelity(this.todayTarget) > 0.999) {
-      this.todayRecord(!this.todayShown && countMoves(lab.history.ops) <= cardPar(card) + 2, null);
+      this.todayRecord(!this.todayShown && !this.todayHinted && countMoves(lab.history.ops) <= cardPar(card) + 2, null);
     }
     // the clock on the card
     this.todayCardTimer += dt;
@@ -2488,7 +2652,7 @@ export class UISystem extends createSystem({
     } else {
       this.modeChoices([]);
       const moves = countMoves(lab.history.ops);
-      this.text('chapter-body', a ? `${a.correct ? 'Made it.' : this.todayShown ? 'That is how.' : 'Made it, the long way.'} ${card.why}` : `Build it with your hands, the dock or your voice: ${cardPar(card)} move${cardPar(card) === 1 ? '' : 's'} is enough.`);
+      this.text('chapter-body', a ? `${a.correct ? 'Made it.' : this.todayShown ? 'That is how.' : this.todayHinted ? 'Made it, with a hint.' : 'Made it, the long way.'} ${card.why}` : `Build it with your hands, the dock or your voice: ${cardPar(card)} move${cardPar(card) === 1 ? '' : 's'} is enough.`);
       this.text('goal-text', a ? (a.correct ? `Right first time: back in ${days} day${days === 1 ? '' : 's'}` : 'Comes back tomorrow') : `Moves: ${moves}  /  best ${cardPar(card)}`);
       this.text('btn-next-label', a ? (this.todayIdx + 1 < n ? 'Next card' : 'Finish') : 'Show me');
     }
@@ -3112,6 +3276,12 @@ export class UISystem extends createSystem({
         return true;
       case 'settings':
         this.toggleSettings();
+        return true;
+      case 'ask':
+        this.ketAnswer(c.text);
+        return true;
+      case 'partner':
+        if (settings.partner !== c.on) this.settingAction('partner');
         return true;
       case 'pin':
         if (!!settings.pinned === c.on) return true;
@@ -4771,6 +4941,8 @@ export class UISystem extends createSystem({
     this.codeOpenT += (1 - this.codeOpenT) * ease;
     this.notesOpenT += (1 - this.notesOpenT) * ease;
     this.place(this.chapter!, 'chapter-panel');
+    // Ket keeps its place by the chapter card, in the compact layout too
+    this.world.getSystem(LabSystem)?.partner.setHome(this.layout() === 'compact' ? (this.ketCompact ??= compactPlacement(KET_HOME, new Euler()).pos) : KET_HOME);
     // the builder replaces the dock while the Build tab is open
     const building = campaign.mode === 'build';
     this.dock!.visible = !building;
@@ -4876,7 +5048,7 @@ export class UISystem extends createSystem({
     // settings stand in front of the board; another window opening there closes them
     if (this.settingsOpen && (this.notes!.open || this.libOpen || this.noiseOpen || this.profileOpen || this.dbgOpen || this.classOpen)) this.settingsOpen = false;
     if (this.settingsOpen) {
-      this.place(this.settingsAsset!, 'notes-panel');
+      this.place(this.settingsAsset!, 'settings-panel');
       this.settingsAsset!.visible = true;
       this.settingsTimer += delta;
       if (this.settingsTimer > 1) {
@@ -4893,6 +5065,7 @@ export class UISystem extends createSystem({
     campaign.update(Math.min(delta, 0.05) * slow);
     this.updateRush(Math.min(delta, 0.05));
     this.updateGame(Math.min(delta, 0.05));
+    this.ketUpdate();
     this.updateRunner(Math.min(delta, 0.05));
     this.pollIbm(Math.min(delta, 0.05));
     this.updateDebugger(Math.min(delta, 0.05));

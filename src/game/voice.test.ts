@@ -44,7 +44,9 @@ group('voice commands', () => {
     expect(parseVoice('show me')).toEqual({ type: 'showme' });
     expect(parseVoice('open the code')).toEqual({ type: 'code' });
     expect(parseVoice('next')).toEqual({ type: 'next' });
-    expect(parseVoice('what is the weather')).toBeNull();
+    // any question goes to Ket, who says what it can help with
+    expect(parseVoice('what is the weather')).toEqual({ type: 'ask', text: 'what is the weather' });
+    expect(parseVoice('lovely day outside')).toBeNull();
     expect(parseVoice('')).toBeNull();
   });
 });
@@ -137,5 +139,17 @@ group('voice: the Play tab', () => {
     expect(parseVoice("today's puzzle")).toEqual({ type: 'daily' });
     // the play list still wins for its own names
     expect(parseVoice('show me the double slit')).toEqual({ type: 'play', item: 'Double slit' });
+  });
+
+  it('asks Ket, the lab partner, and quiets it', () => {
+    expect(parseVoice('what just happened')).toEqual({ type: 'ask', text: 'what just happened' });
+    expect(parseVoice('hey Ket, what is entanglement?')).toEqual({ type: 'ask', text: 'what is entanglement' });
+    expect(parseVoice('help')).toEqual({ type: 'ask', text: 'help' });
+    expect(parseVoice("I'm stuck")).toEqual({ type: 'ask', text: 'i m stuck' });
+    expect(parseVoice('be quiet')).toEqual({ type: 'partner', on: false });
+    expect(parseVoice('Ket')).toEqual({ type: 'partner', on: true });
+    // commands still work
+    expect(parseVoice('Hadamard on qubit two')).toEqual({ type: 'gate', gate: 'h', qubit: 2 });
+    expect(parseVoice('show me')).toEqual({ type: 'showme' });
   });
 });

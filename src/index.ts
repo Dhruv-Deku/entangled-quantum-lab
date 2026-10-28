@@ -1,4 +1,4 @@
-import { World } from '@iwsdk/core';
+import { DepthSensingSystem, World } from '@iwsdk/core';
 import projectOptions from 'virtual:iwsdk-project';
 import { TutorSystem } from './game/tutor-system.js';
 import { UISystem } from './game/ui-system.js';
@@ -19,4 +19,6 @@ World.create(
   world.registerSystem(UISystem);
   world.registerSystem(TutorSystem);
   world.registerSystem(LookSelectSystem);
+  // real-world depth: the orbs are hidden behind your hands and real objects
+  world.registerSystem(DepthSensingSystem);
 });

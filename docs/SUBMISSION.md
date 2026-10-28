@@ -64,6 +64,8 @@ for it (Qiskit, OpenQASM, PennyLane) writes itself beside you.
   screen stands in.
 - **Pin the lab here.** A persistent spatial anchor brings the lab back to
   the same spot in your room next time.
+- **Real occlusion.** With depth sensing, your real hand in front of a qubit
+  hides it, as it would a real glass ball.
 
 ## Seated, hands-first, and quick to get into
 
@@ -74,6 +76,15 @@ for it (Qiskit, OpenQASM, PennyLane) writes itself beside you.
 - Field-of-view aware: on a narrow view (Meta VR Glasses) the compact layout
   swings every side panel inside about 31 degrees of straight ahead; Auto picks
   it from the headset's projection.
+
+## Ket, the lab partner (context-aware assistance)
+
+A small companion beside the desk that perceives what you do and the state
+it leaves, explains it in a sentence read off the real quantum state, plans
+hints by searching for the shortest path from where you are to the goal, and
+answers spoken questions ("what just happened?", "what should I do?", "what
+is entanglement?"). It points at the orb it is talking about, can read its
+words aloud, and runs entirely on the headset.
 
 ## Accessibility
 

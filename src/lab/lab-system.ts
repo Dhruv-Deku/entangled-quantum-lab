@@ -1,5 +1,7 @@
 import {
   createSystem,
+  DepthOccludable,
+  OcclusionShadersMode,
   Group,
   Mesh,
   MeshBasicMaterial,
@@ -22,6 +24,7 @@ import { LabAnchor } from './anchor';
 import { pickDesk, pickWall, readRoom, type Surface } from './room';
 import { WallScreen } from './wall-slit';
 import { CaptionStrip } from './captions';
+import { PartnerVisual } from './partner-3d';
 import { LookSelectSystem } from './look-select';
 import { horizontalFov, saveSettings, settings } from '../game/settings';
 import type { Op } from '../quantum/circuit';
@@ -73,6 +76,8 @@ import { GOLD, GroupVisual, ORB_RADIUS, OrbVisual, setOrbEnvironment, StrikeVisu
 
 /** Desk-top workspace origin when there is no head pose to place it from (desktop view). */
 const DESK = new Vector3(0, 0.74, -0.42);
+/** Where Ket floats: just above the chapter card's inner corner, its words at eye level (workspace coordinates). */
+export const KET_HOME = new Vector3(-0.3, 0.34, -0.12);
 const ORB_HEIGHT = 0.15;
 const GATE_SECONDS = 0.65;
 const STORM_RED = '#ff5a4f';
@@ -182,6 +187,8 @@ export class LabSystem extends createSystem({
   boardHidden = false;
   /** Sound captions, low in the middle of the view. */
   private captions!: CaptionStrip;
+  /** Ket, the lab partner, floating beside the desk. */
+  partner!: PartnerVisual;
   private night = false;
   private trophies!: TrophyShelf;
   /** The Surface Code chapter's lattice, floating between the orb and the board. */
@@ -359,6 +366,11 @@ export class LabSystem extends createSystem({
     for (const r of [this.slits.root, this.sg.root, this.bombs.root]) useStudio(r, env, 0.8);
     this.wallScreen = new WallScreen();
     this.scene.add(this.wallScreen.root);
+    this.partner = new PartnerVisual();
+    this.partner.setHome(KET_HOME);
+    ws.add(this.partner.root);
+    this.scene.add(this.partner.pointerLine);
+    this.partner.root.visible = settings.partner;
     this.captions = new CaptionStrip();
     this.captions.mesh.position.set(0, 0.235, -0.1);
     this.captions.mesh.rotation.x = -0.2;
@@ -564,6 +576,8 @@ export class LabSystem extends createSystem({
       entity.addComponent(Qubit, { index: i });
       entity.addComponent(OneHandGrabbable, { rotate: false });
       entity.addComponent(RayInteractable);
+      // in passthrough, your real hand in front of an orb hides it, as a real object would
+      entity.addComponent(DepthOccludable, { mode: OcclusionShadersMode.SoftOcclusion });
       this.layout(i, n, visual.root.position);
       this.orbs.push({ entity, visual });
     }
@@ -654,6 +668,12 @@ export class LabSystem extends createSystem({
     this.captions.show(text);
   }
 
+  /** Ket says something, pointing at qubit `q` if given. */
+  partnerSay(text: string, q: number | null): void {
+    const at = q !== null && this.orbs[q] && !this.orbsHidden ? this.orbs[q].entity.object3D!.getWorldPosition(new Vector3()) : null;
+    this.partner.say(text, at);
+  }
+
   celebrate(big = true): void {
     // reduce motion: the sound and the banner say it; no confetti
     if (settings.reduceMotion) return;
@@ -731,7 +751,12 @@ export class LabSystem extends createSystem({
   /** Dress every orb in a finish. */
   setSkin(id: OrbSkinId): void {
     this.orbSkin = id;
-    for (const o of this.orbs) o.visual.applySkin(id);
+    for (const o of this.orbs) {
+      o.visual.applySkin(id);
+      // new materials need the depth occlusion again
+      o.entity.removeComponent(DepthOccludable);
+      o.entity.addComponent(DepthOccludable, { mode: OcclusionShadersMode.SoftOcclusion });
+    }
   }
 
   /** Recentre the desk in front of the player (also used by the recenter button); a pinned lab stays put until next time. */
@@ -866,6 +891,10 @@ export class LabSystem extends createSystem({
     this.board.root.visible = !this.boardHidden;
     if (this.wallScreen.root.visible) this.wallScreen.update(dt);
     this.captions.update(dt);
+    if (this.partner.root.visible) {
+      this.player.head.updateWorldMatrix(true, false);
+      this.partner.update(dt, this.va.setFromMatrixPosition(this.player.head.matrixWorld));
+    } else this.partner.pointerLine.visible = false;
     // one machine at a time: the device where the chip floats, its surroundings where the fridge stands
     const device = this.hardwareWanted, room = !!this.pulseView;
     this.chip.root.visible = device && this.machine === 'superconducting';

@@ -79,8 +79,8 @@ the Meta Immersive Web SDK (IWSDK), three.js and TypeScript.
 
 **By the numbers:** 26 chapters, a 14-module course, 21 lessons, 12 puzzles, a
 daily challenge and Quantum Rush, a Play tab, 5 big-state views, 4 kinds of quantum computer
-in 3D at full size, a 49-qubit surface code, 40 achievements, 5 orb finishes, 31 Play tab items, Today (five minutes of spaced repetition), the lab on your real table, the double slit on your wall, look to select, a compact field-of-view layout, quantum tic-tac-toe, the double slit, Stern-Gerlach and the bomb tester, daily quests,
-voice control, shared labs and classes, and 376 unit tests.
+in 3D at full size, a 49-qubit surface code, 40 achievements, 5 orb finishes, 31 Play tab items, Today (five minutes of spaced repetition), Ket the lab partner, the lab on your real table, the double slit on your wall, look to select, a compact field-of-view layout, quantum tic-tac-toe, the double slit, Stern-Gerlach and the bomb tester, daily quests,
+voice control, shared labs and classes, and 383 unit tests.
 
 ## Your room, every day, and everyone
 
@@ -89,6 +89,8 @@ voice control, shared labs and classes, and 376 unit tests.
 | ![The Today card asking how many 1s come from measuring the plus state, the right answer in mint, and the board above: today's three cards, the memory bars box by box, this week's dots and what comes back tomorrow](docs/screenshots/today.png) | ![Left: the slit bench on the real table, the card reading Photons crossing your room, and the screen on the wall ahead. Right, closer: the screen striped with photon dots under the label Your wall, 0.6 m away, stripes 2.3 cm apart, and the histogram below](docs/screenshots/wall-slit.png) |
 | **Settings: your room, the view and access** | **A compact layout for a narrow view** |
 | ![The Settings panel: Lab on my table, Pin the lab here, Wall as a screen, Field of view, Look to select, Dwell time, High contrast, Reduce motion, Sound captions and Wrist menu](docs/screenshots/settings.png) | ![Under the emulated Meta VR Glasses view. Left, the wide layout: the chapter card and the dock reach the edges of the view. Right, compact: the card, the navigator and the dock swing in around the orbs, well inside it](docs/screenshots/glasses-compact.png) |
+
+![Ket, the lab partner: a small pearl with a ring above the chapter card, answering "what is entanglement?" while two orbs on the desk are joined by the gold thread](docs/screenshots/ket.png)
 
 - **Today** (first item on the Play tab, or say "my five minutes"): a session
   the length of a bus ride. Cards you have met come back just before you would
@@ -119,6 +121,16 @@ voice control, shared labs and classes, and 376 unit tests.
   not. The compact layout swings every panel wider than 25 degrees in toward
   the middle around your head, at the same distance and still facing you; Auto
   picks it from the headset's projection.
+- **Ket, your lab partner.** A small companion beside the desk watches what
+  you do and says what it means, read off the real state: "q0 and q1 are
+  entangled now: the gold thread". Stuck on a state to make, it searches for
+  the shortest way from where you are to the goal and suggests the next move,
+  pointing at the orb. Ask it out loud: "what just happened?", "what should I
+  do?", "what is entanglement?". It can read its words aloud, and it all runs
+  on the headset (`src/game/partner.ts`, tested: following its hints always
+  reaches the goal).
+- **Your hands in front of the qubits.** With depth sensing, a real hand (or
+  object) in front of an orb hides it, as it would a real glass ball.
 - **And:** high contrast (white text, bright edges, darker panels), reduce
   motion, captions for every sound cue, and a left- or right-handed wrist
   menu. Every setting also works by voice: "settings", "pin the lab", "high
@@ -145,7 +157,7 @@ voice control, shared labs and classes, and 376 unit tests.
 ```sh
 npm install
 npm run dev        # managed browser with the Quest 3 emulator (IWER)
-npm test           # 376 unit tests: physics, four kinds of quantum computer, gestures, spells, the course, 25 chapters, 15 lessons, puzzles, the daily challenge, achievements, builder, noise, chemistry, import, IBM compiling, Bell tests, error correction, benchmarking, voice, shared rooms and more
+npm test           # 383 unit tests: physics, four kinds of quantum computer, gestures, spells, the course, 25 chapters, 15 lessons, puzzles, the daily challenge, achievements, builder, noise, chemistry, import, IBM compiling, Bell tests, error correction, benchmarking, voice, shared rooms and more
 npm run typecheck
 npm run build
 ```

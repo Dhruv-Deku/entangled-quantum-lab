@@ -56,11 +56,11 @@ function stateKey(s: QState): string {
   return out;
 }
 
-/** The shortest move sequence from |0...0> to the target (up to global phase), searching up to maxDepth moves. */
-export function shortestPath(n: number, target: QState, maxDepth: number): Op[] | null {
+/** The shortest move sequence from |0...0> (or from `from`) to the target (up to global phase), searching up to maxDepth moves. */
+export function shortestPath(n: number, target: QState, maxDepth: number, from?: QState): Op[] | null {
   const moves = movesFor(n);
   const goal = stateKey(target);
-  const start = new QState(n);
+  const start = from ? from.clone() : new QState(n);
   if (stateKey(start) === goal) return [];
   const seen = new Map<string, { parent: string | null; op: Op | null }>([[stateKey(start), { parent: null, op: null }]]);
   let frontier: [string, QState][] = [[stateKey(start), start]];

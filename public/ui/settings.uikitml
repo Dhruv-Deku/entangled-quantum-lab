@@ -105,5 +105,16 @@
       <div id="st-wrist-b" class="btn"><div id="st-wrist-bl" class="bt">Left</div></div>
     </div>
   </div>
+  <div class="section">Lab partner</div>
+  <div class="grid">
+    <div id="st-partner" class="tile">
+      <div class="names"><div class="name">Ket</div><div id="st-partner-m" class="meta">-</div></div>
+      <div id="st-partner-b" class="btn"><div id="st-partner-bl" class="bt">On</div></div>
+    </div>
+    <div id="st-speak" class="tile">
+      <div class="names"><div class="name">Speak aloud</div><div id="st-speak-m" class="meta">-</div></div>
+      <div id="st-speak-b" class="btn"><div id="st-speak-bl" class="bt">Off</div></div>
+    </div>
+  </div>
   <div id="st-note" class="note">Every setting also works by voice: say "settings", "pin the lab", "high contrast" or "look to select".</div>
 </div>

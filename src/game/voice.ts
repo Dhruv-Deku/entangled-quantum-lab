@@ -23,6 +23,8 @@ export type VoiceCommand =
   | { type: 'listen' | 'daily' | 'profile' | 'snapshot' }
   | { type: 'settings' | 'contrast' | 'look' | 'captions' | 'wall' }
   | { type: 'pin'; on: boolean }
+  | { type: 'ask'; text: string }
+  | { type: 'partner'; on: boolean }
   | { type: 'machine'; id: 'superconducting' | 'ions' | 'atoms' | 'photons' }
   | { type: 'compare' }
   | { type: 'fullsize'; on: boolean }
@@ -108,6 +110,10 @@ export function parseVoice(text: string): VoiceCommand | null {
   const qs = qubitNumbers(ts);
 
   if (/^(leave|exit|quit) (the )?(room|lab|class|shared lab)/.test(s)) return { type: 'leave' };
+  // Ket, the lab partner: quiet, back, and questions
+  if (/^(be )?quiet|stop talking|(mute|hide) (ket|the partner)|ket off/.test(s)) return { type: 'partner', on: false };
+  if (/^(ket|hey ket)$|(ket|partner) (on|back)|(show|bring back) (ket|the partner)/.test(s)) return { type: 'partner', on: true };
+  if (/^(hey ket |ket )?(what|why|how|where|who|explain|tell me|help|hint|i m stuck|im stuck)\b/.test(s) && !/^how many shots/.test(s)) return { type: 'ask', text: s.replace(/^(hey ket |ket )/, '') };
   const joining = /^(join|enter) (the )?(room|lab|class|code)? ?(.+)$/.exec(s);
   if (joining) {
     // spoken codes come letter by letter: "l k seven q f"
@@ -265,6 +271,10 @@ export function describe(c: VoiceCommand): string {
       return 'sound captions';
     case 'wall':
       return 'the double slit on your wall';
+    case 'ask':
+      return `asking Ket: ${c.text}`;
+    case 'partner':
+      return c.on ? 'Ket, back on' : 'Ket, quiet';
     case 'machine':
       return c.id === 'ions' ? 'the trapped-ion computer' : c.id === 'atoms' ? 'the neutral-atom computer' : c.id === 'photons' ? 'the photonic chip' : 'the superconducting chip';
     case 'compare':
