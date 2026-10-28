@@ -132,6 +132,9 @@ group('voice: the Play tab', () => {
     expect(parseVoice('turn on look to select')).toEqual({ type: 'look' });
     expect(parseVoice('show captions')).toEqual({ type: 'captions' });
     expect(parseVoice('put the double slit on my wall')).toEqual({ type: 'wall' });
+    expect(parseVoice('my five minutes')).toEqual({ type: 'play', item: 'Today' });
+    expect(parseVoice("start today's cards")).toEqual({ type: 'play', item: 'Today' });
+    expect(parseVoice("today's puzzle")).toEqual({ type: 'daily' });
     // the play list still wins for its own names
     expect(parseVoice('show me the double slit')).toEqual({ type: 'play', item: 'Double slit' });
   });

@@ -120,7 +120,8 @@ export function parseVoice(text: string): VoiceCommand | null {
   if (/(start|share|open) (a |the )?(shared )?lab|share (this|the circuit)/.test(s)) return { type: 'share' };
   if (/class ?room|class panel|my class|the class/.test(s)) return { type: 'classroom' };
   if (/\b(listen|play (the|this) (state|chord)|hear (it|the state))\b/.test(s)) return { type: 'listen' };
-  if (/daily|today'?s (puzzle|challenge)/.test(s)) return { type: 'daily' };
+  if (/five minutes|my (cards|session|review)|today'? ?s (cards|session)|^(start )?today$|review my/.test(s)) return { type: 'play', item: 'Today' };
+  if (/daily|today'? ?s (puzzle|challenge)/.test(s)) return { type: 'daily' };
   if (/compare (the |all )?(machines|computers|platforms|three)/.test(s)) return { type: 'compare' };
   if (/(full|life|real|actual) size/.test(s)) return { type: 'fullsize', on: !/\b(shrink|small|desk|back|off)\b/.test(s) };
   if (/^(shrink|make it small|back on the desk)/.test(s)) return { type: 'fullsize', on: false };

@@ -1182,3 +1182,75 @@ export function bombFigure(v: BombView): Figure {
     },
   };
 }
+
+// ---------------------------------------------------------------- Today: five minutes of spaced repetition
+
+export interface MemoryView {
+  streak: number;
+  /** Cards per box: 0 unseen, then boxes 1 to 5. */
+  boxes: number[];
+  total: number;
+  session: { topic: string; kind: 'quiz' | 'make'; status: 'right' | 'missed' | 'now' | 'next' }[];
+  tomorrow: { due: number; fresh: number };
+  /** The last seven days, oldest first: was there a session? */
+  week: boolean[];
+}
+
+/** Today's cards, your quantum memory box by box, this week, and what tomorrow brings. */
+export function memoryFigure(v: MemoryView): Figure {
+  return {
+    key: `memory:${v.streak}:${v.boxes.join(',')}:${v.session.map((s) => s.status[0]).join('')}:${v.tomorrow.due}/${v.tomorrow.fresh}:${v.week.map(Number).join('')}`,
+    draw: (g, w, h) => {
+      panel(g, w, h, 'Today  /  five minutes', v.streak ? `${v.streak} day${v.streak === 1 ? '' : 's'} in a row` : 'Day one');
+      // today's cards
+      text(g, "Today's cards", 44, 122, DIM, '600 24px');
+      v.session.forEach((c, i) => {
+        const x = 44 + i * 196, y = 140, cw = 182, ch = 112;
+        roundRect(g, x, y, cw, ch, 20);
+        g.fillStyle = c.status === 'right' ? 'rgba(61,220,151,0.12)' : c.status === 'missed' ? 'rgba(255,138,122,0.12)' : '#232428';
+        g.fill();
+        g.lineWidth = c.status === 'now' ? 4 : 2;
+        g.strokeStyle = c.status === 'right' ? MINT : c.status === 'missed' ? CORAL : c.status === 'now' ? BLUE : LINE;
+        g.stroke();
+        text(g, c.kind === 'make' ? 'Make it' : 'Question', x + 18, y + 36, c.kind === 'make' ? SOFT_BLUE : DIM, '600 20px');
+        const lines = wrap(g, c.topic, '700 26px', cw - 36).slice(0, 2);
+        lines.forEach((l, k) => text(g, l, x + 18, y + 70 + k * 30, INK, '700 26px'));
+        const mark = c.status === 'right' ? 'Right' : c.status === 'missed' ? 'Again tomorrow' : c.status === 'now' ? 'Now' : '';
+        if (mark && lines.length < 2) text(g, mark, x + 18, y + 98, c.status === 'right' ? MINT : c.status === 'missed' ? CORAL : BLUE, '600 20px');
+      });
+      // your quantum memory: one bar per box
+      text(g, 'Your quantum memory', 44, 312, DIM, '600 24px');
+      const labels = ['New', '1 day', '2 days', '4 days', '8 days', '16 days'];
+      const top = Math.max(1, ...v.boxes);
+      const bx = 44, by = 560, bw = 128, gap = 22, span = 200;
+      v.boxes.forEach((n, i) => {
+        const x = bx + i * (bw + gap), hgt = Math.max(n ? 10 : 2, (n / top) * span);
+        roundRect(g, x, by - hgt, bw, hgt, 10);
+        g.fillStyle = i === 0 ? '#3a3c41' : i >= 4 ? MINT : BLUE;
+        g.fill();
+        text(g, String(n), x + bw / 2, by - hgt - 12, INK, '700 26px', 'center');
+        text(g, labels[i], x + bw / 2, by + 34, DIM, '600 20px', 'center');
+      });
+      const solid = v.boxes[4] + v.boxes[5];
+      text(g, `${solid} of ${v.total} ideas on solid ground`, 44, h - 26, DIM, '500 22px');
+      // this week and tomorrow
+      const rx = 1060;
+      text(g, 'This week', rx, 312, DIM, '600 24px');
+      v.week.forEach((on, i) => {
+        dot(g, rx + 22 + i * 66, 360, 22, on ? MINT : '#2c2e32');
+        if (i === v.week.length - 1) {
+          g.lineWidth = 3;
+          g.strokeStyle = BLUE;
+          g.beginPath();
+          g.arc(rx + 22 + i * 66, 360, 28, 0, Math.PI * 2);
+          g.stroke();
+        }
+      });
+      text(g, 'Tomorrow', rx, 440, DIM, '600 24px');
+      const t = v.tomorrow;
+      text(g, `${t.due} card${t.due === 1 ? '' : 's'} come${t.due === 1 ? 's' : ''} back`, rx, 482, INK, '700 30px');
+      text(g, t.fresh ? `and ${t.fresh} new idea${t.fresh === 1 ? '' : 's'}` : 'and no new ones: the deck is done', rx, 520, INK, '700 30px');
+      for (const [k, line] of wrap(g, 'Right first time: the card waits longer. Missed: back tomorrow.', '500 22px', 480).entries()) text(g, line, rx, 566 + k * 28, DIM, '500 22px');
+    },
+  };
+}

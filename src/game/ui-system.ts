@@ -69,6 +69,11 @@ import { compactPlacement } from './fov-layout';
 import { setContrast } from '../lab/contrast';
 import { cueListeners } from '../lab/feedback';
 import { CUE_CAPTIONS } from '../lab/captions';
+import { finishSession, loadMemory, mastery, parOf as cardPar, planSession, review, saveMemory, sessionStreak, shuffledChoices, tomorrow, addDays, type MemoryState, type RecallCard } from './today';
+import { memoryFigure, type MemoryView } from '../lab/figures';
+import { countMoves } from './puzzles';
+import { run as runOps } from '../quantum/circuit';
+import type { QState } from '../quantum/state';
 import { LookSelectSystem, type LookTarget } from '../lab/look-select';
 import { compareFigure } from '../lab/figures';
 import { compileFor, comparePlatforms, formatTime, machineQubits, PLATFORMS, platformSchedule, runPlatform, type PlatformId, type PlatformResult } from '../quantum/platforms';
@@ -125,10 +130,10 @@ const LAB_LINES = 10;
 const LAB_KEYS = ['h', 'x', 'y', 'z', 's', 'sdg', 't', 'tdg', 'rx', 'ry', 'rz', 'cx', 'cz', 'swap', 'ccx', 'measure', 'q0', 'q1', 'q2', 'q3', 'q4', 'pi', 'pi2', 'pi4', 'mpi2', 'up', 'down', 'delete', 'clear', 'link', 'subqubit', 'addqubit', 'example', 'fromorbs'];
 const TABS = ['course', 'campaign', 'learn', 'puzzle', 'build', 'sandbox', 'play'] as const;
 /** The Play tab: arcade and showcase picks. */
-type GameId = 'dice' | 'penny' | 'cat' | 'spy' | 'decoder' | 'grover' | 'teleport' | 'ttt' | 'slit' | 'sg' | 'bomb';
+type GameId = 'dice' | 'penny' | 'cat' | 'spy' | 'decoder' | 'grover' | 'teleport' | 'ttt' | 'slit' | 'sg' | 'bomb' | 'today';
 
-const PLAY = ['Code lab', 'First five minutes', 'Daily quests', 'Quantum Rush', 'Zen Rush', 'Rush versus', 'Class challenge', 'Daily', 'Spy game', 'Be the decoder', 'Grover maze', 'Teleporter', 'Quantum tic-tac-toe', 'Double slit', 'Stern-Gerlach', 'Bomb tester', 'Shor in 3D', 'System Two', 'Photonic chip', 'Surface Code', 'Many worlds', 'Quantum dice', 'Penny flip', 'Schrodinger cat', 'State album', 'Giant sphere', 'Inside a qubit', 'Night sky', 'History', 'Ambient music'] as const;
-const PLAY_TAGS = ['qasm', 'tour', '3/day', '60s', 'zen', 'vs', 'class', 'day', 'BB84', 'd=3', '8', 'tp', 'X O', '2 slit', 'Ag', 'EV', '15', '3x', 'light',  '49q', 'H H', 'd8', 'coin', 'box', '15', '1 m', 'JJ', 'sky', '1981', 'hum'];
+const PLAY = ['Today', 'Code lab', 'First five minutes', 'Daily quests', 'Quantum Rush', 'Zen Rush', 'Rush versus', 'Class challenge', 'Daily', 'Spy game', 'Be the decoder', 'Grover maze', 'Teleporter', 'Quantum tic-tac-toe', 'Double slit', 'Stern-Gerlach', 'Bomb tester', 'Shor in 3D', 'System Two', 'Photonic chip', 'Surface Code', 'Many worlds', 'Quantum dice', 'Penny flip', 'Schrodinger cat', 'State album', 'Giant sphere', 'Inside a qubit', 'Night sky', 'History', 'Ambient music'] as const;
+const PLAY_TAGS = ['5 min', 'qasm', 'tour', '3/day', '60s', 'zen', 'vs', 'class', 'day', 'BB84', 'd=3', '8', 'tp', 'X O', '2 slit', 'Ag', 'EV', '15', '3x', 'light',  '49q', 'H H', 'd8', 'coin', 'box', '15', '1 m', 'JJ', 'sky', '1981', 'hum'];
 
 /** The settings panel's tiles, in order. */
 const SETTING_KEYS = ['desk', 'pin', 'wall', 'fov', 'look', 'dwell', 'contrast', 'motion', 'captions', 'wrist'] as const;
@@ -244,6 +249,19 @@ export class UISystem extends createSystem({
   private readonly compactSpots = new Map<string, { pos: Vector3; rot: Euler }>();
   /** The double slit sends its photons to the wall in front of you. */
   private slitWall = false;
+  /** Today: five minutes of spaced repetition. */
+  private memory: MemoryState = loadMemory();
+  private todayPlan: RecallCard[] = [];
+  private todayIdx = 0;
+  private todayResults: ('right' | 'missed')[] = [];
+  /** The current card is answered (quiz) or made (make card), and how. */
+  private todayAnswer: { correct: boolean; picked: number | null } | null = null;
+  private todayTarget: QState | null = null;
+  private todayShown = false;
+  private todayStart = 0;
+  private todayEnd = 0;
+  private todayDone = false;
+  private todayCardTimer = 0;
   /** Development: show the wrist menu at a fixed spot, without a tracked hand. */
   wristForce = false;
   private dbgAsset: UIKitMLAsset | null = null;
@@ -472,7 +490,7 @@ export class UISystem extends createSystem({
       } else campaign.next();
       feedback('select');
     });
-    for (let i = 0; i < 3; i++) on(`choice-${i}`, () => (this.game === 'spy' ? this.spyAnswer(i) : this.game === 'ttt' || this.game === 'slit' || this.game === 'sg' || this.game === 'bomb' ? this.modeChoice(i) : feedback(campaign.answer(i) ? 'success' : 'reject')));
+    for (let i = 0; i < 3; i++) on(`choice-${i}`, () => (this.game === 'today' ? this.todayPick(i) : this.game === 'spy' ? this.spyAnswer(i) : this.game === 'ttt' || this.game === 'slit' || this.game === 'sg' || this.game === 'bomb' ? this.modeChoice(i) : feedback(campaign.answer(i) ? 'success' : 'reject')));
     on('btn-replay', () => {
       if (this.rush || this.rushOver || this.racePending) return this.endRush(true);
       if (this.game) return this.endGame(true);
@@ -780,6 +798,10 @@ export class UISystem extends createSystem({
     LookSelectSystem.providers.push(provide);
     this.cleanupFuncs.push(() => LookSelectSystem.providers.splice(LookSelectSystem.providers.indexOf(provide), 1));
     if (settings.contrast) setContrast(this.panels(), true);
+    // a returning player: today's cards are waiting
+    const today = dayKey();
+    const waiting = planSession(this.memory, today).length;
+    if (Object.keys(this.memory.sessions).length && !this.memory.sessions[today] && waiting) this.flash(`Today: ${waiting} cards waiting, about ${Math.max(2, waiting)} minutes. Play tab, first item`);
   }
 
   private panels(): (UIKitMLAsset | null)[] {
@@ -1547,6 +1569,10 @@ export class UISystem extends createSystem({
     const lsys = this.world.getSystem(LabSystem);
     this.quest('wonder');
     if (item === 'Code lab') return this.labOpen ? this.closeCodeLab() : this.openCodeLab(false);
+    if (item === 'Today') {
+      this.endRush(false);
+      return this.startGame('today');
+    }
     if (item === 'First five minutes') {
       this.endRush(false);
       this.endGame(false);
@@ -1747,6 +1773,9 @@ export class UISystem extends createSystem({
       campaign.enterSandbox(1, []);
       this.game = g;
       this.modeStart(g);
+    } else if (g === 'today') {
+      this.game = g;
+      this.todayBegin();
     } else {
       campaign.enterSandbox(3, []);
       this.groverNew();
@@ -1783,6 +1812,7 @@ export class UISystem extends createSystem({
     if (this.game === 'grover') return this.groverNext();
     if (this.game === 'teleport') return this.teleportNext();
     if (this.game === 'ttt' || this.game === 'slit' || this.game === 'sg' || this.game === 'bomb') return this.modeNext();
+    if (this.game === 'today') return this.todayNext();
     if (this.game === 'dice') {
       // three Hadamards and three measurements: a fair number from 1 to 8
       lab.reset(3);
@@ -1825,6 +1855,7 @@ export class UISystem extends createSystem({
   private updateGame(dt: number): void {
     const ls = this.world.getSystem(LabSystem);
     if (this.game === 'ttt' || this.game === 'slit' || this.game === 'sg' || this.game === 'bomb') this.modeUpdate(dt);
+    if (this.game === 'today') this.todayUpdate(dt);
     if (this.game === 'teleport' && this.tele.phase === 'flying' && ls?.teleporter.arrived) {
       this.tele.phase = 'fix';
       this.renderGameCard();
@@ -1853,6 +1884,7 @@ export class UISystem extends createSystem({
 
   private renderGameCard(): void {
     for (let i = 0; i < 5; i++) this.els.get(`pip-${i}`)?.setProperties({ display: 'none' });
+    if (this.game === 'today') return this.renderTodayCard();
     if (this.game === 'ttt' || this.game === 'slit' || this.game === 'sg' || this.game === 'bomb') return this.renderModeCard();
     const asking = this.game === 'spy' && this.spyPhase === 'guess';
     this.els.get('choices')?.setProperties({ display: asking ? 'flex' : 'none' });
@@ -2073,6 +2105,7 @@ export class UISystem extends createSystem({
 
   /** The board's figure for the mode (redrawn at most five times a second while particles stream). */
   private modeFigure(): Figure | null {
+    if (this.game === 'today') return memoryFigure(this.todayView());
     const now = this.clockNow();
     const stamp = `${this.game}`;
     if (this.modeFig && this.modeFig.key === stamp && now - this.modeFig.at < 0.2 && (this.game === 'slit' || this.game === 'sg')) return this.modeFig.fig;
@@ -2294,6 +2327,172 @@ export class UISystem extends createSystem({
     this.text('chapter-body', body);
     this.text('goal-text', goal);
     this.modeChoices(choices, active);
+  }
+
+  // ---- Today: five minutes of spaced repetition
+
+  private todayBegin(): void {
+    this.todayPlan = planSession(this.memory, dayKey());
+    this.todayIdx = 0;
+    this.todayResults = [];
+    this.todayDone = false;
+    this.todayStart = this.clockNow();
+    this.todayCard();
+  }
+
+  private get todayCurrent(): RecallCard | null {
+    return this.todayDone ? null : (this.todayPlan[this.todayIdx] ?? null);
+  }
+
+  /** Set the lab up for the current card: a make card gets fresh qubits to build on. */
+  private todayCard(): void {
+    const card = this.todayCurrent;
+    this.todayAnswer = null;
+    this.todayShown = false;
+    this.todayTarget = card?.kind === 'make' ? runOps(card.qubits!, card.solution!, () => 0.5).state : null;
+    campaign.enterSandbox(card?.kind === 'make' ? card.qubits! : 1, []);
+    this.renderGameCard();
+  }
+
+  /** Record the first answer to the current card. */
+  private todayRecord(correct: boolean, picked: number | null): void {
+    const card = this.todayCurrent;
+    if (!card || this.todayAnswer) return;
+    this.todayAnswer = { correct, picked };
+    this.todayResults[this.todayIdx] = correct ? 'right' : 'missed';
+    this.memory = review(this.memory, card.id, correct, dayKey());
+    saveMemory(this.memory);
+    feedback(correct ? 'success' : 'reject');
+    this.renderGameCard();
+  }
+
+  private todayPick(i: number): void {
+    const card = this.todayCurrent;
+    if (!card || card.kind !== 'quiz' || this.todayAnswer) return;
+    this.todayRecord(i === shuffledChoices(card, dayKey()).right, i);
+  }
+
+  /** The card's main button: Show me or Skip, then Next card, then Finish; Practice more after. */
+  private todayNext(): void {
+    const card = this.todayCurrent;
+    if (this.todayDone) return this.todayBegin();
+    if (!card) return;
+    if (!this.todayAnswer) {
+      if (card.kind === 'make') {
+        // show me: build it for you (it counts as a miss: it comes back tomorrow)
+        this.todayShown = true;
+        campaign.enterSandbox(card.qubits!, []);
+        for (const op of card.solution!) if (op.kind === 'gate') lab.gate(op.gate, op.target, op.params, op.controls);
+        return;
+      }
+      return this.todayRecord(false, null);
+    }
+    this.todayIdx++;
+    if (this.todayIdx < this.todayPlan.length) {
+      feedback('select');
+      return this.todayCard();
+    }
+    this.todayFinish();
+  }
+
+  private todayFinish(): void {
+    const today = dayKey();
+    const right = this.todayResults.filter((r) => r === 'right').length;
+    this.memory = finishSession(this.memory, today, this.todayPlan.length, right);
+    saveMemory(this.memory);
+    this.todayDone = true;
+    this.todayEnd = this.clockNow();
+    const streak = sessionStreak(this.memory, today);
+    if (streak >= 3) this.use('today:streak3');
+    if (mastery(this.memory).solid >= 10) this.use('today:solid10');
+    this.use('today');
+    this.quest('puzzle');
+    this.profileDirty = true;
+    this.banner.show('Done for today', `${right} of ${this.todayPlan.length} right first time`, streak > 1 ? `${streak} days in a row` : 'Day one of your streak');
+    this.world.getSystem(LabSystem)?.celebrate(right === this.todayPlan.length);
+    campaign.enterSandbox(1, []);
+    this.renderGameCard();
+  }
+
+  private todayUpdate(dt: number): void {
+    const card = this.todayCurrent;
+    if (card?.kind === 'make' && !this.todayAnswer && this.todayTarget && lab.state.n === this.todayTarget.n && lab.state.fidelity(this.todayTarget) > 0.999) {
+      this.todayRecord(!this.todayShown && countMoves(lab.history.ops) <= cardPar(card) + 2, null);
+    }
+    // the clock on the card
+    this.todayCardTimer += dt;
+    if (this.todayCardTimer > 1) {
+      this.todayCardTimer = 0;
+      this.renderGameCard();
+    }
+  }
+
+  private todayView(): MemoryView {
+    const today = dayKey();
+    const m = mastery(this.memory);
+    return {
+      streak: sessionStreak(this.memory, today),
+      boxes: m.boxes,
+      total: m.total,
+      session: this.todayPlan.map((c, i) => ({ topic: c.topic, kind: c.kind, status: this.todayResults[i] ?? (!this.todayDone && i === this.todayIdx ? 'now' : 'next') })),
+      tomorrow: tomorrow(this.memory, today),
+      week: Array.from({ length: 7 }, (_, i) => !!this.memory.sessions[addDays(today, i - 6)]),
+    };
+  }
+
+  private renderTodayCard(): void {
+    const today = dayKey();
+    const card = this.todayCurrent;
+    const secs = Math.max(0, Math.round((this.todayDone ? this.todayEnd : this.clockNow()) - this.todayStart));
+    const clock = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
+    this.els.get('btn-notes')?.setProperties({ display: 'none' });
+    this.els.get('btn-lib')?.setProperties({ display: 'none' });
+    this.text('btn-replay-label', 'Done');
+    this.bg('btn-next', C.primary);
+    // the pips are today's cards
+    this.todayPlan.forEach((_, i) => {
+      if (i > 4) return;
+      const r = this.todayResults[i];
+      this.els.get(`pip-${i}`)?.setProperties({ display: 'flex', backgroundColor: r === 'right' ? C.done : r === 'missed' ? '#ff8a7a' : !this.todayDone && i === this.todayIdx ? C.current : C.todo });
+    });
+    if (!card) {
+      const right = this.todayResults.filter((r) => r === 'right').length;
+      const streak = sessionStreak(this.memory, today);
+      const t = tomorrow(this.memory, today);
+      this.text('chapter-eyebrow', `Today  /  done in ${clock}`);
+      this.text('chapter-title', 'Done for today');
+      this.text('chapter-body', `${right} of ${this.todayPlan.length} right first time. ${streak > 1 ? `${streak} days in a row.` : 'Day one of your streak.'} Tomorrow ${t.due} card${t.due === 1 ? '' : 's'} come${t.due === 1 ? 's' : ''} back${t.fresh ? `, with ${t.fresh} new idea${t.fresh === 1 ? '' : 's'}` : ''}.`);
+      this.text('goal-text', 'See you tomorrow');
+      this.bg('goal-dot', C.done);
+      this.text('btn-next-label', 'Practice more');
+      return this.modeChoices([]);
+    }
+    const n = this.todayPlan.length;
+    this.text('chapter-eyebrow', `Today  /  card ${this.todayIdx + 1} of ${n}  /  ${card.topic}  /  ${clock}`);
+    this.text('chapter-title', card.prompt);
+    const a = this.todayAnswer;
+    const box = this.memory.cards[card.id]?.box ?? 1;
+    const days = [1, 2, 4, 8, 16][box - 1];
+    if (card.kind === 'quiz') {
+      const { labels, right } = shuffledChoices(card, today);
+      this.modeChoices(labels);
+      if (a) {
+        labels.forEach((_, i) => {
+          this.bg(`choice-${i}`, i === right ? '#1f3a30' : i === a.picked ? '#3a2523' : '#2d2f33');
+          this.els.get(`choice-${i}-l`)?.setProperties({ color: i === right ? C.done : i === a.picked ? '#ff8a7a' : C.textDim });
+        });
+      }
+      this.text('chapter-body', a ? `${a.correct ? 'Right.' : `The answer: ${card.choices![0]}.`} ${card.why}` : 'Pick one. It comes back just before you would forget it.');
+      this.text('goal-text', a ? (a.correct ? `Right first time: back in ${days} day${days === 1 ? '' : 's'}` : 'Comes back tomorrow') : 'Tap an answer');
+      this.text('btn-next-label', a ? (this.todayIdx + 1 < n ? 'Next card' : 'Finish') : 'Skip');
+    } else {
+      this.modeChoices([]);
+      const moves = countMoves(lab.history.ops);
+      this.text('chapter-body', a ? `${a.correct ? 'Made it.' : this.todayShown ? 'That is how.' : 'Made it, the long way.'} ${card.why}` : `Build it with your hands, the dock or your voice: ${cardPar(card)} move${cardPar(card) === 1 ? '' : 's'} is enough.`);
+      this.text('goal-text', a ? (a.correct ? `Right first time: back in ${days} day${days === 1 ? '' : 's'}` : 'Comes back tomorrow') : `Moves: ${moves}  /  best ${cardPar(card)}`);
+      this.text('btn-next-label', a ? (this.todayIdx + 1 < n ? 'Next card' : 'Finish') : 'Show me');
+    }
+    this.bg('goal-dot', a ? (a.correct ? C.done : '#ff8a7a') : C.current);
   }
 
   // ---- the double slit and Stern-Gerlach
