@@ -40,6 +40,11 @@ for it (Qiskit, OpenQASM, PennyLane) writes itself beside you.
 - **Your crystal:** a glass crystal on your desk grows a shard for every
   idea you learn and a ring for every day you come; it waits grey until
   today's five minutes are done. Growth you can see between sessions.
+- **The exponential wall:** add qubits and watch what an ordinary computer
+  would need to store the state (2^n numbers, 16 bytes each, exactly): a
+  phone, a laptop, a server, then racks of memory lining an aisle that runs
+  away from your desk through your room. Around 49 qubits no supercomputer
+  has the memory. It is the welcome tour's finale.
 - **Today, five minutes a day:** a spaced-repetition session sized for a bus
   ride. Cards you have met come back just before you would forget them; one
   or two new ideas join each day; at least one card asks you to build a state
@@ -48,7 +53,7 @@ for it (Qiskit, OpenQASM, PennyLane) writes itself beside you.
 - **Learn:** 26 chapters (superposition to the surface code), 21 lessons, a
   course with quizzes, puzzles with par, a daily challenge the same for
   everyone, and a Code Lab where you write OpenQASM 3 on the panel.
-- **Play:** 32 items, including quantum tic-tac-toe on a tappable 3D board,
+- **Play:** 33 items, including quantum tic-tac-toe on a tappable 3D board,
   the double slit, Stern-Gerlach, the Elitzur-Vaidman bomb tester, a spy game
   (BB84), a Grover maze, teleportation booths and Quantum Rush.
 - **Real hardware:** the dilution refrigerator, a trapped-ion chamber, a

@@ -136,6 +136,7 @@ group('voice: the Play tab', () => {
     expect(parseVoice('put the double slit on my wall')).toEqual({ type: 'wall' });
     expect(parseVoice('my five minutes')).toEqual({ type: 'play', item: 'Today' });
     expect(parseVoice('wind down')).toEqual({ type: 'play', item: 'Wind down' });
+    expect(parseVoice('show me the supercomputer')).toEqual({ type: 'play', item: 'Supercomputer' });
     expect(parseVoice('something calm before bed')).toEqual({ type: 'play', item: 'Wind down' });
     expect(parseVoice("start today's cards")).toEqual({ type: 'play', item: 'Today' });
     expect(parseVoice("today's puzzle")).toEqual({ type: 'daily' });

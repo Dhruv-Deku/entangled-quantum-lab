@@ -79,8 +79,26 @@ the Meta Immersive Web SDK (IWSDK), three.js and TypeScript.
 
 **By the numbers:** 26 chapters, a 14-module course, 21 lessons, 12 puzzles, a
 daily challenge and Quantum Rush, a Play tab, 5 big-state views, 4 kinds of quantum computer
-in 3D at full size, a 49-qubit surface code, 40 achievements, 5 orb finishes, 32 Play tab items, Today (five minutes of spaced repetition) and your crystal that grows with it, Ket the lab partner, the lab on your real table, the double slit on your wall, look to select, a compact field-of-view layout, quantum tic-tac-toe, the double slit, Stern-Gerlach and the bomb tester, daily quests,
-voice control, shared labs and classes, and 389 unit tests.
+in 3D at full size, a 49-qubit surface code, 41 achievements, 5 orb finishes, 33 Play tab items, the exponential wall, Today (five minutes of spaced repetition) and your crystal that grows with it, Ket the lab partner, the lab on your real table, the double slit on your wall, look to select, a compact field-of-view layout, quantum tic-tac-toe, the double slit, Stern-Gerlach and the bomb tester, daily quests,
+voice control, shared labs and classes, and 393 unit tests.
+
+## The exponential wall: why a few qubits matter
+
+![Left: 30 qubits, 16 GB: a laptop on the desk under a label reading 1,073,741,824 numbers, Ket saying already a laptop full of memory. Right: 55 qubits, 512 PB: racks of servers line both sides of an aisle running away from the desk, and Ket says past about 49 qubits no supercomputer has enough memory; real quantum chips already have over 100 qubits](docs/screenshots/exponential-wall.png)
+
+Add qubits and see what an ordinary computer would need just to write the
+state down: one number per basis state, 2^n of them, 16 bytes each, exactly.
+A phone holds 28 qubits, a laptop 32, a server 37; then racks of memory
+appear on the floor, lining an aisle that runs away from your desk, and each
+qubit doubles them. Around 49 qubits the memory of the largest
+supercomputers (about 10 PB) runs out; at 55 the aisle holds 4,096 racks and
+runs on past your walls. Ket says what each step means, the board plots it
+on a log scale, and real chips with over 100 qubits put it in perspective.
+It is the welcome tour's finale ("Why it matters"), the Play tab's fifth
+item, and an achievement: The exponential wall (`src/quantum/scale.ts`,
+tested).
+
+![The view down the aisle at 55 qubits: dark racks with blue and mint light strips on both sides, receding to a vanishing point, the label 55 qubits: 512 PB, 4,096 racks of memory, 1,696 more out of sight, floating over it](docs/screenshots/exponential-aisle.png)
 
 ## Your room, every day, and everyone
 
@@ -164,6 +182,7 @@ voice control, shared labs and classes, and 389 unit tests.
 
 ## Contents
 
+- [The exponential wall: why a few qubits matter](#the-exponential-wall-why-a-few-qubits-matter)
 - [Your room, every day, and everyone](#your-room-every-day-and-everyone)
 - [Try it](#try-it)
 - [Part 1: Your hands are the quantum computer](#part-1-your-hands-are-the-quantum-computer)
@@ -183,7 +202,7 @@ voice control, shared labs and classes, and 389 unit tests.
 ```sh
 npm install
 npm run dev        # managed browser with the Quest 3 emulator (IWER)
-npm test           # 389 unit tests: physics, four kinds of quantum computer, gestures, spells, the course, 25 chapters, 15 lessons, puzzles, the daily challenge, achievements, builder, noise, chemistry, import, IBM compiling, Bell tests, error correction, benchmarking, voice, shared rooms and more
+npm test           # 393 unit tests: physics, four kinds of quantum computer, gestures, spells, the course, 25 chapters, 15 lessons, puzzles, the daily challenge, achievements, builder, noise, chemistry, import, IBM compiling, Bell tests, error correction, benchmarking, voice, shared rooms and more
 npm run typecheck
 npm run build
 ```
@@ -1226,7 +1245,7 @@ course) the board shows a **certificate**, and the 2D page can save it as a PNG.
   shorter sequence exists. Solving it extends a streak, and on the 2D page the
   result comes as one line to copy and paste: "Entangled daily #25: 2 moves
   (par 2), 3 of 3 stars. Streak: 1 day."
-- **Achievements**: 40 of them, from "First move" and "Spooky action" (your
+- **Achievements**: 41 of them, from "First move" and "Spooky action" (your
   first Bell pair) to "All for one" (a five-qubit GHZ state), "Rainmaker"
   (1,000 shots), "Beyond classical" (the Bell Test), "Below threshold" (the
   surface code), "Many worlds" (watching paths cancel), "Rush hour" and "On

@@ -70,10 +70,11 @@ import { setContrast } from '../lab/contrast';
 import { cueListeners } from '../lab/feedback';
 import { CUE_CAPTIONS } from '../lab/captions';
 import { growthOf, grewSince, type Growth } from './growth';
+import { deviceFor, scaleFor, type Device } from '../quantum/scale';
 import { answerTopic, classify, describeState, explainOp, moveWords, nextMove, type Line as KetLine } from './partner';
 import { GREETING, partOfDay, planWindDown } from './today';
 import { finishSession, loadMemory, mastery, parOf as cardPar, planSession, review, saveMemory, sessionStreak, shuffledChoices, tomorrow, addDays, type MemoryState, type RecallCard } from './today';
-import { memoryFigure, type MemoryView } from '../lab/figures';
+import { memoryFigure, scaleFigure, type MemoryView } from '../lab/figures';
 import { countMoves } from './puzzles';
 import { run as runOps } from '../quantum/circuit';
 import type { QState } from '../quantum/state';
@@ -135,10 +136,10 @@ const LAB_LINES = 10;
 const LAB_KEYS = ['h', 'x', 'y', 'z', 's', 'sdg', 't', 'tdg', 'rx', 'ry', 'rz', 'cx', 'cz', 'swap', 'ccx', 'measure', 'q0', 'q1', 'q2', 'q3', 'q4', 'pi', 'pi2', 'pi4', 'mpi2', 'up', 'down', 'delete', 'clear', 'link', 'subqubit', 'addqubit', 'example', 'fromorbs'];
 const TABS = ['course', 'campaign', 'learn', 'puzzle', 'build', 'sandbox', 'play'] as const;
 /** The Play tab: arcade and showcase picks. */
-type GameId = 'dice' | 'penny' | 'cat' | 'spy' | 'decoder' | 'grover' | 'teleport' | 'ttt' | 'slit' | 'sg' | 'bomb' | 'today';
+type GameId = 'dice' | 'penny' | 'cat' | 'spy' | 'decoder' | 'grover' | 'teleport' | 'ttt' | 'slit' | 'sg' | 'bomb' | 'today' | 'super';
 
-const PLAY = ['Today', 'Wind down', 'Code lab', 'First five minutes', 'Daily quests', 'Quantum Rush', 'Zen Rush', 'Rush versus', 'Class challenge', 'Daily', 'Spy game', 'Be the decoder', 'Grover maze', 'Teleporter', 'Quantum tic-tac-toe', 'Double slit', 'Stern-Gerlach', 'Bomb tester', 'Shor in 3D', 'System Two', 'Photonic chip', 'Surface Code', 'Many worlds', 'Quantum dice', 'Penny flip', 'Schrodinger cat', 'State album', 'Giant sphere', 'Inside a qubit', 'Night sky', 'History', 'Ambient music'] as const;
-const PLAY_TAGS = ['5 min', 'calm', 'qasm', 'tour', '3/day', '60s', 'zen', 'vs', 'class', 'day', 'BB84', 'd=3', '8', 'tp', 'X O', '2 slit', 'Ag', 'EV', '15', '3x', 'light',  '49q', 'H H', 'd8', 'coin', 'box', '15', '1 m', 'JJ', 'sky', '1981', 'hum'];
+const PLAY = ['Today', 'Wind down', 'Code lab', 'First five minutes', 'Supercomputer', 'Daily quests', 'Quantum Rush', 'Zen Rush', 'Rush versus', 'Class challenge', 'Daily', 'Spy game', 'Be the decoder', 'Grover maze', 'Teleporter', 'Quantum tic-tac-toe', 'Double slit', 'Stern-Gerlach', 'Bomb tester', 'Shor in 3D', 'System Two', 'Photonic chip', 'Surface Code', 'Many worlds', 'Quantum dice', 'Penny flip', 'Schrodinger cat', 'State album', 'Giant sphere', 'Inside a qubit', 'Night sky', 'History', 'Ambient music'] as const;
+const PLAY_TAGS = ['5 min', 'calm', 'qasm', 'tour', '2^n', '3/day', '60s', 'zen', 'vs', 'class', 'day', 'BB84', 'd=3', '8', 'tp', 'X O', '2 slit', 'Ag', 'EV', '15', '3x', 'light',  '49q', 'H H', 'd8', 'coin', 'box', '15', '1 m', 'JJ', 'sky', '1981', 'hum'];
 
 /** The settings panel's tiles, in order. */
 const SETTING_KEYS = ['desk', 'pin', 'wall', 'fov', 'look', 'dwell', 'contrast', 'motion', 'captions', 'wrist', 'partner', 'speak'] as const;
@@ -267,6 +268,8 @@ export class UISystem extends createSystem({
   private todayEnd = 0;
   private todayDone = false;
   private todayCardTimer = 0;
+  /** The exponential wall: how many qubits are on the table. */
+  private superN = 2;
   /** This session is the evening wind-down: known ideas only, night sky, soft music, no clock. */
   private todayWind = false;
   /** The night sky and music as they were before winding down. */
@@ -512,12 +515,14 @@ export class UISystem extends createSystem({
       if (this.rush) return this.skipRush();
       if (this.rushOver) return this.versusSeed !== null ? this.raceButton(this.room?.kind ?? 'lab') : this.startRush(this.rushZen);
       if (this.game) return this.gameNext();
+      // the welcome tour's finale: why a few qubits matter
+      if (campaign.view.chapterDone && campaign.view.chapter?.chip === 'Tour') return this.startPlay(PLAY.indexOf('Supercomputer'));
       if (campaign.mode === 'sandbox') {
         if (lab.n < MAX_ORBS) lab.reset(lab.n + 1);
       } else campaign.next();
       feedback('select');
     });
-    for (let i = 0; i < 3; i++) on(`choice-${i}`, () => (this.game === 'today' ? this.todayPick(i) : this.game === 'spy' ? this.spyAnswer(i) : this.game === 'ttt' || this.game === 'slit' || this.game === 'sg' || this.game === 'bomb' ? this.modeChoice(i) : feedback(campaign.answer(i) ? 'success' : 'reject')));
+    for (let i = 0; i < 3; i++) on(`choice-${i}`, () => (this.game === 'super' ? this.superSet([this.superN + 10, 50, 2][i]) : this.game === 'today' ? this.todayPick(i) : this.game === 'spy' ? this.spyAnswer(i) : this.game === 'ttt' || this.game === 'slit' || this.game === 'sg' || this.game === 'bomb' ? this.modeChoice(i) : feedback(campaign.answer(i) ? 'success' : 'reject')));
     on('btn-replay', () => {
       if (this.rush || this.rushOver || this.racePending) return this.endRush(true);
       if (this.game) return this.endGame(true);
@@ -1130,7 +1135,7 @@ export class UISystem extends createSystem({
       pip.setProperties({ display: 'flex', backgroundColor: done ? C.done : i === v.stepIndex ? C.current : C.todo });
     }
     // a step that needs a card button (Oracle, Storm ...) turns Continue into that button
-    this.text('btn-next-label', v.action ?? (listed ? 'Next' : 'Continue'));
+    this.text('btn-next-label', v.action ?? (v.chapterDone && ch.chip === 'Tour' ? 'Why it matters' : listed ? 'Next' : 'Continue'));
     this.text('btn-replay-label', course && step?.solve && !v.stepDone && !v.chapterDone ? 'Show me' : listed ? 'Retry' : 'Replay');
     this.bg('btn-next', v.action || v.chapterDone || v.stepDone ? C.primary : C.primaryIdle);
     if (v.action) this.text('goal-text', (v.goal ?? '') + (this.immersive ? `: tap ${v.action}` : '  (press Enter)'));
@@ -1613,6 +1618,11 @@ export class UISystem extends createSystem({
     const lsys = this.world.getSystem(LabSystem);
     this.quest('wonder');
     if (item === 'Code lab') return this.labOpen ? this.closeCodeLab() : this.openCodeLab(false);
+    if (item === 'Supercomputer') {
+      this.endRush(false);
+      this.endGame(false);
+      return this.startGame('super');
+    }
     if (item === 'Today' || item === 'Wind down') {
       this.endRush(false);
       this.endGame(false);
@@ -1822,6 +1832,14 @@ export class UISystem extends createSystem({
     } else if (g === 'today') {
       this.game = g;
       this.todayBegin();
+    } else if (g === 'super') {
+      campaign.enterSandbox(1, []);
+      this.game = g;
+      this.superN = 2;
+      const ls = this.world.getSystem(LabSystem);
+      if (ls) ls.orbsHidden = true;
+      ls?.showScale(scaleFor(2));
+      this.ketSay({ text: 'Two qubits hold four numbers. Add qubits and watch what an ordinary computer would need to keep up.', point: null }, true);
     } else {
       campaign.enterSandbox(3, []);
       this.groverNew();
@@ -1843,6 +1861,7 @@ export class UISystem extends createSystem({
       for (const r of [ls.ttt.root, ls.slits.root, ls.sg.root, ls.bombs.root]) r.visible = false;
       ls.orbsHidden = false;
       if (this.slitWall) ls.useWall(false);
+      ls.showScale(null);
     }
     this.slitWall = false;
     if (this.windBefore) {
@@ -1866,6 +1885,7 @@ export class UISystem extends createSystem({
     if (this.game === 'teleport') return this.teleportNext();
     if (this.game === 'ttt' || this.game === 'slit' || this.game === 'sg' || this.game === 'bomb') return this.modeNext();
     if (this.game === 'today') return this.todayNext();
+    if (this.game === 'super') return this.superSet(this.superN + 1);
     if (this.game === 'dice') {
       // three Hadamards and three measurements: a fair number from 1 to 8
       lab.reset(3);
@@ -1938,6 +1958,7 @@ export class UISystem extends createSystem({
   private renderGameCard(): void {
     for (let i = 0; i < 5; i++) this.els.get(`pip-${i}`)?.setProperties({ display: 'none' });
     if (this.game === 'today') return this.renderTodayCard();
+    if (this.game === 'super') return this.renderSuperCard();
     if (this.game === 'ttt' || this.game === 'slit' || this.game === 'sg' || this.game === 'bomb') return this.renderModeCard();
     const asking = this.game === 'spy' && this.spyPhase === 'guess';
     this.els.get('choices')?.setProperties({ display: asking ? 'flex' : 'none' });
@@ -2159,6 +2180,10 @@ export class UISystem extends createSystem({
   /** The board's figure for the mode (redrawn at most five times a second while particles stream). */
   private modeFigure(): Figure | null {
     if (this.game === 'today') return memoryFigure(this.todayView());
+    if (this.game === 'super') {
+      const sc = scaleFor(this.superN);
+      return scaleFigure({ n: sc.n, amplitudes: sc.amplitudes, bytes: sc.bytes, note: sc.note });
+    }
     const now = this.clockNow();
     const stamp = `${this.game}`;
     if (this.modeFig && this.modeFig.key === stamp && now - this.modeFig.at < 0.2 && (this.game === 'slit' || this.game === 'sg')) return this.modeFig.fig;
@@ -2380,6 +2405,44 @@ export class UISystem extends createSystem({
     this.text('chapter-body', body);
     this.text('goal-text', goal);
     this.modeChoices(choices, active);
+  }
+
+  // ---- the exponential wall
+
+  private superSet(n: number): void {
+    const before = deviceFor(this.superN);
+    this.superN = Math.max(1, Math.min(60, n));
+    const sc = scaleFor(this.superN);
+    this.world.getSystem(LabSystem)?.showScale(sc);
+    if (sc.device !== before) {
+      const lines: Record<Device, string> = {
+        phone: 'Still small: a phone could store every number.',
+        laptop: 'Already a laptop full of memory, for a few dozen qubits.',
+        server: 'Now it takes a server. Each qubit doubles it again.',
+        rack: 'A whole rack of servers, just to write the state down.',
+        supercomputer: 'Now it takes a supercomputer. Look at the racks filling the room.',
+        beyond: 'Past about 49 qubits, no supercomputer has enough memory. Real quantum chips already have over 100 qubits.',
+      };
+      this.ketSay({ text: lines[sc.device], point: null }, true);
+    }
+    if (this.superN >= 50) this.use('super:50');
+    feedback('select');
+    this.renderGameCard();
+  }
+
+  private renderSuperCard(): void {
+    const sc = scaleFor(this.superN);
+    this.els.get('btn-notes')?.setProperties({ display: 'none' });
+    this.els.get('btn-lib')?.setProperties({ display: 'none' });
+    this.text('btn-replay-label', 'Done');
+    this.bg('btn-next', C.primary);
+    this.bg('goal-dot', sc.device === 'beyond' ? '#ff8a7a' : C.current);
+    this.text('chapter-eyebrow', 'Play  /  The exponential wall');
+    this.text('chapter-title', `${sc.n} qubits: ${sc.bytes}`);
+    this.text('chapter-body', `${sc.note} An ordinary computer stores one number per basis state: 2^${sc.n} of them, 16 bytes each.`);
+    this.text('goal-text', sc.n < 50 ? 'Add qubits and look around you' : 'Each qubit doubles it again');
+    this.text('btn-next-label', 'Add a qubit');
+    this.modeChoices([`+10 qubits`, 'Jump to 50', 'Back to 2']);
   }
 
   // ---- your crystal

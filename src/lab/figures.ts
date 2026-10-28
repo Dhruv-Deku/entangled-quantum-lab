@@ -1256,3 +1256,72 @@ export function memoryFigure(v: MemoryView): Figure {
     },
   };
 }
+
+// ---------------------------------------------------------------- the exponential wall
+
+export interface ScaleView {
+  n: number;
+  amplitudes: string;
+  bytes: string;
+  note: string;
+}
+
+/** Memory against qubits, on a log scale: a straight line that crosses phone, laptop, server, rack and supercomputer. */
+export function scaleFigure(v: ScaleView): Figure {
+  return {
+    key: `scale:${v.n}`,
+    draw: (g, w, h) => {
+      panel(g, w, h, 'The exponential wall', `${v.n} qubit${v.n === 1 ? '' : 's'}`);
+      const x0 = 120, y0 = 110, pw = 860, ph = 430;
+      const NMAX = 60;
+      const sx = (n: number) => x0 + (n / NMAX) * pw;
+      // log2 of bytes, from 2^4 to 2^64
+      const sy = (bits: number) => y0 + ph - ((bits - 4) / 60) * ph;
+      g.strokeStyle = GRID;
+      g.lineWidth = 2;
+      for (let n = 0; n <= NMAX; n += 10) {
+        g.beginPath();
+        g.moveTo(sx(n), y0);
+        g.lineTo(sx(n), y0 + ph);
+        g.stroke();
+        text(g, String(n), sx(n), y0 + ph + 32, DIM, '500 22px', 'center');
+      }
+      text(g, 'qubits', x0 + pw, y0 + ph + 62, DIM, '600 20px', 'right');
+      // the machines, as lines across
+      const marks: [string, number, string][] = [
+        ['a phone, 4 GB', 32, DIM],
+        ['a laptop, 64 GB', 36, DIM],
+        ['a server, 2 TB', 41, DIM],
+        ['a rack, 140 TB', 47, DIM],
+        ['the largest supercomputers, about 10 PB', Math.log2(10e15), CORAL],
+      ];
+      for (const [name, bits, color] of marks) {
+        g.strokeStyle = color === CORAL ? 'rgba(255,138,122,0.5)' : LINE;
+        g.setLineDash([8, 8]);
+        g.beginPath();
+        g.moveTo(x0, sy(bits));
+        g.lineTo(x0 + pw, sy(bits));
+        g.stroke();
+        g.setLineDash([]);
+        text(g, name, x0 + 10, sy(bits) - 10, color, '600 20px');
+      }
+      // 16 bytes per amplitude, 2^n amplitudes: a straight line
+      g.strokeStyle = BLUE;
+      g.lineWidth = 4;
+      g.beginPath();
+      g.moveTo(sx(0), sy(4));
+      g.lineTo(sx(NMAX), sy(NMAX + 4));
+      g.stroke();
+      dot(g, sx(v.n), sy(v.n + 4), 12, '#ffffff');
+      dot(g, sx(v.n), sy(v.n + 4), 7, BLUE);
+      // the numbers
+      const rx = 1040;
+      text(g, `${v.n} qubits`, rx, 150, INK, '700 44px');
+      text(g, 'amplitudes to store:', rx, 200, DIM, '600 22px');
+      for (const [i, line] of wrap(g, v.amplitudes, '700 28px', 500).entries()) text(g, line, rx, 238 + i * 34, SOFT_BLUE, '700 28px');
+      text(g, v.bytes, rx, 340, INK, '700 56px');
+      for (const [i, line] of wrap(g, v.note, '500 24px', 500).slice(0, 4).entries()) text(g, line, rx, 392 + i * 32, DIM, '500 24px');
+      text(g, 'Each qubit doubles it. A quantum chip just adds one more qubit.', 44, h - 26, DIM, '500 22px');
+    },
+  };
+}
