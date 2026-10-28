@@ -166,6 +166,8 @@ On a Quest on the same Wi-Fi: run `npx @iwsdk/cli dev status`, open one of the
 `runtimeUrls.network` addresses in the Quest browser, accept the local
 certificate warning, and tap Enter XR.
 
+A first launch opens on the welcome tour: five moves to your first Bell pair.
+
 ## Part 1: Your hands are the quantum computer
 
 ### Gestures
@@ -950,9 +952,11 @@ missing, and Run points at the first one.
 - **Daily quests**: three small tasks a day, the same for everyone, picked by
   the date from a pool of twelve (apply 30 gates, make two Bell pairs, score
   1,000 in Rush, run two programs in the Code Lab ...). Each pays 15 XP.
-- **First five minutes**: a guided welcome tour, the first item on the Play tab
-  after the Code Lab (and a Learn lesson): turn a qubit, H, measure, entangle,
-  and 100 shots of your first Bell pair, with the ghost hand showing each move.
+- **First five minutes**: the welcome tour, where every first launch begins
+  (and on the Play tab and in Learn): turn a qubit, H, measure, entangle, and
+  100 shots of your first Bell pair, with the ghost hand showing each move,
+  Ket saying hello, and a Show me for every step. A short card, no wall of
+  text: the gold thread appears within the first few minutes.
 
 ### New worlds: light, teleportation, Shor and a modular machine
 

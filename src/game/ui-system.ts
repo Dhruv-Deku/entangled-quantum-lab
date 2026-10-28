@@ -348,7 +348,8 @@ export class UISystem extends createSystem({
     }
     // a share link opens its circuit in the sandbox (progress stays in the save)
     if (!this.openReplay() && !this.openShared() && !resumed) {
-      campaign.startChapter(0);
+      // first launch: the welcome tour reaches a Bell pair in five moves (turn, H, measure, entangle, shots)
+      campaign.startLesson(Math.max(0, campaign.lessons.findIndex((l) => l.chip === 'Tour')));
       campaign.intro = true;
     }
     this.openRoomLink();
@@ -1034,8 +1035,8 @@ export class UISystem extends createSystem({
     if (v.intro) {
       this.text('chapter-eyebrow', 'Welcome');
       this.text('chapter-title', 'Entangled');
-      this.text('chapter-body', 'Hold a qubit in your hand. Twenty-six chapters, from one qubit to Shor, VQE and the surface code, plus Quantum Rush. A ghost hand shows every move, and every move has a button too.');
-      this.text('goal-text', this.immersive ? 'Tap Start, or pinch the orb and turn it' : 'Press Enter, or hold an arrow key');
+      this.text('chapter-body', 'Hold a qubit in your hand. In five moves you will tie two qubits into one state. A ghost hand shows each move; every move has a button too.');
+      this.text('goal-text', this.immersive ? 'Pinch the orb and turn your wrist' : 'Press Enter, or hold an arrow key');
       this.bg('goal-dot', C.current);
       for (let i = 0; i < 5; i++) this.els.get(`pip-${i}`)?.setProperties({ display: 'none' });
       this.text('btn-next-label', 'Start');
@@ -2432,7 +2433,8 @@ export class UISystem extends createSystem({
     const now = this.clockNow();
     if (!this.ketGreeted && now > 6) {
       this.ketGreeted = true;
-      this.ketSay({ text: "Hi, I'm Ket, your lab partner. Ask me 'what just happened?' or 'what should I do?' any time.", point: null }, true);
+      const tour = campaign.view.mode === 'learn' && campaign.view.chapter?.chip === 'Tour';
+      this.ketSay(tour ? { text: "Hi, I'm Ket. That glass orb is a qubit: pinch it and turn your wrist. Ask me anything, any time.", point: 0 } : { text: "Hi, I'm Ket, your lab partner. Ask me 'what just happened?' or 'what should I do?' any time.", point: null }, true);
       return;
     }
     const idle = now - this.ketOpAt;

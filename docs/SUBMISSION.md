@@ -149,8 +149,11 @@ loop matters more than another hour of content.
 1. Open the link in the Meta Quest Browser and tap **Enter AR**. Allow hand
    tracking, and allow spatial data if asked (it lets the lab find your
    table and wall).
-2. Sit at a table. The lab appears on it (or floating in front of you).
-3. Pinch an orb, turn your wrist, touch two orbs together, make a fist.
+2. Sit at a table. The lab appears on it (or floating in front of you), and
+   the welcome tour starts: five moves to your first Bell pair, with a ghost
+   hand showing each one and Ket, the lab partner, saying hello.
+3. Pinch an orb, turn your wrist, touch two orbs together, make a fist. Ask
+   Ket "what just happened?" at any point.
 4. **Play tab, first item: Today.** A complete five-minute session.
 5. **Play tab: Double slit, then My wall** to send photons to your wall.
 6. **Settings** (nav panel footer): Pin the lab, Look to select, High contrast,
