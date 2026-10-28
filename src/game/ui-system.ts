@@ -71,6 +71,7 @@ import { cueListeners } from '../lab/feedback';
 import { CUE_CAPTIONS } from '../lab/captions';
 import { growthOf, grewSince, type Growth } from './growth';
 import { answerTopic, classify, describeState, explainOp, moveWords, nextMove, type Line as KetLine } from './partner';
+import { GREETING, partOfDay, planWindDown } from './today';
 import { finishSession, loadMemory, mastery, parOf as cardPar, planSession, review, saveMemory, sessionStreak, shuffledChoices, tomorrow, addDays, type MemoryState, type RecallCard } from './today';
 import { memoryFigure, type MemoryView } from '../lab/figures';
 import { countMoves } from './puzzles';
@@ -136,8 +137,8 @@ const TABS = ['course', 'campaign', 'learn', 'puzzle', 'build', 'sandbox', 'play
 /** The Play tab: arcade and showcase picks. */
 type GameId = 'dice' | 'penny' | 'cat' | 'spy' | 'decoder' | 'grover' | 'teleport' | 'ttt' | 'slit' | 'sg' | 'bomb' | 'today';
 
-const PLAY = ['Today', 'Code lab', 'First five minutes', 'Daily quests', 'Quantum Rush', 'Zen Rush', 'Rush versus', 'Class challenge', 'Daily', 'Spy game', 'Be the decoder', 'Grover maze', 'Teleporter', 'Quantum tic-tac-toe', 'Double slit', 'Stern-Gerlach', 'Bomb tester', 'Shor in 3D', 'System Two', 'Photonic chip', 'Surface Code', 'Many worlds', 'Quantum dice', 'Penny flip', 'Schrodinger cat', 'State album', 'Giant sphere', 'Inside a qubit', 'Night sky', 'History', 'Ambient music'] as const;
-const PLAY_TAGS = ['5 min', 'qasm', 'tour', '3/day', '60s', 'zen', 'vs', 'class', 'day', 'BB84', 'd=3', '8', 'tp', 'X O', '2 slit', 'Ag', 'EV', '15', '3x', 'light',  '49q', 'H H', 'd8', 'coin', 'box', '15', '1 m', 'JJ', 'sky', '1981', 'hum'];
+const PLAY = ['Today', 'Wind down', 'Code lab', 'First five minutes', 'Daily quests', 'Quantum Rush', 'Zen Rush', 'Rush versus', 'Class challenge', 'Daily', 'Spy game', 'Be the decoder', 'Grover maze', 'Teleporter', 'Quantum tic-tac-toe', 'Double slit', 'Stern-Gerlach', 'Bomb tester', 'Shor in 3D', 'System Two', 'Photonic chip', 'Surface Code', 'Many worlds', 'Quantum dice', 'Penny flip', 'Schrodinger cat', 'State album', 'Giant sphere', 'Inside a qubit', 'Night sky', 'History', 'Ambient music'] as const;
+const PLAY_TAGS = ['5 min', 'calm', 'qasm', 'tour', '3/day', '60s', 'zen', 'vs', 'class', 'day', 'BB84', 'd=3', '8', 'tp', 'X O', '2 slit', 'Ag', 'EV', '15', '3x', 'light',  '49q', 'H H', 'd8', 'coin', 'box', '15', '1 m', 'JJ', 'sky', '1981', 'hum'];
 
 /** The settings panel's tiles, in order. */
 const SETTING_KEYS = ['desk', 'pin', 'wall', 'fov', 'look', 'dwell', 'contrast', 'motion', 'captions', 'wrist', 'partner', 'speak'] as const;
@@ -266,6 +267,10 @@ export class UISystem extends createSystem({
   private todayEnd = 0;
   private todayDone = false;
   private todayCardTimer = 0;
+  /** This session is the evening wind-down: known ideas only, night sky, soft music, no clock. */
+  private todayWind = false;
+  /** The night sky and music as they were before winding down. */
+  private windBefore: { night: boolean; music: boolean } | null = null;
   /** Ket used a hint on this Today card (it then comes back tomorrow). */
   private todayHinted = false;
   /** Ket: when it last spoke, the last step it could explain, and how long since you last did something. */
@@ -824,7 +829,9 @@ export class UISystem extends createSystem({
     // a returning player: today's cards are waiting
     const today = dayKey();
     const waiting = planSession(this.memory, today).length;
-    if (Object.keys(this.memory.sessions).length && !this.memory.sessions[today] && waiting) this.flash(`Today: ${waiting} cards waiting, about ${Math.max(2, waiting)} minutes. Play tab, first item`);
+    const part = partOfDay(new Date().getHours());
+    if (Object.keys(this.memory.sessions).length && !this.memory.sessions[today] && waiting)
+      this.flash(part === 'evening' || part === 'night' ? `${GREETING[part]}: ${waiting} cards waiting. Today, or Wind down for a calm review (Play tab)` : `${GREETING[part]}: ${waiting} cards waiting, about ${Math.max(2, waiting)} minutes. Play tab, first item`);
   }
 
   private panels(): (UIKitMLAsset | null)[] {
@@ -1606,8 +1613,10 @@ export class UISystem extends createSystem({
     const lsys = this.world.getSystem(LabSystem);
     this.quest('wonder');
     if (item === 'Code lab') return this.labOpen ? this.closeCodeLab() : this.openCodeLab(false);
-    if (item === 'Today') {
+    if (item === 'Today' || item === 'Wind down') {
       this.endRush(false);
+      this.endGame(false);
+      this.todayWind = item === 'Wind down';
       return this.startGame('today');
     }
     if (item === 'First five minutes') {
@@ -1836,6 +1845,13 @@ export class UISystem extends createSystem({
       if (this.slitWall) ls.useWall(false);
     }
     this.slitWall = false;
+    if (this.windBefore) {
+      this.nightOn = this.windBefore.night;
+      ls?.setNight(this.nightOn);
+      if (!this.windBefore.music && this.ambient.on) this.ambient.stop();
+      this.windBefore = null;
+    }
+    this.todayWind = false;
     this.slitStream = this.sgStream = false;
     ls?.showSurfacePuzzle(null);
     if (render) this.render(campaign.view);
@@ -2515,7 +2531,14 @@ export class UISystem extends createSystem({
 
   private todayBegin(): void {
     this.crystalAtStart = growthOf(this.memory, dayKey());
-    this.todayPlan = planSession(this.memory, dayKey());
+    this.todayPlan = this.todayWind ? planWindDown(this.memory, dayKey()) : planSession(this.memory, dayKey());
+    if (this.todayWind && !this.windBefore) {
+      // the room goes dark and quiet: stars overhead, the state as soft music
+      this.windBefore = { night: this.nightOn, music: this.ambient.on };
+      this.nightOn = true;
+      this.world.getSystem(LabSystem)?.setNight(true);
+      if (!this.ambient.on) this.ambient.start();
+    }
     this.todayIdx = 0;
     this.todayResults = [];
     this.todayDone = false;
@@ -2592,14 +2615,19 @@ export class UISystem extends createSystem({
     if (this.crystalAtStart && this.crystalShown) {
       const grew = grewSince(this.crystalAtStart, this.crystalShown);
       const parts = [grew.fresh.length ? `${grew.fresh.length} new shard${grew.fresh.length === 1 ? '' : 's'}` : '', grew.rose.length ? `${grew.rose.length} grew taller` : ''].filter(Boolean);
-      this.ketSay({ text: `Your crystal is awake: ${parts.length ? `${parts.join(', ')}, and ` : ''}a new ring for today. Come back tomorrow and it grows again.`, point: null }, true);
+      this.ketSay(
+        this.todayWind
+          ? { text: 'Rest well. Sleep is when memories settle: these ideas will be firmer tomorrow. Your crystal has a new ring.', point: null }
+          : { text: `Your crystal is awake: ${parts.length ? `${parts.join(', ')}, and ` : ''}a new ring for today. Come back tomorrow and it grows again.`, point: null },
+        true,
+      );
     }
     if (streak >= 3) this.use('today:streak3');
     if (mastery(this.memory).solid >= 10) this.use('today:solid10');
     this.use('today');
     this.quest('puzzle');
     this.profileDirty = true;
-    this.banner.show('Done for today', `${right} of ${this.todayPlan.length} right first time`, streak > 1 ? `${streak} days in a row` : 'Day one of your streak');
+    this.banner.show(this.todayWind ? 'Rest well' : 'Done for today', `${right} of ${this.todayPlan.length} right first time`, streak > 1 ? `${streak} days in a row` : 'Day one of your streak');
     this.world.getSystem(LabSystem)?.celebrate(right === this.todayPlan.length);
     campaign.enterSandbox(1, []);
     this.renderGameCard();
@@ -2628,6 +2656,7 @@ export class UISystem extends createSystem({
       session: this.todayPlan.map((c, i) => ({ topic: c.topic, kind: c.kind, status: this.todayResults[i] ?? (!this.todayDone && i === this.todayIdx ? 'now' : 'next') })),
       tomorrow: tomorrow(this.memory, today),
       week: Array.from({ length: 7 }, (_, i) => !!this.memory.sessions[addDays(today, i - 6)]),
+      title: this.todayWind ? 'Wind down  /  a calm review, nothing new' : undefined,
     };
   }
 
@@ -2650,8 +2679,8 @@ export class UISystem extends createSystem({
       const right = this.todayResults.filter((r) => r === 'right').length;
       const streak = sessionStreak(this.memory, today);
       const t = tomorrow(this.memory, today);
-      this.text('chapter-eyebrow', `Today  /  done in ${clock}`);
-      this.text('chapter-title', 'Done for today');
+      this.text('chapter-eyebrow', this.todayWind ? 'Wind down  /  done' : `Today  /  done in ${clock}`);
+      this.text('chapter-title', this.todayWind ? 'Rest well' : 'Done for today');
       this.text('chapter-body', `${right} of ${this.todayPlan.length} right first time. ${streak > 1 ? `${streak} days in a row.` : 'Day one of your streak.'} Tomorrow ${t.due} card${t.due === 1 ? '' : 's'} come${t.due === 1 ? 's' : ''} back${t.fresh ? `, with ${t.fresh} new idea${t.fresh === 1 ? '' : 's'}` : ''}.`);
       this.text('goal-text', 'See you tomorrow');
       this.bg('goal-dot', C.done);
@@ -2659,7 +2688,8 @@ export class UISystem extends createSystem({
       return this.modeChoices([]);
     }
     const n = this.todayPlan.length;
-    this.text('chapter-eyebrow', `Today  /  card ${this.todayIdx + 1} of ${n}  /  ${card.topic}  /  ${clock}`);
+    const hello = this.todayIdx === 0 && !this.todayAnswer ? `${GREETING[partOfDay(new Date().getHours())]}  /  ` : '';
+    this.text('chapter-eyebrow', this.todayWind ? `Wind down  /  ${card.topic}  /  ${this.todayIdx + 1} of ${n}` : `${hello}Today  /  card ${this.todayIdx + 1} of ${n}  /  ${card.topic}  /  ${clock}`);
     this.text('chapter-title', card.prompt);
     const a = this.todayAnswer;
     const box = this.memory.cards[card.id]?.box ?? 1;

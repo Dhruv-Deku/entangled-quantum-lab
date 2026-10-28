@@ -1194,14 +1194,16 @@ export interface MemoryView {
   tomorrow: { due: number; fresh: number };
   /** The last seven days, oldest first: was there a session? */
   week: boolean[];
+  /** The board's heading (default: Today). */
+  title?: string;
 }
 
 /** Today's cards, your quantum memory box by box, this week, and what tomorrow brings. */
 export function memoryFigure(v: MemoryView): Figure {
   return {
-    key: `memory:${v.streak}:${v.boxes.join(',')}:${v.session.map((s) => s.status[0]).join('')}:${v.tomorrow.due}/${v.tomorrow.fresh}:${v.week.map(Number).join('')}`,
+    key: `memory:${v.title ?? ''}:${v.streak}:${v.boxes.join(',')}:${v.session.map((s) => s.status[0]).join('')}:${v.tomorrow.due}/${v.tomorrow.fresh}:${v.week.map(Number).join('')}`,
     draw: (g, w, h) => {
-      panel(g, w, h, 'Today  /  five minutes', v.streak ? `${v.streak} day${v.streak === 1 ? '' : 's'} in a row` : 'Day one');
+      panel(g, w, h, v.title ?? 'Today  /  five minutes', v.streak ? `${v.streak} day${v.streak === 1 ? '' : 's'} in a row` : 'Day one');
       // today's cards
       text(g, "Today's cards", 44, 122, DIM, '600 24px');
       v.session.forEach((c, i) => {

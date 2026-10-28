@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { run } from '../quantum/circuit';
-import { addDays, DECK, emptyMemory, finishSession, mastery, parseMemory, planSession, review, sessionStreak, SESSION_SIZE, shuffledChoices, tomorrow, type MemoryState } from './today';
+import { addDays, DECK, emptyMemory, finishSession, mastery, parseMemory, partOfDay, planSession, planWindDown, review, sessionStreak, SESSION_SIZE, shuffledChoices, tomorrow, type MemoryState } from './today';
 
 const day = '2026-11-02';
 
@@ -86,5 +86,30 @@ describe('Today: five minutes of spaced repetition', () => {
     expect(st.cards.plus.box).toBe(5);
     expect(st.cards.bad).toBeUndefined();
     expect(Object.keys(st.sessions)).toEqual(['2026-11-02']);
+  });
+});
+
+describe('the time of day, and winding down', () => {
+  it('knows the part of the day', () => {
+    expect(partOfDay(7)).toBe('morning');
+    expect(partOfDay(14)).toBe('day');
+    expect(partOfDay(20)).toBe('evening');
+    expect(partOfDay(23)).toBe('night');
+    expect(partOfDay(3)).toBe('night');
+  });
+
+  it('winds down with ideas you already know: due first, never new, at most four', () => {
+    let st = emptyMemory();
+    for (const c of planSession(st, day)) st = review(st, c.id, true, day);
+    const next = addDays(day, 1);
+    const wd = planWindDown(st, next);
+    expect(wd.map((c) => c.id).sort()).toEqual(['measure-plus', 'one', 'plus']);
+    expect(wd.every((c) => st.cards[c.id])).toBe(true);
+    // nothing due: the least certain ones, three of them
+    const calm = planWindDown(st, day);
+    expect(calm.length).toBe(3);
+    expect(calm.every((c) => st.cards[c.id])).toBe(true);
+    // a first-ever session starts as usual
+    expect(planWindDown(emptyMemory(), day).map((c) => c.id)).toEqual(['plus', 'measure-plus', 'one']);
   });
 });

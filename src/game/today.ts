@@ -210,3 +210,29 @@ export function saveMemory(st: MemoryState): void {
     // storage full or private mode: today's progress lasts this session
   }
 }
+
+// ---------------------------------------------------------------- the time of day
+
+export type PartOfDay = 'morning' | 'day' | 'evening' | 'night';
+
+export function partOfDay(hour: number): PartOfDay {
+  if (hour >= 5 && hour < 12) return 'morning';
+  if (hour >= 12 && hour < 18) return 'day';
+  if (hour >= 18 && hour < 22) return 'evening';
+  return 'night';
+}
+
+export const GREETING: Record<PartOfDay, string> = { morning: 'Good morning', day: 'Good afternoon', evening: 'Good evening', night: 'Late night' };
+
+/**
+ * Wind down: an evening review, calm and short. Only ideas you have already
+ * met (the ones due first, then the least certain), at most four, nothing
+ * new. A first-ever session falls back to the usual start.
+ */
+export function planWindDown(st: MemoryState, today: string, deck: readonly RecallCard[] = DECK): RecallCard[] {
+  const seen = deck.filter((c) => st.cards[c.id]);
+  if (!seen.length) return planSession(st, today, deck);
+  const due = dueCards(st, today, deck);
+  const rest = seen.filter((c) => !due.includes(c)).sort((a, b) => st.cards[a.id].box - st.cards[b.id].box || st.cards[a.id].due.localeCompare(st.cards[b.id].due));
+  return [...due, ...rest].slice(0, due.length ? 4 : 3);
+}

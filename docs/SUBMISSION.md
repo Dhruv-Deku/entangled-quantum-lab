@@ -34,6 +34,9 @@ between them), make a fist to measure, spread your fingers to fire 100 shots.
 Every gesture is a real quantum gate on a real simulated state, and the code
 for it (Qiskit, OpenQASM, PennyLane) writes itself beside you.
 
+- **Wind down:** an evening variant, a calm review of known ideas under the
+  night sky with soft music and no clock; Today greets you by the time of
+  day. Habits tied to the moment: the commute and bedtime.
 - **Your crystal:** a glass crystal on your desk grows a shard for every
   idea you learn and a ring for every day you come; it waits grey until
   today's five minutes are done. Growth you can see between sessions.
@@ -45,7 +48,7 @@ for it (Qiskit, OpenQASM, PennyLane) writes itself beside you.
 - **Learn:** 26 chapters (superposition to the surface code), 21 lessons, a
   course with quizzes, puzzles with par, a daily challenge the same for
   everyone, and a Code Lab where you write OpenQASM 3 on the panel.
-- **Play:** 31 items, including quantum tic-tac-toe on a tappable 3D board,
+- **Play:** 32 items, including quantum tic-tac-toe on a tappable 3D board,
   the double slit, Stern-Gerlach, the Elitzur-Vaidman bomb tester, a spy game
   (BB84), a Grover maze, teleportation booths and Quantum Rush.
 - **Real hardware:** the dilution refrigerator, a trapped-ion chamber, a

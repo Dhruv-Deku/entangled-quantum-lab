@@ -79,8 +79,8 @@ the Meta Immersive Web SDK (IWSDK), three.js and TypeScript.
 
 **By the numbers:** 26 chapters, a 14-module course, 21 lessons, 12 puzzles, a
 daily challenge and Quantum Rush, a Play tab, 5 big-state views, 4 kinds of quantum computer
-in 3D at full size, a 49-qubit surface code, 40 achievements, 5 orb finishes, 31 Play tab items, Today (five minutes of spaced repetition) and your crystal that grows with it, Ket the lab partner, the lab on your real table, the double slit on your wall, look to select, a compact field-of-view layout, quantum tic-tac-toe, the double slit, Stern-Gerlach and the bomb tester, daily quests,
-voice control, shared labs and classes, and 387 unit tests.
+in 3D at full size, a 49-qubit surface code, 40 achievements, 5 orb finishes, 32 Play tab items, Today (five minutes of spaced repetition) and your crystal that grows with it, Ket the lab partner, the lab on your real table, the double slit on your wall, look to select, a compact field-of-view layout, quantum tic-tac-toe, the double slit, Stern-Gerlach and the bomb tester, daily quests,
+voice control, shared labs and classes, and 389 unit tests.
 
 ## Your room, every day, and everyone
 
@@ -100,6 +100,15 @@ voice control, shared labs and classes, and 387 unit tests.
   brings it back tomorrow. The board shows today's cards, your quantum memory
   box by box, this week and what tomorrow brings. 24 cards, from the plus
   state to Stern-Gerlach; `src/game/today.ts`, tested over a simulated month.
+- **Wind down**, for the evening (second on the Play tab, or say "wind
+  down"): a calm review of ideas you already know, nothing new, at most four
+  cards, under the night sky with the state playing as soft music and no
+  clock. Today greets you by the time of day, and a returning player in the
+  evening is offered either. Morning commute or bedtime: a habit tied to the
+  moment, as the Productivity track asks.
+
+  ![Wind down: the room gone to a starry night, the card reading Wind down, Superposition, 1 of 3, make all four outcomes equally likely on two qubits, the board titled Wind down, a calm review, nothing new, and the crystal waiting](docs/screenshots/wind-down.png)
+
 - **Your crystal.** A glass crystal on the desk grows with Today: a shard
   for every idea you have met, taller the better you know it (gold for
   entanglement, violet for phase, blue for superposition), and a ring around
@@ -170,7 +179,7 @@ voice control, shared labs and classes, and 387 unit tests.
 ```sh
 npm install
 npm run dev        # managed browser with the Quest 3 emulator (IWER)
-npm test           # 387 unit tests: physics, four kinds of quantum computer, gestures, spells, the course, 25 chapters, 15 lessons, puzzles, the daily challenge, achievements, builder, noise, chemistry, import, IBM compiling, Bell tests, error correction, benchmarking, voice, shared rooms and more
+npm test           # 389 unit tests: physics, four kinds of quantum computer, gestures, spells, the course, 25 chapters, 15 lessons, puzzles, the daily challenge, achievements, builder, noise, chemistry, import, IBM compiling, Bell tests, error correction, benchmarking, voice, shared rooms and more
 npm run typecheck
 npm run build
 ```
