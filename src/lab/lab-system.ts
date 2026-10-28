@@ -27,6 +27,7 @@ import { CaptionStrip } from './captions';
 import { PartnerVisual } from './partner-3d';
 import { CrystalVisual } from './crystal-3d';
 import { ScaleVisual } from './scale-3d';
+import { QmlVisual } from './qml-3d';
 import type { Scale } from '../quantum/scale';
 import { LookSelectSystem } from './look-select';
 import { horizontalFov, saveSettings, settings } from '../game/settings';
@@ -198,6 +199,8 @@ export class LabSystem extends createSystem({
   crystal!: CrystalVisual;
   /** The exponential wall: the classical memory n qubits would need. */
   private scaleView!: ScaleVisual;
+  /** Quantum AI: the network's landscape and its training points. */
+  qml!: QmlVisual;
   private night = false;
   private trophies!: TrophyShelf;
   /** The Surface Code chapter's lattice, floating between the orb and the board. */
@@ -375,6 +378,10 @@ export class LabSystem extends createSystem({
     for (const r of [this.slits.root, this.sg.root, this.bombs.root]) useStudio(r, env, 0.8);
     this.wallScreen = new WallScreen();
     this.scene.add(this.wallScreen.root);
+    this.qml = new QmlVisual();
+    this.qml.root.position.set(0, 0.12, -0.06);
+    ws.add(this.qml.root);
+    useStudio(this.qml.root, env, 0.7);
     this.scaleView = new ScaleVisual();
     ws.add(this.scaleView.root);
     useStudio(this.scaleView.root, env, 0.8);
@@ -921,6 +928,7 @@ export class LabSystem extends createSystem({
     setListener({ x: hm[12], y: hm[13], z: hm[14] }, { x: -hm[8], y: -hm[9], z: -hm[10] }, { x: hm[4], y: hm[5], z: hm[6] });
     const sel = this.orbs[lab.selected];
     setSoundSource(sel && !this.orbsHidden ? sel.entity.object3D!.getWorldPosition(this.vb) : null);
+    if (this.qml.root.visible) this.qml.update(dt);
     if (this.scaleView.root.visible) {
       this.player.head.updateWorldMatrix(true, false);
       this.scaleView.update(dt, this.va.setFromMatrixPosition(this.player.head.matrixWorld));

@@ -71,10 +71,12 @@ import { cueListeners } from '../lab/feedback';
 import { CUE_CAPTIONS } from '../lab/captions';
 import { growthOf, grewSince, type Growth } from './growth';
 import { deviceFor, scaleFor, type Device } from '../quantum/scale';
+import { accuracy as qmlAccuracy, field as qmlField, initialWeights, loss as qmlLoss, predict as qmlPredict, trainStep, xorData, type Point as QmlPoint } from '../quantum/qml';
+import { FIELD_N } from '../lab/qml-3d';
 import { answerTopic, classify, describeState, explainOp, moveWords, nextMove, type Line as KetLine } from './partner';
 import { GREETING, partOfDay, planWindDown } from './today';
 import { finishSession, loadMemory, mastery, parOf as cardPar, planSession, review, saveMemory, sessionStreak, shuffledChoices, tomorrow, addDays, type MemoryState, type RecallCard } from './today';
-import { memoryFigure, scaleFigure, type MemoryView } from '../lab/figures';
+import { memoryFigure, qmlFigure, scaleFigure, type MemoryView } from '../lab/figures';
 import { countMoves } from './puzzles';
 import { run as runOps } from '../quantum/circuit';
 import type { QState } from '../quantum/state';
@@ -136,10 +138,10 @@ const LAB_LINES = 10;
 const LAB_KEYS = ['h', 'x', 'y', 'z', 's', 'sdg', 't', 'tdg', 'rx', 'ry', 'rz', 'cx', 'cz', 'swap', 'ccx', 'measure', 'q0', 'q1', 'q2', 'q3', 'q4', 'pi', 'pi2', 'pi4', 'mpi2', 'up', 'down', 'delete', 'clear', 'link', 'subqubit', 'addqubit', 'example', 'fromorbs'];
 const TABS = ['course', 'campaign', 'learn', 'puzzle', 'build', 'sandbox', 'play'] as const;
 /** The Play tab: arcade and showcase picks. */
-type GameId = 'dice' | 'penny' | 'cat' | 'spy' | 'decoder' | 'grover' | 'teleport' | 'ttt' | 'slit' | 'sg' | 'bomb' | 'today' | 'super';
+type GameId = 'dice' | 'penny' | 'cat' | 'spy' | 'decoder' | 'grover' | 'teleport' | 'ttt' | 'slit' | 'sg' | 'bomb' | 'today' | 'super' | 'qml';
 
-const PLAY = ['Today', 'Wind down', 'Code lab', 'First five minutes', 'Supercomputer', 'Daily quests', 'Quantum Rush', 'Zen Rush', 'Rush versus', 'Class challenge', 'Daily', 'Spy game', 'Be the decoder', 'Grover maze', 'Teleporter', 'Quantum tic-tac-toe', 'Double slit', 'Stern-Gerlach', 'Bomb tester', 'Shor in 3D', 'System Two', 'Photonic chip', 'Surface Code', 'Many worlds', 'Quantum dice', 'Penny flip', 'Schrodinger cat', 'State album', 'Giant sphere', 'Inside a qubit', 'Night sky', 'History', 'Ambient music'] as const;
-const PLAY_TAGS = ['5 min', 'calm', 'qasm', 'tour', '2^n', '3/day', '60s', 'zen', 'vs', 'class', 'day', 'BB84', 'd=3', '8', 'tp', 'X O', '2 slit', 'Ag', 'EV', '15', '3x', 'light',  '49q', 'H H', 'd8', 'coin', 'box', '15', '1 m', 'JJ', 'sky', '1981', 'hum'];
+const PLAY = ['Today', 'Wind down', 'Code lab', 'First five minutes', 'Supercomputer', 'Quantum AI', 'Daily quests', 'Quantum Rush', 'Zen Rush', 'Rush versus', 'Class challenge', 'Daily', 'Spy game', 'Be the decoder', 'Grover maze', 'Teleporter', 'Quantum tic-tac-toe', 'Double slit', 'Stern-Gerlach', 'Bomb tester', 'Shor in 3D', 'System Two', 'Photonic chip', 'Surface Code', 'Many worlds', 'Quantum dice', 'Penny flip', 'Schrodinger cat', 'State album', 'Giant sphere', 'Inside a qubit', 'Night sky', 'History', 'Ambient music'] as const;
+const PLAY_TAGS = ['5 min', 'calm', 'qasm', 'tour', '2^n', 'QNN', '3/day', '60s', 'zen', 'vs', 'class', 'day', 'BB84', 'd=3', '8', 'tp', 'X O', '2 slit', 'Ag', 'EV', '15', '3x', 'light',  '49q', 'H H', 'd8', 'coin', 'box', '15', '1 m', 'JJ', 'sky', '1981', 'hum'];
 
 /** The settings panel's tiles, in order. */
 const SETTING_KEYS = ['desk', 'pin', 'wall', 'fov', 'look', 'dwell', 'contrast', 'motion', 'captions', 'wrist', 'partner', 'speak'] as const;
@@ -270,6 +272,20 @@ export class UISystem extends createSystem({
   private todayCardTimer = 0;
   /** The exponential wall: how many qubits are on the table. */
   private superN = 2;
+  /** Quantum AI: the data, the weights, whether the CNOT is in, and how training went. */
+  private qmlData: QmlPoint[] = [];
+  private qmlW: number[] = [0, 0, 0];
+  private qmlEntangle = true;
+  private qmlTraining = false;
+  private qmlStep = 0;
+  private qmlAcc: number[] = [];
+  private qmlLoss: number[] = [];
+  private qmlAcc_ = 0;
+  private qmlTimer = 0;
+  private qmlSeed = 7;
+  private qmlSaid = '';
+  /** The network's answer over the grid, worked out once per step (the landscape and the board share it). */
+  private qmlFieldNow: number[] = [];
   /** This session is the evening wind-down: known ideas only, night sky, soft music, no clock. */
   private todayWind = false;
   /** The night sky and music as they were before winding down. */
@@ -522,7 +538,7 @@ export class UISystem extends createSystem({
       } else campaign.next();
       feedback('select');
     });
-    for (let i = 0; i < 3; i++) on(`choice-${i}`, () => (this.game === 'super' ? this.superSet([this.superN + 10, 50, 2][i]) : this.game === 'today' ? this.todayPick(i) : this.game === 'spy' ? this.spyAnswer(i) : this.game === 'ttt' || this.game === 'slit' || this.game === 'sg' || this.game === 'bomb' ? this.modeChoice(i) : feedback(campaign.answer(i) ? 'success' : 'reject')));
+    for (let i = 0; i < 3; i++) on(`choice-${i}`, () => (this.game === 'qml' ? this.qmlChoice(i) : this.game === 'super' ? this.superSet([this.superN + 10, 50, 2][i]) : this.game === 'today' ? this.todayPick(i) : this.game === 'spy' ? this.spyAnswer(i) : this.game === 'ttt' || this.game === 'slit' || this.game === 'sg' || this.game === 'bomb' ? this.modeChoice(i) : feedback(campaign.answer(i) ? 'success' : 'reject')));
     on('btn-replay', () => {
       if (this.rush || this.rushOver || this.racePending) return this.endRush(true);
       if (this.game) return this.endGame(true);
@@ -1618,6 +1634,11 @@ export class UISystem extends createSystem({
     const lsys = this.world.getSystem(LabSystem);
     this.quest('wonder');
     if (item === 'Code lab') return this.labOpen ? this.closeCodeLab() : this.openCodeLab(false);
+    if (item === 'Quantum AI') {
+      this.endRush(false);
+      this.endGame(false);
+      return this.startGame('qml');
+    }
     if (item === 'Supercomputer') {
       this.endRush(false);
       this.endGame(false);
@@ -1832,6 +1853,17 @@ export class UISystem extends createSystem({
     } else if (g === 'today') {
       this.game = g;
       this.todayBegin();
+    } else if (g === 'qml') {
+      campaign.enterSandbox(2, []);
+      this.game = g;
+      const ls = this.world.getSystem(LabSystem);
+      if (ls) {
+        ls.orbsHidden = true;
+        ls.qml.root.visible = true;
+      }
+      this.qmlEntangle = true;
+      this.qmlNew(true);
+      this.ketSay({ text: 'A quantum neural network: two qubits read each point, and it learns which colour goes where. Tap Train and watch the landscape.', point: null }, true);
     } else if (g === 'super') {
       campaign.enterSandbox(1, []);
       this.game = g;
@@ -1862,6 +1894,7 @@ export class UISystem extends createSystem({
       ls.orbsHidden = false;
       if (this.slitWall) ls.useWall(false);
       ls.showScale(null);
+      ls.qml.root.visible = false;
     }
     this.slitWall = false;
     if (this.windBefore) {
@@ -1886,6 +1919,11 @@ export class UISystem extends createSystem({
     if (this.game === 'ttt' || this.game === 'slit' || this.game === 'sg' || this.game === 'bomb') return this.modeNext();
     if (this.game === 'today') return this.todayNext();
     if (this.game === 'super') return this.superSet(this.superN + 1);
+    if (this.game === 'qml') {
+      this.qmlTraining = !this.qmlTraining;
+      feedback('select');
+      return this.renderGameCard();
+    }
     if (this.game === 'dice') {
       // three Hadamards and three measurements: a fair number from 1 to 8
       lab.reset(3);
@@ -1929,6 +1967,7 @@ export class UISystem extends createSystem({
     const ls = this.world.getSystem(LabSystem);
     if (this.game === 'ttt' || this.game === 'slit' || this.game === 'sg' || this.game === 'bomb') this.modeUpdate(dt);
     if (this.game === 'today') this.todayUpdate(dt);
+    if (this.game === 'qml') this.qmlUpdate(dt);
     if (this.game === 'teleport' && this.tele.phase === 'flying' && ls?.teleporter.arrived) {
       this.tele.phase = 'fix';
       this.renderGameCard();
@@ -1959,6 +1998,7 @@ export class UISystem extends createSystem({
     for (let i = 0; i < 5; i++) this.els.get(`pip-${i}`)?.setProperties({ display: 'none' });
     if (this.game === 'today') return this.renderTodayCard();
     if (this.game === 'super') return this.renderSuperCard();
+    if (this.game === 'qml') return this.renderQmlCard();
     if (this.game === 'ttt' || this.game === 'slit' || this.game === 'sg' || this.game === 'bomb') return this.renderModeCard();
     const asking = this.game === 'spy' && this.spyPhase === 'guess';
     this.els.get('choices')?.setProperties({ display: asking ? 'flex' : 'none' });
@@ -2180,6 +2220,8 @@ export class UISystem extends createSystem({
   /** The board's figure for the mode (redrawn at most five times a second while particles stream). */
   private modeFigure(): Figure | null {
     if (this.game === 'today') return memoryFigure(this.todayView());
+    if (this.game === 'qml')
+      return qmlFigure({ field: this.qmlFieldNow, n: FIELD_N, points: this.qmlData, weights: this.qmlW, entangle: this.qmlEntangle, step: this.qmlStep, acc: this.qmlAcc, loss: this.qmlLoss });
     if (this.game === 'super') {
       const sc = scaleFor(this.superN);
       return scaleFigure({ n: sc.n, amplitudes: sc.amplitudes, bytes: sc.bytes, note: sc.note });
@@ -2405,6 +2447,91 @@ export class UISystem extends createSystem({
     this.text('chapter-body', body);
     this.text('goal-text', goal);
     this.modeChoices(choices, active);
+  }
+
+  // ---- Quantum AI
+
+  /** New data (or the same data again) and fresh, untrained weights. */
+  private qmlNew(sameData: boolean): void {
+    if (!sameData || !this.qmlData.length) this.qmlSeed = (this.qmlSeed * 7919 + 13) % 100000;
+    this.qmlData = xorData(40, mulberry32(this.qmlSeed));
+    this.qmlW = initialWeights(mulberry32(this.qmlSeed + 1));
+    this.qmlStep = 0;
+    this.qmlAcc = [];
+    this.qmlLoss = [];
+    this.qmlTraining = false;
+    this.qmlSaid = '';
+    this.world.getSystem(LabSystem)?.qml.setData(this.qmlData);
+    this.qmlRefresh();
+  }
+
+  /** Measure how it does now, and show its landscape. */
+  private qmlRefresh(): void {
+    const acc = qmlAccuracy(this.qmlData, this.qmlW, this.qmlEntangle);
+    this.qmlAcc_ = acc;
+    this.qmlAcc.push(acc);
+    this.qmlLoss.push(qmlLoss(this.qmlData, this.qmlW, this.qmlEntangle));
+    if (this.qmlAcc.length > 200) {
+      this.qmlAcc.shift();
+      this.qmlLoss.shift();
+    }
+    const wrong = this.qmlData.map((p) => Math.sign(qmlPredict(p.x, p.y, this.qmlW, this.qmlEntangle)) !== p.label);
+    this.qmlFieldNow = qmlField(this.qmlW, this.qmlEntangle, FIELD_N);
+    this.world.getSystem(LabSystem)?.qml.setField(this.qmlFieldNow, wrong);
+  }
+
+  private qmlUpdate(dt: number): void {
+    if (!this.qmlTraining) return;
+    this.qmlTimer += dt;
+    if (this.qmlTimer < 0.14) return;
+    this.qmlTimer = 0;
+    // a gentle learning rate, so you can watch the landscape find its shape
+    this.qmlW = trainStep(this.qmlData, this.qmlW, this.qmlEntangle, 0.12);
+    this.qmlStep++;
+    this.qmlRefresh();
+    const acc = this.qmlAcc_;
+    if (acc >= 0.95 && this.qmlEntangle && this.qmlSaid !== 'learned') {
+      this.qmlSaid = 'learned';
+      this.qmlTraining = false;
+      this.use('qml:learned');
+      this.world.getSystem(LabSystem)?.celebrate(false);
+      this.ketSay({ text: `It learned XOR: ${Math.round(acc * 100)}% right, in ${this.qmlStep} steps. The CNOT lets the answer depend on both coordinates at once. Now turn entanglement off and train again.`, point: null }, true);
+    } else if (!this.qmlEntangle && this.qmlStep >= 50 && this.qmlSaid !== 'stuck') {
+      this.qmlSaid = 'stuck';
+      this.qmlTraining = false;
+      this.ketSay({ text: `Stuck at ${Math.round(acc * 100)}%. Without entanglement, qubit 1 only ever hears about y, and XOR needs x and y together.`, point: null }, true);
+    } else if (this.qmlStep >= 150) this.qmlTraining = false;
+    this.renderGameCard();
+  }
+
+  private qmlChoice(i: number): void {
+    if (i === 0) {
+      this.qmlEntangle = !this.qmlEntangle;
+      this.qmlNew(true);
+    } else if (i === 1) this.qmlNew(false);
+    else this.qmlNew(true);
+    feedback('select');
+    this.renderGameCard();
+  }
+
+  private renderQmlCard(): void {
+    const acc = Math.round(this.qmlAcc_ * 100);
+    this.els.get('btn-notes')?.setProperties({ display: 'none' });
+    this.els.get('btn-lib')?.setProperties({ display: 'none' });
+    this.text('btn-replay-label', 'Done');
+    this.bg('btn-next', C.primary);
+    this.bg('goal-dot', acc >= 95 ? C.done : C.current);
+    this.text('chapter-eyebrow', `Play  /  Quantum AI  /  step ${this.qmlStep}`);
+    this.text('chapter-title', this.qmlStep === 0 ? 'Teach two qubits XOR' : acc >= 95 ? `Learned: ${acc}% right` : `${acc}% right`);
+    this.text(
+      'chapter-body',
+      this.qmlEntangle
+        ? 'Each point turns two qubits (its x and its y), a CNOT entangles them, and qubit 1 answers: teal above zero, red below. Training tunes three angles by the parameter-shift rule, as on real quantum hardware.'
+        : 'The same network without the CNOT: the qubits never meet. Watch it try.',
+    );
+    this.text('goal-text', this.qmlTraining ? 'Training...' : acc >= 95 ? 'Every bead on its own side' : 'Tap Train');
+    this.text('btn-next-label', this.qmlTraining ? 'Pause' : 'Train');
+    this.modeChoices([this.qmlEntangle ? 'Entanglement: on' : 'Entanglement: off', 'New data', 'Start over'], this.qmlEntangle ? -1 : 0);
   }
 
   // ---- the exponential wall

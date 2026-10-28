@@ -109,6 +109,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'ttt', title: 'Spooky noughts', text: 'Beat the computer at quantum tic-tac-toe.', done: (s) => used(s, 'ttt:win') },
   { id: 'bomb', title: 'Without touching', text: 'Prove a bomb is live without setting it off.', done: (s) => used(s, 'bomb:safe') },
   { id: 'habit', title: 'Every day', text: 'Do your five minutes of Today three days in a row.', done: (s) => used(s, 'today:streak3') },
+  { id: 'qml', title: 'Quantum AI', text: 'Train a quantum neural network to 95% on XOR.', done: (s) => used(s, 'qml:learned') },
   { id: 'wall', title: 'The exponential wall', text: 'Add qubits until no supercomputer could hold the state.', done: (s) => used(s, 'super:50') },
   { id: 'recall', title: 'Solid ground', text: 'Get ten ideas onto solid ground in Today.', done: (s) => used(s, 'today:solid10') },
   counter('experiments', 'Experimenter', 'Run the double slit, Stern-Gerlach and the bomb tester.', (s) => ['slit', 'sg', 'bomb'].filter((m) => used(s, `exp:${m}`)).length, () => 3),

@@ -1325,3 +1325,109 @@ export function scaleFigure(v: ScaleView): Figure {
     },
   };
 }
+
+// ---------------------------------------------------------------- Quantum AI
+
+export interface QmlView {
+  /** The prediction over a square grid, row by row from y = -1. */
+  field: number[];
+  n: number;
+  points: { x: number; y: number; label: 1 | -1 }[];
+  weights: number[];
+  entangle: boolean;
+  step: number;
+  acc: number[];
+  loss: number[];
+}
+
+/** The network's map with the data, the circuit and its weights, and accuracy and loss as it trains. */
+export function qmlFigure(v: QmlView): Figure {
+  return {
+    key: `qml:${v.step}:${v.entangle}:${v.weights.map((w) => w.toFixed(3)).join(',')}:${v.points.length}`,
+    draw: (g, w, h) => {
+      const last = v.acc.length ? v.acc[v.acc.length - 1] : 0;
+      panel(g, w, h, 'Quantum AI  /  a quantum neural network', `step ${v.step}  /  ${Math.round(last * 100)}% right`);
+      // the map
+      const mx = 44, my = 96, ms = 470;
+      const cell = ms / v.n;
+      for (let j = 0; j < v.n; j++)
+        for (let i = 0; i < v.n; i++) {
+          const f = v.field[j * v.n + i];
+          const a = Math.min(1, Math.abs(f));
+          g.fillStyle = f > 0 ? `rgba(63,198,201,${0.12 + 0.6 * a})` : `rgba(255,119,89,${0.12 + 0.6 * a})`;
+          g.fillRect(mx + i * cell, my + (v.n - 1 - j) * cell, cell + 0.5, cell + 0.5);
+        }
+      g.strokeStyle = LINE;
+      g.lineWidth = 2;
+      g.strokeRect(mx, my, ms, ms);
+      for (const p of v.points) {
+        const px = mx + ((p.x + 1) / 2) * ms, py = my + ((1 - p.y) / 2) * ms;
+        dot(g, px, py, 9, '#ffffff');
+        dot(g, px, py, 6.5, p.label > 0 ? '#3fc6c9' : '#ff7759');
+      }
+      text(g, 'x', mx + ms, my + ms + 30, DIM, '600 22px', 'right');
+      text(g, 'y', mx - 22, my + 16, DIM, '600 22px');
+      // the circuit
+      const cx = 560, cy = 130;
+      text(g, 'The network', cx, cy - 10, DIM, '600 22px');
+      const wire = (y: number, name: string) => {
+        g.strokeStyle = '#4a4d54';
+        g.lineWidth = 3;
+        g.beginPath();
+        g.moveTo(cx + 50, y);
+        g.lineTo(cx + 620, y);
+        g.stroke();
+        text(g, name, cx, y + 8, INK, '700 24px');
+      };
+      wire(cy + 50, 'q0');
+      wire(cy + 130, 'q1');
+      const box = (x: number, y: number, label: string, color: string) => {
+        roundRect(g, x, y - 26, 150, 52, 12);
+        g.fillStyle = '#26282c';
+        g.fill();
+        g.strokeStyle = color;
+        g.lineWidth = 2;
+        g.stroke();
+        text(g, label, x + 75, y + 8, INK, '600 20px', 'center');
+      };
+      box(cx + 70, cy + 50, `Ry(pi x + ${v.weights[0].toFixed(2)})`, BLUE);
+      box(cx + 70, cy + 130, `Ry(pi y + ${v.weights[1].toFixed(2)})`, BLUE);
+      if (v.entangle) {
+        g.strokeStyle = GOLD;
+        g.lineWidth = 3;
+        g.beginPath();
+        g.moveTo(cx + 290, cy + 50);
+        g.lineTo(cx + 290, cy + 130);
+        g.stroke();
+        dot(g, cx + 290, cy + 50, 8, GOLD);
+        g.beginPath();
+        g.arc(cx + 290, cy + 130, 14, 0, Math.PI * 2);
+        g.stroke();
+      } else text(g, 'no CNOT', cx + 290, cy + 96, CORAL, '600 20px', 'center');
+      box(cx + 330, cy + 130, `Ry(${v.weights[2].toFixed(2)})`, BLUE);
+      text(g, '<Z>', cx + 560, cy + 138, MINT, '700 24px', 'center');
+      // the curves
+      const gx = 560, gy = 340, gw = 600, gh = 190;
+      g.strokeStyle = LINE;
+      g.lineWidth = 2;
+      g.strokeRect(gx, gy, gw, gh);
+      const plot = (vals: number[], max: number, color: string) => {
+        if (vals.length < 2) return;
+        g.strokeStyle = color;
+        g.lineWidth = 3;
+        g.beginPath();
+        vals.forEach((val, i) => {
+          const px = gx + (i / Math.max(1, vals.length - 1)) * gw, py = gy + gh - Math.min(1, val / max) * gh;
+          if (i) g.lineTo(px, py);
+          else g.moveTo(px, py);
+        });
+        g.stroke();
+      };
+      plot(v.acc, 1, MINT);
+      plot(v.loss, 2, CORAL);
+      text(g, 'accuracy', gx + 10, gy - 10, MINT, '600 20px');
+      text(g, 'loss', gx + 130, gy - 10, CORAL, '600 20px');
+      text(g, v.entangle ? 'XOR needs both coordinates at once: the CNOT lets qubit 1 hear about x.' : 'No entanglement: qubit 1 only ever hears about y, so XOR is out of reach.', 44, h - 26, DIM, '500 22px');
+    },
+  };
+}

@@ -79,8 +79,8 @@ the Meta Immersive Web SDK (IWSDK), three.js and TypeScript.
 
 **By the numbers:** 26 chapters, a 14-module course, 21 lessons, 12 puzzles, a
 daily challenge and Quantum Rush, a Play tab, 5 big-state views, 4 kinds of quantum computer
-in 3D at full size, a 49-qubit surface code, 41 achievements, 5 orb finishes, 33 Play tab items, the exponential wall, Today (five minutes of spaced repetition) and your crystal that grows with it, Ket the lab partner, the lab on your real table, the double slit on your wall, look to select, a compact field-of-view layout, quantum tic-tac-toe, the double slit, Stern-Gerlach and the bomb tester, daily quests,
-voice control, shared labs and classes, and 393 unit tests.
+in 3D at full size, a 49-qubit surface code, 42 achievements, 5 orb finishes, 34 Play tab items, the exponential wall, Quantum AI, Today (five minutes of spaced repetition) and your crystal that grows with it, Ket the lab partner, the lab on your real table, the double slit on your wall, look to select, a compact field-of-view layout, quantum tic-tac-toe, the double slit, Stern-Gerlach and the bomb tester, daily quests,
+voice control, shared labs and classes, and 397 unit tests.
 
 ## The exponential wall: why a few qubits matter
 
@@ -99,6 +99,23 @@ item, and an achievement: The exponential wall (`src/quantum/scale.ts`,
 tested).
 
 ![The view down the aisle at 55 qubits: dark racks with blue and mint light strips on both sides, receding to a vanishing point, the label 55 qubits: 512 PB, 4,096 racks of memory, 1,696 more out of sight, floating over it](docs/screenshots/exponential-aisle.png)
+
+## Quantum AI: a quantum neural network learns on your desk
+
+![Left: learned, 95% right. A landscape over the desk in teal and red quadrants, every training bead on its own side, Ket saying it learned XOR in 21 steps because the CNOT lets the answer depend on both coordinates at once, and the board with the map, the circuit and rising accuracy. Right: the same network without the CNOT, stuck at 55%, its landscape only able to make stripes along one axis](docs/screenshots/quantum-ai.png)
+
+A real quantum neural network, trained live. Two qubits read each point:
+its x turns one (Ry(pi x + a)), its y the other (Ry(pi y + b)); a CNOT
+entangles them; a last Ry(c); and qubit 1's expectation value is the answer,
+teal above zero, red below. **Train** runs gradient descent with gradients
+from the parameter-shift rule (each angle run a quarter turn up and down),
+exactly as on quantum hardware, and the landscape over the desk reshapes
+itself until every bead sits on its own side. The data is XOR, which needs
+both coordinates at once: switch **Entanglement off** and the same network
+can only make stripes, and stalls near half right. Ket explains both. Play
+tab item (Quantum AI), voice ("quantum AI"), an achievement, and
+`src/quantum/qml.ts`, tested: exact parameter-shift gradients, XOR learned
+with the CNOT and not without.
 
 ## Your room, every day, and everyone
 
@@ -183,6 +200,7 @@ tested).
 ## Contents
 
 - [The exponential wall: why a few qubits matter](#the-exponential-wall-why-a-few-qubits-matter)
+- [Quantum AI: a quantum neural network learns on your desk](#quantum-ai-a-quantum-neural-network-learns-on-your-desk)
 - [Your room, every day, and everyone](#your-room-every-day-and-everyone)
 - [Try it](#try-it)
 - [Part 1: Your hands are the quantum computer](#part-1-your-hands-are-the-quantum-computer)
@@ -202,7 +220,7 @@ tested).
 ```sh
 npm install
 npm run dev        # managed browser with the Quest 3 emulator (IWER)
-npm test           # 393 unit tests: physics, four kinds of quantum computer, gestures, spells, the course, 25 chapters, 15 lessons, puzzles, the daily challenge, achievements, builder, noise, chemistry, import, IBM compiling, Bell tests, error correction, benchmarking, voice, shared rooms and more
+npm test           # 397 unit tests: physics, four kinds of quantum computer, gestures, spells, the course, 25 chapters, 15 lessons, puzzles, the daily challenge, achievements, builder, noise, chemistry, import, IBM compiling, Bell tests, error correction, benchmarking, voice, shared rooms and more
 npm run typecheck
 npm run build
 ```
@@ -1245,7 +1263,7 @@ course) the board shows a **certificate**, and the 2D page can save it as a PNG.
   shorter sequence exists. Solving it extends a streak, and on the 2D page the
   result comes as one line to copy and paste: "Entangled daily #25: 2 moves
   (par 2), 3 of 3 stars. Streak: 1 day."
-- **Achievements**: 41 of them, from "First move" and "Spooky action" (your
+- **Achievements**: 42 of them, from "First move" and "Spooky action" (your
   first Bell pair) to "All for one" (a five-qubit GHZ state), "Rainmaker"
   (1,000 shots), "Beyond classical" (the Bell Test), "Below threshold" (the
   surface code), "Many worlds" (watching paths cancel), "Rush hour" and "On
