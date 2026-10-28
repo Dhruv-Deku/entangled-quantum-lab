@@ -69,6 +69,7 @@ import { compactPlacement } from './fov-layout';
 import { setContrast } from '../lab/contrast';
 import { cueListeners } from '../lab/feedback';
 import { CUE_CAPTIONS } from '../lab/captions';
+import { growthOf, grewSince, type Growth } from './growth';
 import { answerTopic, classify, describeState, explainOp, moveWords, nextMove, type Line as KetLine } from './partner';
 import { finishSession, loadMemory, mastery, parOf as cardPar, planSession, review, saveMemory, sessionStreak, shuffledChoices, tomorrow, addDays, type MemoryState, type RecallCard } from './today';
 import { memoryFigure, type MemoryView } from '../lab/figures';
@@ -277,6 +278,10 @@ export class UISystem extends createSystem({
   private ketGreeted = false;
   private ketTargetCache: { key: string; state: QState } | null = null;
   private ketCompact: Vector3 | null = null;
+  /** The crystal as last shown, to tell what grew. */
+  private crystalShown: Growth | null = null;
+  /** The crystal when today's session began. */
+  private crystalAtStart: Growth | null = null;
   /** Development: show the wrist menu at a fixed spot, without a tracked hand. */
   wristForce = false;
   private dbgAsset: UIKitMLAsset | null = null;
@@ -815,6 +820,7 @@ export class UISystem extends createSystem({
     LookSelectSystem.providers.push(provide);
     this.cleanupFuncs.push(() => LookSelectSystem.providers.splice(LookSelectSystem.providers.indexOf(provide), 1));
     if (settings.contrast) setContrast(this.panels(), true);
+    this.showCrystal(false);
     // a returning player: today's cards are waiting
     const today = dayKey();
     const waiting = planSession(this.memory, today).length;
@@ -2360,6 +2366,17 @@ export class UISystem extends createSystem({
     this.modeChoices(choices, active);
   }
 
+  // ---- your crystal
+
+  /** Show the crystal for the current memory; with `animate`, what is new grows in. */
+  private showCrystal(animate: boolean): void {
+    const ls = this.world.getSystem(LabSystem);
+    if (!ls) return;
+    const g = growthOf(this.memory, dayKey());
+    ls.crystal.set(g, animate);
+    this.crystalShown = g;
+  }
+
   // ---- Ket, the lab partner
 
   /** Say a line (unless Ket is off, or spoke a moment ago and this can wait). */
@@ -2497,6 +2514,7 @@ export class UISystem extends createSystem({
   // ---- Today: five minutes of spaced repetition
 
   private todayBegin(): void {
+    this.crystalAtStart = growthOf(this.memory, dayKey());
     this.todayPlan = planSession(this.memory, dayKey());
     this.todayIdx = 0;
     this.todayResults = [];
@@ -2528,6 +2546,7 @@ export class UISystem extends createSystem({
     this.todayResults[this.todayIdx] = correct ? 'right' : 'missed';
     this.memory = review(this.memory, card.id, correct, dayKey());
     saveMemory(this.memory);
+    this.showCrystal(true);
     feedback(correct ? 'success' : 'reject');
     this.renderGameCard();
   }
@@ -2569,6 +2588,12 @@ export class UISystem extends createSystem({
     this.todayDone = true;
     this.todayEnd = this.clockNow();
     const streak = sessionStreak(this.memory, today);
+    this.showCrystal(true);
+    if (this.crystalAtStart && this.crystalShown) {
+      const grew = grewSince(this.crystalAtStart, this.crystalShown);
+      const parts = [grew.fresh.length ? `${grew.fresh.length} new shard${grew.fresh.length === 1 ? '' : 's'}` : '', grew.rose.length ? `${grew.rose.length} grew taller` : ''].filter(Boolean);
+      this.ketSay({ text: `Your crystal is awake: ${parts.length ? `${parts.join(', ')}, and ` : ''}a new ring for today. Come back tomorrow and it grows again.`, point: null }, true);
+    }
     if (streak >= 3) this.use('today:streak3');
     if (mastery(this.memory).solid >= 10) this.use('today:solid10');
     this.use('today');
@@ -5001,6 +5026,7 @@ export class UISystem extends createSystem({
       lsys.showGiant(this.giantOn);
       lsys.showHistory(this.historyOn);
       if (lsys.dice.root.visible && this.game !== 'dice') lsys.dice.hide();
+      lsys.crystal.showLabel(this.profileOpen || this.game === 'today');
       lsys.showTrophies(this.profileOpen ? ACHIEVEMENTS.map((a) => ({ id: a.id, title: a.title, unlocked: !!this.profile.data.unlocked[a.id] })) : null);
     }
     // notes sit where the code panel does; only one of the two is open at a time

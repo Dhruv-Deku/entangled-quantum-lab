@@ -79,8 +79,8 @@ the Meta Immersive Web SDK (IWSDK), three.js and TypeScript.
 
 **By the numbers:** 26 chapters, a 14-module course, 21 lessons, 12 puzzles, a
 daily challenge and Quantum Rush, a Play tab, 5 big-state views, 4 kinds of quantum computer
-in 3D at full size, a 49-qubit surface code, 40 achievements, 5 orb finishes, 31 Play tab items, Today (five minutes of spaced repetition), Ket the lab partner, the lab on your real table, the double slit on your wall, look to select, a compact field-of-view layout, quantum tic-tac-toe, the double slit, Stern-Gerlach and the bomb tester, daily quests,
-voice control, shared labs and classes, and 383 unit tests.
+in 3D at full size, a 49-qubit surface code, 40 achievements, 5 orb finishes, 31 Play tab items, Today (five minutes of spaced repetition) and your crystal that grows with it, Ket the lab partner, the lab on your real table, the double slit on your wall, look to select, a compact field-of-view layout, quantum tic-tac-toe, the double slit, Stern-Gerlach and the bomb tester, daily quests,
+voice control, shared labs and classes, and 387 unit tests.
 
 ## Your room, every day, and everyone
 
@@ -100,6 +100,19 @@ voice control, shared labs and classes, and 383 unit tests.
   brings it back tomorrow. The board shows today's cards, your quantum memory
   box by box, this week and what tomorrow brings. 24 cards, from the plus
   state to Stern-Gerlach; `src/game/today.ts`, tested over a simulated month.
+- **Your crystal.** A glass crystal on the desk grows with Today: a shard
+  for every idea you have met, taller the better you know it (gold for
+  entanglement, violet for phase, blue for superposition), and a ring around
+  its base for every day you came. It waits grey, its ring slowly breathing,
+  until today's five minutes are done; then its colours come back, new shards
+  sprout, and Ket tells you what grew. Visible growth between sessions, in
+  your room (`src/game/growth.ts`, tested: every shard keeps its spot as the
+  crystal grows).
+
+  | Done for today: Ket, the crystal, the memory board | Waiting, then awake |
+  | --- | --- |
+  | ![Done for today: 2 of 4 right first time, 9 days in a row. Ket says: Your crystal is awake: 3 new shards, and a new ring for today. Come back tomorrow and it grows again. The crystal on the desk is labelled 23 ideas, 10 solid, 21 days, 9 in a row, and an achievement, Solid ground, has just unlocked](docs/screenshots/crystal.png) | ![The crystal before today's session, grey with a blue ring breathing around its base, and after, its gold, violet and blue shards glowing](docs/screenshots/crystal-wake.png) |
+
 - **On your real table.** In passthrough, plane and mesh detection find a
   table-height surface under your hands, and the desk (orbs and panels) moves
   onto it, where your hands already are. Tables behind you, off to the side or
@@ -157,7 +170,7 @@ voice control, shared labs and classes, and 383 unit tests.
 ```sh
 npm install
 npm run dev        # managed browser with the Quest 3 emulator (IWER)
-npm test           # 383 unit tests: physics, four kinds of quantum computer, gestures, spells, the course, 25 chapters, 15 lessons, puzzles, the daily challenge, achievements, builder, noise, chemistry, import, IBM compiling, Bell tests, error correction, benchmarking, voice, shared rooms and more
+npm test           # 387 unit tests: physics, four kinds of quantum computer, gestures, spells, the course, 25 chapters, 15 lessons, puzzles, the daily challenge, achievements, builder, noise, chemistry, import, IBM compiling, Bell tests, error correction, benchmarking, voice, shared rooms and more
 npm run typecheck
 npm run build
 ```

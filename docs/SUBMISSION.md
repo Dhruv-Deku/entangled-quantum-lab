@@ -34,6 +34,9 @@ between them), make a fist to measure, spread your fingers to fire 100 shots.
 Every gesture is a real quantum gate on a real simulated state, and the code
 for it (Qiskit, OpenQASM, PennyLane) writes itself beside you.
 
+- **Your crystal:** a glass crystal on your desk grows a shard for every
+  idea you learn and a ring for every day you come; it waits grey until
+  today's five minutes are done. Growth you can see between sessions.
 - **Today, five minutes a day:** a spaced-repetition session sized for a bus
   ride. Cards you have met come back just before you would forget them; one
   or two new ideas join each day; at least one card asks you to build a state

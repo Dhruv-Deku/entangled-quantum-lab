@@ -25,6 +25,7 @@ import { pickDesk, pickWall, readRoom, type Surface } from './room';
 import { WallScreen } from './wall-slit';
 import { CaptionStrip } from './captions';
 import { PartnerVisual } from './partner-3d';
+import { CrystalVisual } from './crystal-3d';
 import { LookSelectSystem } from './look-select';
 import { horizontalFov, saveSettings, settings } from '../game/settings';
 import type { Op } from '../quantum/circuit';
@@ -78,6 +79,8 @@ import { GOLD, GroupVisual, ORB_RADIUS, OrbVisual, setOrbEnvironment, StrikeVisu
 const DESK = new Vector3(0, 0.74, -0.42);
 /** Where Ket floats: just above the chapter card's inner corner, its words at eye level (workspace coordinates). */
 export const KET_HOME = new Vector3(-0.3, 0.34, -0.12);
+/** Where your crystal stands: on the desk, front left, clear of the orbs and the card (workspace coordinates). */
+export const CRYSTAL_HOME = new Vector3(-0.25, 0, 0.07);
 const ORB_HEIGHT = 0.15;
 const GATE_SECONDS = 0.65;
 const STORM_RED = '#ff5a4f';
@@ -189,6 +192,8 @@ export class LabSystem extends createSystem({
   private captions!: CaptionStrip;
   /** Ket, the lab partner, floating beside the desk. */
   partner!: PartnerVisual;
+  /** Your crystal: grows with Today. */
+  crystal!: CrystalVisual;
   private night = false;
   private trophies!: TrophyShelf;
   /** The Surface Code chapter's lattice, floating between the orb and the board. */
@@ -366,6 +371,10 @@ export class LabSystem extends createSystem({
     for (const r of [this.slits.root, this.sg.root, this.bombs.root]) useStudio(r, env, 0.8);
     this.wallScreen = new WallScreen();
     this.scene.add(this.wallScreen.root);
+    this.crystal = new CrystalVisual();
+    this.crystal.root.position.copy(CRYSTAL_HOME);
+    ws.add(this.crystal.root);
+    useStudio(this.crystal.root, env, 0.9);
     this.partner = new PartnerVisual();
     this.partner.setHome(KET_HOME);
     ws.add(this.partner.root);
@@ -891,6 +900,12 @@ export class LabSystem extends createSystem({
     this.board.root.visible = !this.boardHidden;
     if (this.wallScreen.root.visible) this.wallScreen.update(dt);
     this.captions.update(dt);
+    // the desk-filling modes have the desk to themselves
+    this.crystal.root.visible = !this.orbsHidden;
+    if (this.crystal.root.visible) {
+      this.player.head.updateWorldMatrix(true, false);
+      this.crystal.update(dt, this.vb.setFromMatrixPosition(this.player.head.matrixWorld));
+    }
     if (this.partner.root.visible) {
       this.player.head.updateWorldMatrix(true, false);
       this.partner.update(dt, this.va.setFromMatrixPosition(this.player.head.matrixWorld));
