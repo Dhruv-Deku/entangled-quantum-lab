@@ -1,5 +1,5 @@
 <!doctype html>
-<html>
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta
@@ -8,8 +8,109 @@
     />
     <link rel="icon" href="data:," />
     <title>Entangled</title>
+    <meta name="description" content="Hold a qubit in your hand: a hands-first quantum computing lab on your real desk, five minutes a day." />
+    <meta name="theme-color" content="#0b0c0e" />
+    <meta property="og:title" content="Entangled" />
+    <meta property="og:description" content="Hold a qubit in your hand: a hands-first quantum computing lab on your real desk, five minutes a day." />
+    <style>
+      /* the splash shows at once, before the app's code arrives, and fades when the lab is ready */
+      #splash {
+        position: fixed;
+        inset: 0;
+        z-index: 10;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        background: #0b0c0e;
+        color: #f2f3f5;
+        font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+        text-align: center;
+        padding: 24px;
+        transition: opacity 0.5s ease;
+      }
+      #splash.gone {
+        opacity: 0;
+        pointer-events: none;
+      }
+      #splash .orb {
+        width: 64px;
+        height: 64px;
+        border-radius: 50%;
+        background: radial-gradient(circle at 35% 30%, #ffffff 0 8%, rgba(220, 230, 245, 0.55) 9% 30%, rgba(143, 183, 255, 0.18) 31% 70%, rgba(143, 183, 255, 0.05) 71%);
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+        position: relative;
+        margin-bottom: 10px;
+      }
+      #splash .orb::after {
+        content: '';
+        position: absolute;
+        left: 50%;
+        top: 10px;
+        width: 3px;
+        height: 22px;
+        margin-left: -1.5px;
+        border-radius: 2px;
+        background: #ff7759;
+        transform-origin: 50% 100%;
+        animation: tip 2.4s ease-in-out infinite;
+      }
+      @keyframes tip {
+        0%, 100% { transform: rotate(0deg); }
+        50% { transform: rotate(90deg); }
+      }
+      #splash h1 {
+        margin: 0;
+        font-size: 40px;
+        font-weight: 700;
+        letter-spacing: -0.5px;
+      }
+      #splash p {
+        margin: 0;
+        max-width: 420px;
+        font-size: 16px;
+        line-height: 1.5;
+        color: #b8bbc1;
+      }
+      #splash .bar {
+        width: 180px;
+        height: 3px;
+        margin-top: 10px;
+        border-radius: 2px;
+        background: #26282c;
+        overflow: hidden;
+      }
+      #splash .bar::after {
+        content: '';
+        display: block;
+        width: 40%;
+        height: 100%;
+        border-radius: 2px;
+        background: #2d7ff9;
+        animation: slide 1.2s ease-in-out infinite;
+      }
+      @keyframes slide {
+        0% { transform: translateX(-100%); }
+        100% { transform: translateX(250%); }
+      }
+      #splash small {
+        font-size: 13px;
+        color: #8a8d93;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #splash .orb::after, #splash .bar::after { animation: none; }
+      }
+    </style>
   </head>
   <body style="margin: 0; overflow: hidden; background: #0b0c0e">
+    <div id="splash" role="status" aria-live="polite">
+      <div class="orb" aria-hidden="true"></div>
+      <h1>Entangled</h1>
+      <p>Hold a qubit in your hand.</p>
+      <div class="bar" aria-hidden="true"></div>
+      <small>Setting up the lab. Then tap Enter AR, and allow hand tracking.</small>
+    </div>
     <div id="scene-container"></div>
     <script type="module" src="/src/index.ts"></script>
   </body>

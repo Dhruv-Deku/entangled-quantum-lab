@@ -21,4 +21,18 @@ World.create(
   world.registerSystem(LookSelectSystem);
   // real-world depth: the orbs are hidden behind your hands and real objects
   world.registerSystem(DepthSensingSystem);
+  // the lab is up: fade the splash after its first frames
+  const splash = document.getElementById('splash');
+  requestAnimationFrame(() =>
+    requestAnimationFrame(() => {
+      splash?.classList.add('gone');
+      setTimeout(() => splash?.remove(), 700);
+    }),
+  );
+}).catch((err: unknown) => {
+  // no WebGL or WebXR here: say so instead of a blank page
+  const note = document.querySelector('#splash small');
+  if (note) note.textContent = 'Entangled needs a browser with WebGL and WebXR, such as the Meta Quest Browser.';
+  document.querySelector('#splash .bar')?.remove();
+  console.error(err);
 });
