@@ -6,6 +6,60 @@ export type Cue = 'gate' | 'measure' | 'entangle' | 'shots' | 'success' | 'selec
 
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
+/** Where tones go: the master, or a panner placing the current cue in the room. */
+let bus: AudioNode | null = null;
+
+type P3 = { x: number; y: number; z: number };
+/** The qubit the next sound comes from (world position), and the listener's head. */
+let source: P3 | null = null;
+
+/** The sounds of gates, measurements and entanglement come from this point in the room (null: from everywhere). */
+export function setSoundSource(p: P3 | null): void {
+  source = p ? { x: p.x, y: p.y, z: p.z } : null;
+}
+
+/** Each frame: where the head is and which way it faces, so sounds come from the right place. */
+export function setListener(pos: P3, forward: P3, up: P3): void {
+  if (!ctx) return;
+  const l = ctx.listener;
+  try {
+    if (l.positionX) {
+      l.positionX.value = pos.x;
+      l.positionY.value = pos.y;
+      l.positionZ.value = pos.z;
+      l.forwardX.value = forward.x;
+      l.forwardY.value = forward.y;
+      l.forwardZ.value = forward.z;
+      l.upX.value = up.x;
+      l.upY.value = up.y;
+      l.upZ.value = up.z;
+    } else {
+      l.setPosition(pos.x, pos.y, pos.z);
+      l.setOrientation(forward.x, forward.y, forward.z, up.x, up.y, up.z);
+    }
+  } catch {
+    // an older audio engine: sounds stay centred
+  }
+}
+
+/** A panner at the current source for one cue (HRTF: above, behind and to the side all sound different). */
+function placed(a: AudioContext): AudioNode | null {
+  if (!source || !master) return null;
+  try {
+    const p = a.createPanner();
+    p.panningModel = 'HRTF';
+    p.distanceModel = 'inverse';
+    p.refDistance = 0.35;
+    p.rolloffFactor = 0.6;
+    p.positionX.value = source.x;
+    p.positionY.value = source.y;
+    p.positionZ.value = source.z;
+    p.connect(master);
+    return p;
+  } catch {
+    return null;
+  }
+}
 
 function audio(): AudioContext | null {
   try {
@@ -39,7 +93,7 @@ function noise(start: number, dur: number, freq: number, gain = 1): void {
   f.frequency.exponentialRampToValueAtTime(80, t0 + dur);
   const g = a.createGain();
   g.gain.value = gain;
-  src.connect(f).connect(g).connect(master);
+  src.connect(f).connect(g).connect(bus ?? master);
   src.start(t0);
 }
 
@@ -54,7 +108,7 @@ function tone(freq: number, start: number, dur: number, type: OscillatorType = '
   g.gain.setValueAtTime(0, t0);
   g.gain.linearRampToValueAtTime(gain, t0 + 0.012);
   g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-  osc.connect(g).connect(master);
+  osc.connect(g).connect(bus ?? master);
   osc.start(t0);
   osc.stop(t0 + dur + 0.02);
 }
@@ -62,8 +116,21 @@ function tone(freq: number, start: number, dur: number, type: OscillatorType = '
 /** Told about every cue as it plays (sound captions listen here). */
 export const cueListeners: ((cue: Cue) => void)[] = [];
 
+/** The cues that belong to a qubit, and so come from where it is. */
+const SPATIAL = new Set<Cue>(['gate', 'measure', 'entangle', 'shots', 'storm']);
+
 export function feedback(cue: Cue): void {
   for (const l of cueListeners) l(cue);
+  const a = SPATIAL.has(cue) ? audio() : null;
+  bus = a ? placed(a) : null;
+  try {
+    play(cue);
+  } finally {
+    bus = null;
+  }
+}
+
+function play(cue: Cue): void {
   switch (cue) {
     case 'gate':
       tone(660, 0, 0.35, 'sine', 0.6);

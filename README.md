@@ -153,6 +153,10 @@ voice control, shared labs and classes, and 389 unit tests.
   reaches the goal).
 - **Your hands in front of the qubits.** With depth sensing, a real hand (or
   object) in front of an orb hides it, as it would a real glass ball.
+- **Sound where it happens.** The chime of a gate, the click of a
+  measurement and the chord of entanglement come from the qubit itself, in 3D
+  (HRTF), following your head: measure the orb on your right and you hear it
+  on your right.
 - **And:** high contrast (white text, bright edges, darker panels), reduce
   motion, captions for every sound cue, and a left- or right-handed wrist
   menu. Every setting also works by voice: "settings", "pin the lab", "high

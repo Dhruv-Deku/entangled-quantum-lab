@@ -72,7 +72,7 @@ import type { SurfaceView } from './figures';
 import { manyWorlds } from '../quantum/paths';
 import { pureDensity, type StateView } from '../quantum/state-views';
 import { T5 } from '../quantum/routing';
-import { feedback } from './feedback';
+import { feedback, setListener, setSoundSource } from './feedback';
 import { GOLD, GroupVisual, ORB_RADIUS, OrbVisual, setOrbEnvironment, StrikeVisual, ThreadVisual, type OrbSkinId } from './visuals';
 
 /** Desk-top workspace origin when there is no head pose to place it from (desktop view). */
@@ -900,6 +900,12 @@ export class LabSystem extends createSystem({
     this.board.root.visible = !this.boardHidden;
     if (this.wallScreen.root.visible) this.wallScreen.update(dt);
     this.captions.update(dt);
+    // spatial sound: the listener is your head; qubit sounds come from the selected orb
+    this.player.head.updateWorldMatrix(true, false);
+    const hm = this.player.head.matrixWorld.elements;
+    setListener({ x: hm[12], y: hm[13], z: hm[14] }, { x: -hm[8], y: -hm[9], z: -hm[10] }, { x: hm[4], y: hm[5], z: hm[6] });
+    const sel = this.orbs[lab.selected];
+    setSoundSource(sel && !this.orbsHidden ? sel.entity.object3D!.getWorldPosition(this.vb) : null);
     // the desk-filling modes have the desk to themselves
     this.crystal.root.visible = !this.orbsHidden;
     if (this.crystal.root.visible) {
