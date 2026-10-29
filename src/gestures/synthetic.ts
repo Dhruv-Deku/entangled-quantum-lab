@@ -11,6 +11,8 @@ export interface SynthHandOptions {
   spread?: number;
   /** 0 = thumb relaxed, 1 = thumb tip touching the index tip. */
   pinch?: number;
+  /** Which fingertip the thumb reaches for when pinching (default the index). */
+  pinchTo?: 'index' | 'middle' | 'ring' | 'pinky';
   /** Rotation about the forearm axis (+Y), radians. */
   roll?: number;
   handedness?: 'left' | 'right';
@@ -58,7 +60,7 @@ export function synthHand(o: SynthHandOptions = {}): JointPositions {
 
   // thumb: relaxed off to the index side, or reaching for the index tip
   const relaxed: V[] = [[0.022, 0.022, 0.012], [0.045, 0.042, 0.024], [0.062, 0.06, 0.032], [0.074, 0.075, 0.036]];
-  const target = pts[9];
+  const target = pts[9 + 5 * ['index', 'middle', 'ring', 'pinky'].indexOf(o.pinchTo ?? 'index')];
   const t = o.pinch ?? 0;
   for (let k = 0; k < 4; k++) {
     const w = t * (k / 3); // joints nearer the tip move more

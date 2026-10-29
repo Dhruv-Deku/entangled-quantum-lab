@@ -30,7 +30,9 @@ own desk, in your own room. Then we wanted a reason to come back every day.
 
 Glass orbs on your real table are qubits. Pinch one to pick it up, turn your
 wrist to rotate it, touch two together to entangle them (a gold thread appears
-between them), make a fist to measure, spread your fingers to fire 100 shots.
+between them), make a fist to measure, spread your fingers to fire 100 shots. Or just
+tap your thumb to a fingertip: middle for H, ring for X, little finger to
+measure, small enough for an airplane seat.
 Every gesture is a real quantum gate on a real simulated state, and the code
 for it (Qiskit, OpenQASM, PennyLane) writes itself beside you.
 

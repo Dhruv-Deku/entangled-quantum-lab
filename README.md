@@ -90,7 +90,7 @@ the Meta Immersive Web SDK (IWSDK), three.js and TypeScript.
 **By the numbers:** 26 chapters, a 14-module course, 21 lessons, 12 puzzles, a
 daily challenge and Quantum Rush, a Play tab, 5 big-state views, 4 kinds of quantum computer
 in 3D at full size, a 49-qubit surface code, 42 achievements, 9 orb finishes and 5 colour sets, a probability liquid in every qubit, 34 Play tab items, the exponential wall, Quantum AI, Today (five minutes of spaced repetition) and your crystal that grows with it, Ket the lab partner, the lab on your real table, the double slit on your wall, look to select, a compact field-of-view layout, quantum tic-tac-toe, the double slit, Stern-Gerlach and the bomb tester, daily quests,
-voice control, shared labs and classes, and 398 unit tests.
+voice control, shared labs and classes, and 402 unit tests.
 
 ## The exponential wall: why a few qubits matter
 
@@ -258,7 +258,7 @@ with the CNOT and not without.
 ```sh
 npm install
 npm run dev        # managed browser with the Quest 3 emulator (IWER)
-npm test           # 398 unit tests: physics, four kinds of quantum computer, gestures, spells, the course, 25 chapters, 15 lessons, puzzles, the daily challenge, achievements, builder, noise, chemistry, import, IBM compiling, Bell tests, error correction, benchmarking, voice, shared rooms and more
+npm test           # 402 unit tests: physics, four kinds of quantum computer, gestures, spells, the course, 25 chapters, 15 lessons, puzzles, the daily challenge, achievements, builder, noise, chemistry, import, IBM compiling, Bell tests, error correction, benchmarking, voice, shared rooms and more
 npm run typecheck
 npm run build
 ```
@@ -292,6 +292,7 @@ depends on a single input path.
 | Flick an orb and let go | Toss it: it lands on the desk, which measures it, then floats home | – | – |
 | Turn your left palm up | Wrist menu: H X Z S, Measure, Next qubit, Undo | – | – |
 | Pinch in the air and draw a circle, a Z or a stroke up | Spells: S, Z or X on the selected qubit | – | – |
+| Tap your thumb to your middle, ring or little fingertip | H, X or measure on the selected qubit (finger taps; the index pinch stays for grabbing) | H / X / Measure | H / X / M |
 | Touch two held orbs together | CNOT (entangle); a gold thread appears | CNOT | C |
 | – | Pauli and phase gates | X Y Z S T | X Y Z S T |
 | – | 100 shots: probability rain | 100 shots | Space |

@@ -148,7 +148,7 @@ const STUDIO_OPTIONS = ['liquid', 'gauge', 'phase', 'trail'] as const;
 type StudioOption = (typeof STUDIO_OPTIONS)[number];
 
 /** The settings panel's tiles, in order. */
-const SETTING_KEYS = ['desk', 'pin', 'wall', 'fov', 'look', 'dwell', 'contrast', 'motion', 'captions', 'wrist', 'partner', 'speak'] as const;
+const SETTING_KEYS = ['desk', 'pin', 'wall', 'fov', 'look', 'dwell', 'contrast', 'motion', 'captions', 'taps', 'wrist', 'partner', 'speak'] as const;
 type SettingKey = (typeof SETTING_KEYS)[number];
 
 /** Where hidden panels park, out of reach of every pointer. */
@@ -586,7 +586,10 @@ export class UISystem extends createSystem({
       });
     }
     for (const g of ['h', 'x', 'y', 'z', 's', 't'] as GateName[]) {
-      on(`g-${g}`, () => lab.gate(g) && feedback('gate'));
+      on(`g-${g}`, () => {
+        if (lab.gate(g)) feedback('gate');
+        this.tapHint();
+      });
     }
     on('g-rl', () => lab.gate('ry', lab.selected, [-Math.PI / 8]) && feedback('gate'));
     on('g-rr', () => lab.gate('ry', lab.selected, [Math.PI / 8]) && feedback('gate'));
@@ -839,6 +842,8 @@ export class UISystem extends createSystem({
     this.render(campaign.view);
     this.renderDock();
     this.bindAccess();
+    const gs = this.world.getSystem(GestureSystem);
+    if (gs) gs.onTap = (finger) => this.flash(`Finger tap: ${finger === 'middle' ? 'H' : finger === 'ring' ? 'X' : 'measure'} on q${lab.selected}`);
     return true;
   }
 
@@ -969,6 +974,9 @@ export class UISystem extends createSystem({
       case 'wrist':
         settings.wristHand = settings.wristHand === 'left' ? 'right' : 'left';
         break;
+      case 'taps':
+        settings.fingerTaps = !settings.fingerTaps;
+        break;
       case 'partner':
         settings.partner = !settings.partner;
         if (ls) ls.partner.root.visible = settings.partner;
@@ -1015,6 +1023,8 @@ export class UISystem extends createSystem({
     onOff('motion', settings.reduceMotion);
     meta('captions', 'Every sound cue shown as words');
     onOff('captions', settings.captions);
+    meta('taps', 'Thumb to middle: H, ring: X, little finger: measure');
+    onOff('taps', settings.fingerTaps);
     meta('wrist', `Turn your ${settings.wristHand} palm up for the menu`);
     onOff('wrist', false, settings.wristHand === 'left' ? 'Left' : 'Right');
     meta('partner', settings.partner ? 'Explains each move, hints when stuck' : 'Off: say "Ket" to bring it back');
@@ -2682,6 +2692,17 @@ export class UISystem extends createSystem({
     const g = growthOf(this.memory, dayKey());
     ls.crystal.set(g, animate);
     this.crystalShown = g;
+  }
+
+  // ---- finger taps
+
+  private tapHinted = false;
+
+  /** Once a session, after a gate from the dock: there is a quicker way. */
+  private tapHint(): void {
+    if (this.tapHinted || !settings.fingerTaps || !this.immersive) return;
+    this.tapHinted = true;
+    this.ketSay({ text: 'A quicker way: tap your thumb to your middle finger for H, your ring finger for X, your little finger to measure.', point: null }, true);
   }
 
   // ---- Ket, the lab partner

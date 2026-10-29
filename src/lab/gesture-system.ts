@@ -5,6 +5,7 @@ import { J, JOINTS } from '../gestures/hand';
 import { recognize, SPELL_GATE, type P2 } from '../gestures/spells';
 import { LabSystem } from './lab-system';
 import { HandTracker, type GestureEvent } from '../gestures/tracker';
+import { TapDetector, type TapFinger } from '../gestures/taps';
 import { Qubit } from './components';
 import { lab } from './instance';
 import { feedback } from './feedback';
@@ -23,6 +24,10 @@ export class GestureSystem extends createSystem({
   qubits: { required: [Qubit] },
 }) {
   private trackers = { left: new HandTracker('left'), right: new HandTracker('right') };
+  /** Finger taps: thumb to the middle, ring or little fingertip applies a gate. */
+  private taps = { left: new TapDetector(), right: new TapDetector() };
+  /** Told about each finger tap (the UI shows what it did). */
+  onTap: ((finger: TapFinger, hand: 'left' | 'right') => void) | null = null;
   private joints = { left: new Float32Array(75), right: new Float32Array(75) };
   private readonly v = new Vector3();
   private readonly orbPos = new Vector3();
@@ -171,10 +176,23 @@ export class GestureSystem extends createSystem({
     }
   }
 
+  /** A finger tap: middle is H, ring is X, the little finger measures, on the selected qubit. */
+  private fingerTap(finger: TapFinger, hand: 'left' | 'right'): void {
+    if (finger === 'middle') {
+      if (lab.gate('h')) feedback('gate');
+    } else if (finger === 'ring') {
+      if (lab.gate('x')) feedback('gate');
+    } else if (lab.measure() !== null) feedback('measure');
+    this.onTap?.(finger, hand);
+  }
+
   update(delta: number): void {
     const dt = Math.min(delta, 0.05);
     for (const hand of ['left', 'right'] as const) {
-      const events = this.trackers[hand].update(this.readHand(hand), dt);
+      const joints = this.readHand(hand);
+      const events = this.trackers[hand].update(joints, dt);
+      const tap = settings.fingerTaps ? this.taps[hand].update(joints, dt) : null;
+      if (tap) this.fingerTap(tap, hand);
       for (const ev of events) this.onGesture(hand, ev);
     }
 

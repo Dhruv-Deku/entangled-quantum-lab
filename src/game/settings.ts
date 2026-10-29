@@ -30,6 +30,8 @@ export interface Settings {
   partner: boolean;
   /** Ket reads its words aloud. */
   speak: boolean;
+  /** Finger taps: thumb to the middle fingertip is H, ring is X, little finger measures. */
+  fingerTaps: boolean;
   /** Qubit studio: the colour set and what each orb shows. */
   palette: string;
   orbLiquid: boolean;
@@ -51,6 +53,7 @@ export const DEFAULT_SETTINGS: Settings = {
   wristHand: 'left',
   partner: true,
   speak: false,
+  fingerTaps: true,
   palette: 'classic',
   orbLiquid: true,
   orbGauge: true,
@@ -74,7 +77,7 @@ export function parseSettings(raw: string | null): Settings {
   }
   if (!data || typeof data !== 'object') return out;
   const d = data as Record<string, unknown>;
-  for (const k of ['realDesk', 'wallScreen', 'lookSelect', 'contrast', 'reduceMotion', 'captions', 'partner', 'speak', 'orbLiquid', 'orbGauge', 'orbPhase', 'orbTrail'] as const) if (typeof d[k] === 'boolean') out[k] = d[k] as boolean;
+  for (const k of ['realDesk', 'wallScreen', 'lookSelect', 'contrast', 'reduceMotion', 'captions', 'partner', 'speak', 'orbLiquid', 'orbGauge', 'orbPhase', 'orbTrail', 'fingerTaps'] as const) if (typeof d[k] === 'boolean') out[k] = d[k] as boolean;
   if (typeof d.pinned === 'string' && d.pinned.length > 0 && d.pinned.length < 200) out.pinned = d.pinned;
   if (d.fov === 'auto' || d.fov === 'wide' || d.fov === 'compact') out.fov = d.fov;
   if (d.dwell === 'slow' || d.dwell === 'normal' || d.dwell === 'fast') out.dwell = d.dwell;

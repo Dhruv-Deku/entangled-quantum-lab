@@ -100,6 +100,10 @@
       <div class="names"><div class="name">Sound captions</div><div id="st-captions-m" class="meta">-</div></div>
       <div id="st-captions-b" class="btn"><div id="st-captions-bl" class="bt">Off</div></div>
     </div>
+    <div id="st-taps" class="tile">
+      <div class="names"><div class="name">Finger taps</div><div id="st-taps-m" class="meta">-</div></div>
+      <div id="st-taps-b" class="btn"><div id="st-taps-bl" class="bt">On</div></div>
+    </div>
     <div id="st-wrist" class="tile">
       <div class="names"><div class="name">Wrist menu</div><div id="st-wrist-m" class="meta">-</div></div>
       <div id="st-wrist-b" class="btn"><div id="st-wrist-bl" class="bt">Left</div></div>
