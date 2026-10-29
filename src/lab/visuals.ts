@@ -383,6 +383,8 @@ export class OrbVisual {
   private time = Math.random() * 10;
   private pct = -1;
   private owner: string | null = null;
+  /** 0..1 while the orb materialises (it pops in with a flash when it is made). */
+  private appear = 0;
 
   constructor(readonly index = 0, readonly radius = ORB_RADIUS, groundOffset = 0.15) {
     const r = radius;
@@ -526,6 +528,8 @@ export class OrbVisual {
 
     this.setBloch([0, 0, 1]);
     this.setOptions(this.options);
+    this.root.scale.setScalar(0.001);
+    this.flash('#ffffff');
   }
 
   /** Which layers the orb shows (the studio's toggles). */
@@ -759,6 +763,13 @@ export class OrbVisual {
 
   update(dt: number): void {
     this.time += dt;
+    if (this.appear < 1) {
+      // pop in: grow with a little overshoot, then settle
+      this.appear = Math.min(1, this.appear + dt / 0.6);
+      const t = this.appear, k = 1.7;
+      const back = 1 + (k + 1) * Math.pow(t - 1, 3) + k * Math.pow(t - 1, 2);
+      this.root.scale.setScalar(Math.max(0.001, back));
+    }
     if (this.options.liquid) {
       this.level += (this.levelTarget - this.level) * (1 - Math.exp(-dt * 4));
       this.slosh = Math.max(0, this.slosh - dt * 0.8);
