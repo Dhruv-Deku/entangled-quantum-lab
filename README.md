@@ -18,6 +18,16 @@ the Meta Immersive Web SDK (IWSDK), three.js and TypeScript.
 </p>
 <p align="center"><sub>"Hadamard on qubit zero." "Entangle zero and one." "Run 100 shots." Every shot lands on 00 or 11.</sub></p>
 
+## At a glance
+
+| Home: your lab, your qubits | Why a few qubits matter |
+| --- | --- |
+| ![The home card greeting you with your level, today's cards and one-tap launches; two qubits on the desk holding liquid filled to their chance of reading 1, with gauges, the crystal and Ket](docs/screenshots/glance-home.png) | ![A data-centre aisle of server racks running away from the desk: the memory 55 qubits would need, 512 PB](docs/screenshots/glance-aisle.png) |
+| **A quantum neural network learns on your desk** | **Your real wall is the screen** |
+| ![The Quantum AI landscape in teal and red quadrants with every training point on its side, Ket saying it learned XOR, the board with accuracy rising](docs/screenshots/glance-qml.png) | ![The double slit on the desk sending photons to a screen on the real wall, stripes spaced by the wall's distance](docs/screenshots/glance-wall.png) |
+| **Five minutes a day, and a crystal that grows** | **Ket, your lab partner** |
+| ![Done for today: the crystal on the desk awake with its shards, Ket saying it grew, an achievement unlocked, the memory board](docs/screenshots/glance-crystal.png) | ![Ket, a small pearl with a ring, answering what is entanglement over two orbs joined by the gold thread](docs/screenshots/glance-ket.png) |
+
 ## Why it is different
 
 - **Your hands are the interface.** Five natural gestures do the work of a
