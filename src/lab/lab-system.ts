@@ -28,6 +28,7 @@ import { PartnerVisual } from './partner-3d';
 import { CrystalVisual } from './crystal-3d';
 import { ScaleVisual } from './scale-3d';
 import { QmlVisual } from './qml-3d';
+import { SculptVisual } from './sculpt-3d';
 import type { Scale } from '../quantum/scale';
 import { LookSelectSystem } from './look-select';
 import { horizontalFov, saveSettings, settings } from '../game/settings';
@@ -36,7 +37,7 @@ import { mixedness, pairStrength } from '../quantum/entanglement';
 import { decompose, gateMatrix, type Vec3 } from '../quantum/gates';
 import { gateLabel } from './gate-label';
 import { QState } from '../quantum/state';
-import { BoardCell, Qubit, VirtualRoom } from './components';
+import { BoardCell, Qubit, SculptBar, VirtualRoom } from './components';
 import { lab } from './instance';
 import { partialState, type LabEvent } from './lab';
 import { RainVisual } from './rain';
@@ -109,6 +110,7 @@ export class LabSystem extends createSystem({
   qubits: { required: [Qubit] },
   pressed: { required: [Qubit, Pressed] },
   cells: { required: [BoardCell, Pressed] },
+  bars: { required: [SculptBar, Pressed] },
   rooms: { required: [VirtualRoom] },
 }) {
   private workspace!: Entity;
@@ -170,6 +172,10 @@ export class LabSystem extends createSystem({
   bombs!: Interferometer;
   /** A tic-tac-toe square was tapped. */
   cellTap: ((square: number) => void) | null = null;
+  /** State sculptor: the bars you tap, filled by the shots. */
+  sculpt!: SculptVisual;
+  /** A sculptor bar was tapped (its outcome). */
+  barTap: ((k: number) => void) | null = null;
   /** These modes have the desk to themselves: the orbs step aside. */
   orbsHidden = false;
   /** The real room: detected tables, floor, walls and furniture (empty until the headset reports them). */
@@ -380,6 +386,17 @@ export class LabSystem extends createSystem({
     for (const r of [this.slits.root, this.sg.root, this.bombs.root]) useStudio(r, env, 0.8);
     this.wallScreen = new WallScreen();
     this.scene.add(this.wallScreen.root);
+    this.sculpt = new SculptVisual();
+    this.sculpt.root.position.set(0, 0.02, -0.03);
+    const sculptEntity = this.world.createTransformEntity(this.sculpt.root, { parent: this.workspace });
+    this.sculpt.hits.forEach((hit, k) => {
+      const e = this.world.createTransformEntity(hit, { parent: sculptEntity });
+      e.addComponent(SculptBar, { index: k });
+      e.addComponent(RayInteractable);
+      e.addComponent(PokeInteractable);
+    });
+    this.sculpt.root.position.set(0, 0.02, -0.03);
+    useStudio(this.sculpt.root, env, 0.8);
     this.qml = new QmlVisual();
     this.qml.root.position.set(0, 0.12, -0.06);
     ws.add(this.qml.root);
@@ -404,6 +421,7 @@ export class LabSystem extends createSystem({
     const looks = () => [
       ...(this.orbsHidden ? [] : this.orbs.map((o, i) => ({ object: o.entity.object3D!, press: () => lab.select(i), radius: ORB_RADIUS }))),
       ...(this.ttt.root.visible ? this.ttt.tiles.map((t, i) => ({ object: t, press: () => this.cellTap?.(i), deep: true })) : []),
+      ...(this.sculpt.root.visible ? this.sculpt.hits.slice(0, this.sculpt.count).map((t, k) => ({ object: t, press: () => this.barTap?.(k) })) : []),
     ];
     LookSelectSystem.providers.push(looks);
     this.sky = new NightSky();
@@ -430,6 +448,10 @@ export class LabSystem extends createSystem({
     });
     this.queries.cells.subscribe('qualify', (entity) => {
       if (this.ttt.root.visible) this.cellTap?.(entity.getValue(BoardCell, 'index') ?? 0);
+    });
+    this.queries.bars.subscribe('qualify', (entity) => {
+      const k = entity.getValue(SculptBar, 'index') ?? 0;
+      if (this.sculpt.root.visible && k < this.sculpt.count) this.barTap?.(k);
     });
 
     // passthrough: hide the virtual room and re-seat the workspace in front of the player
@@ -947,6 +969,13 @@ export class LabSystem extends createSystem({
     const sel = this.orbs[lab.selected];
     setSoundSource(sel && !this.orbsHidden ? sel.entity.object3D!.getWorldPosition(this.vb) : null);
     if (this.qml.root.visible) this.qml.update(dt);
+    if (this.sculpt.root.visible) this.sculpt.update(dt);
+    // every interactable is in the pointer lists, shown or not: hidden tap targets must not catch pokes meant for the orbs
+    // (set each frame: the input system writes 'auto' whenever it registers one)
+    const tttTaps = this.ttt.root.visible ? 'auto' : 'none';
+    const barTaps = this.sculpt.root.visible ? 'auto' : 'none';
+    for (const t of this.ttt.tiles) t.pointerEvents = tttTaps;
+    for (const h of this.sculpt.hits) h.pointerEvents = barTaps;
     if (this.scaleView.root.visible) {
       this.player.head.updateWorldMatrix(true, false);
       this.scaleView.update(dt, this.va.setFromMatrixPosition(this.player.head.matrixWorld));

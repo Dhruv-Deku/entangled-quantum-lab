@@ -1,5 +1,6 @@
 import { CHSH_ALICE, CHSH_BOB, logicalError, TSIRELSON, zenoSurvival, type ChshResult, type RbResult, type Unitary } from '../quantum/advanced';
 import { QUBIT_COLORS } from './visuals';
+import type { Op } from '../quantum/circuit';
 
 /**
  * Figures a chapter puts on the circuit board: the CHSH score, the bit-flip
@@ -1430,6 +1431,124 @@ export function qmlFigure(v: QmlView): Figure {
       text(g, 'accuracy', gx + 10, gy - 10, MINT, '600 20px');
       text(g, 'loss', gx + 130, gy - 10, CORAL, '600 20px');
       text(g, v.entangle ? 'XOR needs both coordinates at once: the CNOT lets qubit 1 hear about x.' : 'No entanglement: qubit 1 only ever hears about y, so XOR is out of reach.', 44, h - 26, DIM, '500 22px');
+    },
+  };
+}
+
+// ---------------------------------------------------------------- the State sculptor
+
+export interface SculptView {
+  n: number;
+  /** The distribution drawn, one probability per outcome. */
+  target: number[];
+  /** Shots so far per outcome (null before a run). */
+  counts: number[] | null;
+  /** The run's size. */
+  shots: number;
+  /** The program the lab wrote: only Ry and CNOT. */
+  ops: readonly Op[];
+  rotations: number;
+  cnots: number;
+  /** How closely the shots match, once they are all in. */
+  match: number | null;
+  name: string;
+}
+
+/** The shape you drew against the shots, and the program the lab wrote to load it. */
+export function sculptFigure(v: SculptView): Figure {
+  const done = v.counts ? v.counts.reduce((a, b) => a + b, 0) : 0;
+  return {
+    key: `sculpt:${v.n}:${digest(v.target)}:${done}:${v.counts ? digest(v.counts) : '-'}:${v.match ?? '-'}:${v.name}`,
+    draw: (g, w, h) => {
+      const N = v.target.length;
+      panel(g, w, h, `State sculptor  /  ${v.name}`, `${v.n} qubits  /  ${N} outcomes`);
+      // the histogram: your line in blue glass, the shots inside it
+      const x0 = 70, y0 = 120, pw = 860, ph = 360;
+      const seen = v.counts && done ? v.counts.map((c) => c / done) : null;
+      const top = Math.max(0.05, ...v.target, ...(seen ?? [])) * 1.08;
+      const slot = pw / N;
+      g.strokeStyle = GRID;
+      g.lineWidth = 2;
+      g.beginPath();
+      g.moveTo(x0, y0 + ph);
+      g.lineTo(x0 + pw, y0 + ph);
+      g.stroke();
+      const matched = v.match !== null && v.match >= 0.97;
+      for (let k = 0; k < N; k++) {
+        const cx = x0 + slot * (k + 0.5);
+        const bw = slot * 0.7;
+        const th = (v.target[k] / top) * ph;
+        g.fillStyle = 'rgba(45,127,249,0.22)';
+        g.fillRect(cx - bw / 2, y0 + ph - th, bw, th);
+        g.fillStyle = SOFT_BLUE;
+        g.fillRect(cx - bw / 2 - 2, y0 + ph - th - 3, bw + 4, 4);
+        if (seen) {
+          const sh = (seen[k] / top) * ph;
+          g.fillStyle = matched ? MINT : INK;
+          g.fillRect(cx - bw * 0.3, y0 + ph - sh, bw * 0.6, sh);
+        }
+        const above = Math.max(th, seen ? (seen[k] / top) * ph : 0);
+        if (N <= 8 && v.target[k] > 0) text(g, v.target[k] < 0.005 ? '<1%' : `${Math.round(v.target[k] * 100)}%`, cx, y0 + ph - above - 14, DIM, '600 20px', 'center');
+        text(g, k.toString(2).padStart(v.n, '0'), cx, y0 + ph + 32, INK, `600 ${N > 8 ? 17 : 22}px`, 'center');
+      }
+      text(g, 'your shape', x0, y0 - 16, SOFT_BLUE, '600 20px');
+      text(g, v.counts ? `shots: ${done} of ${v.shots}` : 'shots: tap Run', x0 + 150, y0 - 16, v.counts ? INK : DIM, '600 20px');
+      // the program, as a small circuit: q0 on top
+      const rx = 1000, rw = 556;
+      text(g, 'The program it wrote', rx, 120, DIM, '600 22px');
+      const wy = (q: number) => 160 + q * (v.n > 3 ? 40 : 52);
+      for (let q = 0; q < v.n; q++) {
+        g.strokeStyle = '#4a4d54';
+        g.lineWidth = 2;
+        g.beginPath();
+        g.moveTo(rx + 40, wy(q));
+        g.lineTo(rx + rw, wy(q));
+        g.stroke();
+        text(g, `q${q}`, rx, wy(q) + 7, INK, '700 20px');
+      }
+      const ops = v.ops.filter((o): o is Extract<Op, { kind: 'gate' }> => o.kind === 'gate');
+      const col = Math.min(44, (rw - 56) / Math.max(1, ops.length));
+      const size = Math.min(26, col - 4);
+      ops.forEach((o, i) => {
+        const x = rx + 56 + col * (i + 0.5);
+        const t = o.target;
+        if (o.controls?.length) {
+          const c = o.controls[0];
+          g.strokeStyle = GOLD;
+          g.lineWidth = 2;
+          g.beginPath();
+          g.moveTo(x, wy(c));
+          g.lineTo(x, wy(t));
+          g.stroke();
+          dot(g, x, wy(c), Math.max(3, size * 0.2), GOLD);
+          g.beginPath();
+          g.arc(x, wy(t), size * 0.42, 0, Math.PI * 2);
+          g.stroke();
+          g.beginPath();
+          g.moveTo(x - size * 0.42, wy(t));
+          g.lineTo(x + size * 0.42, wy(t));
+          g.moveTo(x, wy(t) - size * 0.42);
+          g.lineTo(x, wy(t) + size * 0.42);
+          g.stroke();
+        } else {
+          roundRect(g, x - size / 2, wy(t) - size / 2, size, size, 5);
+          g.fillStyle = '#26282c';
+          g.fill();
+          g.strokeStyle = BLUE;
+          g.lineWidth = 2;
+          g.stroke();
+          if (size >= 22) text(g, 'Ry', x, wy(t) + 6, INK, '600 14px', 'center');
+        }
+      });
+      if (!ops.length) text(g, 'nothing yet: tap a bar', rx + 56, wy(0) - 18, DIM, '500 20px');
+      const ny = wy(v.n - 1) + 66;
+      text(g, `${v.rotations} turn${v.rotations === 1 ? '' : 's'} + ${v.cnots} CNOT${v.cnots === 1 ? '' : 's'}`, rx, ny, INK, '700 34px');
+      text(g, 'Only Ry and CNOT: it runs on any quantum computer.', rx, ny + 36, DIM, '500 21px');
+      if (v.match !== null) {
+        text(g, `${(v.match * 100).toFixed(1)}% match`, rx, ny + 92, matched ? MINT : CORAL, '700 40px');
+        text(g, `after ${done} shots`, rx + 300, ny + 92, DIM, '600 22px');
+      }
+      text(g, `Each outcome gets the square root of its chance as its amplitude: ${N} numbers loaded by ${v.rotations} turn${v.rotations === 1 ? '' : 's'}. This is how a quantum computer takes in data.`, 44, h - 26, DIM, '500 21px');
     },
   };
 }

@@ -142,6 +142,8 @@ group('voice: the Play tab', () => {
     expect(parseVoice('customize my qubits')).toEqual({ type: 'studio' });
     expect(parseVoice('change the colours')).toEqual({ type: 'studio' });
     expect(parseVoice('neural network')).toEqual({ type: 'play', item: 'Quantum AI' });
+    expect(parseVoice('open the state sculptor')).toEqual({ type: 'play', item: 'State sculptor' });
+    expect(parseVoice('load my data')).toEqual({ type: 'play', item: 'State sculptor' });
     expect(parseVoice('something calm before bed')).toEqual({ type: 'play', item: 'Wind down' });
     expect(parseVoice("start today's cards")).toEqual({ type: 'play', item: 'Today' });
     expect(parseVoice("today's puzzle")).toEqual({ type: 'daily' });

@@ -73,10 +73,12 @@ import { growthOf, grewSince, type Growth } from './growth';
 import { deviceFor, scaleFor, type Device } from '../quantum/scale';
 import { accuracy as qmlAccuracy, field as qmlField, initialWeights, loss as qmlLoss, predict as qmlPredict, trainStep, xorData, type Point as QmlPoint } from '../quantum/qml';
 import { FIELD_N } from '../lab/qml-3d';
+import { gateCounts, prepare as prepareState, SHAPES as PREP_SHAPES } from '../quantum/stateprep';
+import { bitLabel, levelsFor, match as shotMatch, MAX_LEVEL, probsOf, resample, sampleOne, tapLevel } from './sculpt';
 import { answerTopic, classify, describeState, explainOp, moveWords, nextMove, type Line as KetLine } from './partner';
 import { GREETING, partOfDay, planWindDown } from './today';
 import { finishSession, loadMemory, mastery, parOf as cardPar, planSession, review, saveMemory, sessionStreak, shuffledChoices, tomorrow, addDays, type MemoryState, type RecallCard } from './today';
-import { memoryFigure, qmlFigure, scaleFigure, type MemoryView } from '../lab/figures';
+import { memoryFigure, qmlFigure, scaleFigure, sculptFigure, type MemoryView } from '../lab/figures';
 import { countMoves } from './puzzles';
 import { run as runOps } from '../quantum/circuit';
 import type { QState } from '../quantum/state';
@@ -138,10 +140,13 @@ const LAB_LINES = 10;
 const LAB_KEYS = ['h', 'x', 'y', 'z', 's', 'sdg', 't', 'tdg', 'rx', 'ry', 'rz', 'cx', 'cz', 'swap', 'ccx', 'measure', 'q0', 'q1', 'q2', 'q3', 'q4', 'pi', 'pi2', 'pi4', 'mpi2', 'up', 'down', 'delete', 'clear', 'link', 'subqubit', 'addqubit', 'example', 'fromorbs'];
 const TABS = ['course', 'campaign', 'learn', 'puzzle', 'build', 'sandbox', 'play'] as const;
 /** The Play tab: arcade and showcase picks. */
-type GameId = 'dice' | 'penny' | 'cat' | 'spy' | 'decoder' | 'grover' | 'teleport' | 'ttt' | 'slit' | 'sg' | 'bomb' | 'today' | 'super' | 'qml';
+type GameId = 'dice' | 'penny' | 'cat' | 'spy' | 'decoder' | 'grover' | 'teleport' | 'ttt' | 'slit' | 'sg' | 'bomb' | 'today' | 'super' | 'qml' | 'sculpt';
 
-const PLAY = ['Today', 'Wind down', 'Code lab', 'First five minutes', 'Supercomputer', 'Quantum AI', 'Daily quests', 'Quantum Rush', 'Zen Rush', 'Rush versus', 'Class challenge', 'Daily', 'Spy game', 'Be the decoder', 'Grover maze', 'Teleporter', 'Quantum tic-tac-toe', 'Double slit', 'Stern-Gerlach', 'Bomb tester', 'Shor in 3D', 'System Two', 'Photonic chip', 'Surface Code', 'Many worlds', 'Quantum dice', 'Penny flip', 'Schrodinger cat', 'State album', 'Giant sphere', 'Inside a qubit', 'Night sky', 'History', 'Ambient music'] as const;
-const PLAY_TAGS = ['5 min', 'calm', 'qasm', 'tour', '2^n', 'QNN', '3/day', '60s', 'zen', 'vs', 'class', 'day', 'BB84', 'd=3', '8', 'tp', 'X O', '2 slit', 'Ag', 'EV', '15', '3x', 'light',  '49q', 'H H', 'd8', 'coin', 'box', '15', '1 m', 'JJ', 'sky', '1981', 'hum'];
+const PLAY = ['Today', 'Wind down', 'Code lab', 'First five minutes', 'Supercomputer', 'Quantum AI', 'State sculptor', 'Daily quests', 'Quantum Rush', 'Zen Rush', 'Rush versus', 'Class challenge', 'Daily', 'Spy game', 'Be the decoder', 'Grover maze', 'Teleporter', 'Quantum tic-tac-toe', 'Double slit', 'Stern-Gerlach', 'Bomb tester', 'Shor in 3D', 'System Two', 'Photonic chip', 'Surface Code', 'Many worlds', 'Quantum dice', 'Penny flip', 'Schrodinger cat', 'State album', 'Giant sphere', 'Inside a qubit', 'Night sky', 'History', 'Ambient music'] as const;
+const PLAY_TAGS = ['5 min', 'calm', 'qasm', 'tour', '2^n', 'QNN', 'prep', '3/day', '60s', 'zen', 'vs', 'class', 'day', 'BB84', 'd=3', '8', 'tp', 'X O', '2 slit', 'Ag', 'EV', '15', '3x', 'light',  '49q', 'H H', 'd8', 'coin', 'box', '15', '1 m', 'JJ', 'sky', '1981', 'hum'];
+
+/** Shots in one State sculptor run. */
+const SCULPT_SHOTS = 1000;
 
 /** What the studio's Show row toggles. */
 const STUDIO_OPTIONS = ['liquid', 'gauge', 'phase', 'trail'] as const;
@@ -280,6 +285,18 @@ export class UISystem extends createSystem({
   private todayCardTimer = 0;
   /** The exponential wall: how many qubits are on the table. */
   private superN = 2;
+  /** State sculptor: the qubits, each bar's height, the ready-made shape (-1: your own), the program it wrote, and the run. */
+  private sculptN = 3;
+  private sculptLevels: number[] = [];
+  private sculptShape = 0;
+  private sculptOps: Op[] = [];
+  private sculptCounts: number[] | null = null;
+  private sculptQueue: number[] = [];
+  private sculptMatch: number | null = null;
+  private sculptEdited = false;
+  private sculptTimer = 0;
+  private sculptCardTimer = 0;
+  private sculptSaid = '';
   /** Quantum AI: the data, the weights, whether the CNOT is in, and how training went. */
   private qmlData: QmlPoint[] = [];
   private qmlW: number[] = [0, 0, 0];
@@ -548,7 +565,7 @@ export class UISystem extends createSystem({
       } else campaign.next();
       feedback('select');
     });
-    for (let i = 0; i < 3; i++) on(`choice-${i}`, () => (!this.game && this.homeShown && campaign.mode === 'sandbox' ? this.homeChoice(i) : this.game === 'qml' ? this.qmlChoice(i) : this.game === 'super' ? this.superSet([this.superN + 10, 50, 2][i]) : this.game === 'today' ? this.todayPick(i) : this.game === 'spy' ? this.spyAnswer(i) : this.game === 'ttt' || this.game === 'slit' || this.game === 'sg' || this.game === 'bomb' ? this.modeChoice(i) : feedback(campaign.answer(i) ? 'success' : 'reject')));
+    for (let i = 0; i < 3; i++) on(`choice-${i}`, () => (!this.game && this.homeShown && campaign.mode === 'sandbox' ? this.homeChoice(i) : this.game === 'sculpt' ? this.sculptChoice(i) : this.game === 'qml' ? this.qmlChoice(i) : this.game === 'super' ? this.superSet([this.superN + 10, 50, 2][i]) : this.game === 'today' ? this.todayPick(i) : this.game === 'spy' ? this.spyAnswer(i) : this.game === 'ttt' || this.game === 'slit' || this.game === 'sg' || this.game === 'bomb' ? this.modeChoice(i) : feedback(campaign.answer(i) ? 'success' : 'reject')));
     on('btn-replay', () => {
       if (this.rush || this.rushOver || this.racePending) return this.endRush(true);
       if (this.game) return this.endGame(true);
@@ -1745,6 +1762,11 @@ export class UISystem extends createSystem({
     const lsys = this.world.getSystem(LabSystem);
     this.quest('wonder');
     if (item === 'Code lab') return this.labOpen ? this.closeCodeLab() : this.openCodeLab(false);
+    if (item === 'State sculptor') {
+      this.endRush(false);
+      this.endGame(false);
+      return this.startGame('sculpt');
+    }
     if (item === 'Quantum AI') {
       this.endRush(false);
       this.endGame(false);
@@ -1860,6 +1882,8 @@ export class UISystem extends createSystem({
         return this.labOpen;
       case 'Daily quests':
         return this.questsOpen;
+      case 'State sculptor':
+        return this.game === 'sculpt';
       case 'Spy game':
         return this.game === 'spy';
       case 'Be the decoder':
@@ -1964,6 +1988,19 @@ export class UISystem extends createSystem({
     } else if (g === 'today') {
       this.game = g;
       this.todayBegin();
+    } else if (g === 'sculpt') {
+      campaign.enterSandbox(this.sculptN, []);
+      this.game = g;
+      const ls = this.world.getSystem(LabSystem);
+      if (ls) {
+        ls.orbsHidden = true;
+        ls.sculpt.root.visible = true;
+        ls.barTap = (k) => this.sculptTap(k);
+      }
+      this.sculptEdited = false;
+      this.sculptSaid = '';
+      this.sculptSet(this.sculptN, this.sculptShape < 0 ? 0 : this.sculptShape);
+      this.ketSay({ text: 'Draw any chances you like: tap a bar to raise it. I write the quantum program that loads your shape, using only turns and CNOTs.', point: null }, true);
     } else if (g === 'qml') {
       campaign.enterSandbox(2, []);
       this.game = g;
@@ -2006,6 +2043,8 @@ export class UISystem extends createSystem({
       if (this.slitWall) ls.useWall(false);
       ls.showScale(null);
       ls.qml.root.visible = false;
+      ls.sculpt.root.visible = false;
+      ls.barTap = null;
     }
     this.slitWall = false;
     if (this.windBefore) {
@@ -2030,6 +2069,7 @@ export class UISystem extends createSystem({
     if (this.game === 'ttt' || this.game === 'slit' || this.game === 'sg' || this.game === 'bomb') return this.modeNext();
     if (this.game === 'today') return this.todayNext();
     if (this.game === 'super') return this.superSet(this.superN + 1);
+    if (this.game === 'sculpt') return this.sculptRun();
     if (this.game === 'qml') {
       this.qmlTraining = !this.qmlTraining;
       feedback('select');
@@ -2079,6 +2119,7 @@ export class UISystem extends createSystem({
     if (this.game === 'ttt' || this.game === 'slit' || this.game === 'sg' || this.game === 'bomb') this.modeUpdate(dt);
     if (this.game === 'today') this.todayUpdate(dt);
     if (this.game === 'qml') this.qmlUpdate(dt);
+    if (this.game === 'sculpt') this.sculptUpdate(dt);
     if (this.game === 'teleport' && this.tele.phase === 'flying' && ls?.teleporter.arrived) {
       this.tele.phase = 'fix';
       this.renderGameCard();
@@ -2110,6 +2151,7 @@ export class UISystem extends createSystem({
     if (this.game === 'today') return this.renderTodayCard();
     if (this.game === 'super') return this.renderSuperCard();
     if (this.game === 'qml') return this.renderQmlCard();
+    if (this.game === 'sculpt') return this.renderSculptCard();
     if (this.game === 'ttt' || this.game === 'slit' || this.game === 'sg' || this.game === 'bomb') return this.renderModeCard();
     const asking = this.game === 'spy' && this.spyPhase === 'guess';
     this.els.get('choices')?.setProperties({ display: asking ? 'flex' : 'none' });
@@ -2331,6 +2373,10 @@ export class UISystem extends createSystem({
   /** The board's figure for the mode (redrawn at most five times a second while particles stream). */
   private modeFigure(): Figure | null {
     if (this.game === 'today') return memoryFigure(this.todayView());
+    if (this.game === 'sculpt') {
+      const c = gateCounts(this.sculptOps);
+      return sculptFigure({ n: this.sculptN, target: probsOf(this.sculptLevels) ?? this.sculptLevels.map(() => 0), counts: this.sculptCounts, shots: SCULPT_SHOTS, ops: this.sculptOps, rotations: c.rotations, cnots: c.cnots, match: this.sculptMatch, name: this.sculptName() });
+    }
     if (this.game === 'qml')
       return qmlFigure({ field: this.qmlFieldNow, n: FIELD_N, points: this.qmlData, weights: this.qmlW, entangle: this.qmlEntangle, step: this.qmlStep, acc: this.qmlAcc, loss: this.qmlLoss });
     if (this.game === 'super') {
@@ -2558,6 +2604,129 @@ export class UISystem extends createSystem({
     this.text('chapter-body', body);
     this.text('goal-text', goal);
     this.modeChoices(choices, active);
+  }
+
+  // ---- State sculptor
+
+  private sculptName(): string {
+    return this.sculptShape >= 0 ? PREP_SHAPES[this.sculptShape].name : 'your shape';
+  }
+
+  /** n qubits and a ready-made shape (or, with -1, your own bars stretched to fit). */
+  private sculptSet(n: number, shapeIdx: number): void {
+    const N = 2 ** n;
+    this.sculptLevels = shapeIdx >= 0 ? levelsFor(PREP_SHAPES[shapeIdx].id, n) : resample(this.sculptLevels.length ? this.sculptLevels : [MAX_LEVEL], N);
+    this.sculptN = n;
+    this.sculptShape = shapeIdx;
+    this.world.getSystem(LabSystem)?.sculpt.setCount(N, (k) => bitLabel(k, n));
+    this.sculptLoad();
+  }
+
+  /** Write the program for the bars as they stand and load it into the lab; any run so far is void. */
+  private sculptLoad(): void {
+    const probs = probsOf(this.sculptLevels);
+    this.sculptOps = probs ? prepareState(probs) : [];
+    lab.load(this.sculptN, this.sculptOps);
+    this.sculptCounts = null;
+    this.sculptQueue = [];
+    this.sculptMatch = null;
+    const ls = this.world.getSystem(LabSystem);
+    ls?.sculpt.setTarget(this.sculptLevels.map((l) => l / MAX_LEVEL));
+    ls?.sculpt.setShots(null);
+    this.renderGameCard();
+  }
+
+  private sculptTap(k: number): void {
+    if (k >= this.sculptLevels.length) return;
+    this.sculptLevels[k] = tapLevel(this.sculptLevels[k]);
+    this.sculptShape = -1;
+    this.world.getSystem(LabSystem)?.sculpt.pulse(k);
+    feedback('select');
+    this.sculptLoad();
+    if (!this.sculptEdited) {
+      this.sculptEdited = true;
+      const c = gateCounts(this.sculptOps);
+      this.ketSay({ text: `New program: ${c.rotations} turns and ${c.cnots} CNOTs. Each turn splits the chance between two halves of the answers; the CNOTs make a split depend on the qubits before it.`, point: null }, true);
+    }
+  }
+
+  private sculptChoice(i: number): void {
+    if (i === 0) this.sculptSet(this.sculptN >= 4 ? 2 : this.sculptN + 1, this.sculptShape);
+    else if (i === 1) this.sculptSet(this.sculptN, (Math.max(-1, this.sculptShape) + 1) % PREP_SHAPES.length);
+    else return this.showCode();
+    feedback('select');
+  }
+
+  /** Measure the prepared state SCULPT_SHOTS times; the shots land over a second and a half. */
+  private sculptRun(): void {
+    if (this.sculptQueue.length) return;
+    if (!probsOf(this.sculptLevels)) {
+      feedback('reject');
+      return this.ketSay({ text: 'Every bar is empty: tap one to give that answer a chance.', point: null }, true);
+    }
+    // from the state the program actually made, not from the bars: the shots test the program
+    const probs = lab.state.probabilities();
+    this.sculptQueue = Array.from({ length: SCULPT_SHOTS }, () => sampleOne(probs, Math.random()));
+    this.sculptCounts = this.sculptLevels.map(() => 0);
+    this.sculptMatch = null;
+    this.sculptTimer = 0;
+    feedback('measure');
+    this.renderGameCard();
+  }
+
+  private sculptUpdate(dt: number): void {
+    if (!this.sculptQueue.length || !this.sculptCounts) return;
+    const ls = this.world.getSystem(LabSystem);
+    const batch = Math.max(1, Math.ceil((SCULPT_SHOTS * dt) / 1.5));
+    for (const k of this.sculptQueue.splice(0, batch)) this.sculptCounts[k]++;
+    // the shots rise toward your lines: a full run fills each glass to the line you drew
+    const total = this.sculptLevels.reduce((a, b) => a + b, 0) / MAX_LEVEL;
+    const heights = this.sculptCounts.map((c) => (c / SCULPT_SHOTS) * total);
+    if (this.sculptQueue.length) {
+      ls?.sculpt.setShots(heights);
+      this.sculptCardTimer += dt;
+      if (this.sculptCardTimer > 0.2) {
+        this.sculptCardTimer = 0;
+        this.renderGameCard();
+      }
+      return;
+    }
+    const target = probsOf(this.sculptLevels)!;
+    const m = (this.sculptMatch = shotMatch(target, this.sculptCounts));
+    const good = m >= 0.97;
+    ls?.sculpt.setShots(heights, good);
+    const pct = `${(m * 100).toFixed(1)}%`;
+    if (good && this.sculptEdited && this.sculptShape < 0 && this.sculptN >= 3) {
+      this.use('sculpt:matched');
+      ls?.celebrate(false);
+    }
+    feedback(good ? 'success' : 'reject');
+    const said = `${this.sculptN}:${this.sculptName()}`;
+    if (this.sculptSaid !== said) {
+      this.sculptSaid = said;
+      this.ketSay({ text: good ? `${SCULPT_SHOTS} shots, a ${pct} match: the program loads your shape. Tap See the code to take it to a real quantum computer.` : `${pct} match. Shots are random; run again and it gets closer.`, point: null }, true);
+    }
+    this.renderGameCard();
+  }
+
+  private renderSculptCard(): void {
+    const c = gateCounts(this.sculptOps);
+    const running = this.sculptQueue.length > 0;
+    const m = this.sculptMatch;
+    this.els.get('btn-notes')?.setProperties({ display: 'none' });
+    this.els.get('btn-lib')?.setProperties({ display: 'none' });
+    this.text('btn-replay-label', 'Done');
+    this.bg('btn-next', C.primary);
+    this.bg('goal-dot', m !== null && m >= 0.97 ? C.done : C.current);
+    this.text('chapter-eyebrow', `Play  /  State sculptor  /  ${this.sculptN} qubits`);
+    this.text('chapter-title', m !== null ? `${(m * 100).toFixed(1)}% match` : running ? 'Measuring...' : 'Draw a quantum state');
+    this.text(
+      'chapter-body',
+      `Each bar is the chance of one answer: tap one to raise it. Entangled writes the program that loads your shape (the way quantum computers take in data): ${c.rotations} turns and ${c.cnots} CNOTs.`,
+    );
+    this.text('goal-text', running ? `${SCULPT_SHOTS - this.sculptQueue.length} of ${SCULPT_SHOTS} shots` : m !== null ? 'Reshape it, or see the code' : 'Shape it, then run the shots');
+    this.text('btn-next-label', running ? 'Measuring...' : `Run ${SCULPT_SHOTS} shots`);
+    this.modeChoices([`${this.sculptN} qubits`, this.sculptShape >= 0 ? PREP_SHAPES[this.sculptShape].name : 'Your shape', 'See the code']);
   }
 
   // ---- Quantum AI

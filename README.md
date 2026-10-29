@@ -27,6 +27,8 @@ the Meta Immersive Web SDK (IWSDK), three.js and TypeScript.
 | ![The Quantum AI landscape in teal and red quadrants with every training point on its side, Ket saying it learned XOR, the board with accuracy rising](docs/screenshots/glance-qml.png) | ![The double slit on the desk sending photons to a screen on the real wall, stripes spaced by the wall's distance](docs/screenshots/glance-wall.png) |
 | **Five minutes a day, and a crystal that grows** | **Ket, your lab partner** |
 | ![Done for today: the crystal on the desk awake with its shards, Ket saying it grew, an achievement unlocked, the memory board](docs/screenshots/glance-crystal.png) | ![Ket, a small pearl with a ring, answering what is entanglement over two orbs joined by the gold thread](docs/screenshots/glance-ket.png) |
+| **Draw any quantum state: it writes the program** | **Your shape, the shots, and the circuit it wrote** |
+| ![The State sculptor: sixteen glass bars on the desk in two peaks, each filled in mint by 1000 measured shots right to the line drawn, the card reading 99.4% match, and the code window showing the program in OpenQASM 3](docs/screenshots/glance-sculpt.png) | ![The sculptor's board: the two-peaked shape in blue outlines with the shots in mint inside, and the program on four qubits, 15 Ry turns and 14 CNOTs, 99.4% match after 1000 shots](docs/screenshots/glance-sculpt-board.png) |
 
 ## Why it is different
 
@@ -89,8 +91,8 @@ the Meta Immersive Web SDK (IWSDK), three.js and TypeScript.
 
 **By the numbers:** 26 chapters, a 14-module course, 21 lessons, 12 puzzles, a
 daily challenge and Quantum Rush, a Play tab, 5 big-state views, 4 kinds of quantum computer
-in 3D at full size, a 49-qubit surface code, 42 achievements, 9 orb finishes and 5 colour sets, a probability liquid in every qubit, 34 Play tab items, the exponential wall, Quantum AI, Today (five minutes of spaced repetition) and your crystal that grows with it, Ket the lab partner, the lab on your real table, the double slit on your wall, look to select, a compact field-of-view layout, quantum tic-tac-toe, the double slit, Stern-Gerlach and the bomb tester, daily quests,
-voice control, shared labs and classes, and 402 unit tests.
+in 3D at full size, a 49-qubit surface code, 43 achievements, 9 orb finishes and 5 colour sets, a probability liquid in every qubit, 35 Play tab items, the exponential wall, Quantum AI, the State sculptor, Today (five minutes of spaced repetition) and your crystal that grows with it, Ket the lab partner, the lab on your real table, the double slit on your wall, look to select, a compact field-of-view layout, quantum tic-tac-toe, the double slit, Stern-Gerlach and the bomb tester, daily quests,
+voice control, shared labs and classes, and 412 unit tests.
 
 ## The exponential wall: why a few qubits matter
 
@@ -153,6 +155,41 @@ can only make stripes, and stalls near half right. Ket explains both. Play
 tab item (Quantum AI), voice ("quantum AI"), an achievement, and
 `src/quantum/qml.ts`, tested: exact parameter-shift gradients, XOR learned
 with the CNOT and not without.
+
+## State sculptor: draw any state, get the quantum program
+
+![The State sculptor on four qubits: sixteen glass bars on the desk in two peaks, each filled in mint by measured shots right to the line drawn; the card at 99.4% match; the code window with the program in OpenQASM 3; the board above with the shape, the shots and the circuit](docs/screenshots/glance-sculpt.png)
+
+Every quantum algorithm that works on data first has to load it: turn a
+list of numbers into a quantum state. The State sculptor does that live.
+Glass bars stand on the desk, one per outcome: sixteen for four qubits,
+eight for three, four for two. Tap a bar to raise it a step and Entangled immediately writes
+the quantum program that prepares exactly that distribution, and loads it.
+
+- **The method is the real one.** Grover and Rudolph's state preparation:
+  split the chance between the two halves of the answers, qubit by qubit,
+  each split a Ry turn controlled by the qubits above; and each controlled
+  turn built from plain Ry gates and CNOTs in Gray-code order (Mottonen et
+  al.). Only Ry and CNOT: it runs on any quantum computer, at most 2^n - 1
+  turns and 2^n - 2 CNOTs, fewer when the shape allows (a flat shape needs
+  no CNOTs at all; branches that never happen are free and are used to
+  cancel CNOTs).
+- **The shots test the program, not the drawing.** Run 1000 shots and they
+  are sampled from the state the program actually made, then rise inside
+  each glass toward the line you drew. The board shows your shape against
+  the shots, the circuit it wrote, and the match (classical fidelity);
+  above 97% the bars turn mint.
+- **Take it to real hardware.** See the code opens the code window with
+  the same program in Qiskit, OpenQASM 3 and PennyLane, routed onto the T5
+  chip, and Run on IBM.
+
+Seven ready-made shapes (bell curve, two peaks, wave, ramp, flat, all or
+nothing, one answer), 2 to 4 qubits, Ket explaining what each turn and CNOT
+does, a Play tab item (State sculptor), voice ("load my data", "state
+sculptor"), and an achievement for shaping a state yourself and measuring it
+to 97%. `src/quantum/stateprep.ts` is tested: random distributions on 1 to 5
+qubits load to 1e-9, gate counts stay within the bounds, every shape is
+exact.
 
 ## Your room, every day, and everyone
 
@@ -239,6 +276,7 @@ with the CNOT and not without.
 - [The exponential wall: why a few qubits matter](#the-exponential-wall-why-a-few-qubits-matter)
 - [Home: your lab, and qubits made your own](#home-your-lab-and-qubits-made-your-own)
 - [Quantum AI: a quantum neural network learns on your desk](#quantum-ai-a-quantum-neural-network-learns-on-your-desk)
+- [State sculptor: draw any state, get the quantum program](#state-sculptor-draw-any-state-get-the-quantum-program)
 - [Your room, every day, and everyone](#your-room-every-day-and-everyone)
 - [Try it](#try-it)
 - [Part 1: Your hands are the quantum computer](#part-1-your-hands-are-the-quantum-computer)
@@ -258,7 +296,7 @@ with the CNOT and not without.
 ```sh
 npm install
 npm run dev        # managed browser with the Quest 3 emulator (IWER)
-npm test           # 402 unit tests: physics, four kinds of quantum computer, gestures, spells, the course, 25 chapters, 15 lessons, puzzles, the daily challenge, achievements, builder, noise, chemistry, import, IBM compiling, Bell tests, error correction, benchmarking, voice, shared rooms and more
+npm test           # 412 unit tests: physics, four kinds of quantum computer, gestures, spells, the course, 25 chapters, 15 lessons, puzzles, the daily challenge, achievements, builder, noise, chemistry, import, IBM compiling, Bell tests, error correction, benchmarking, voice, shared rooms and more
 npm run typecheck
 npm run build
 ```

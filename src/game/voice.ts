@@ -131,6 +131,7 @@ export function parseVoice(text: string): VoiceCommand | null {
   if (/studio|customi[sz]e|change (the )?colou?rs?|dress (my|the) qubits/.test(s)) return { type: 'studio' };
   if (/wind(ing)? down|calm review|bed ?time|before (bed|sleep)/.test(s)) return { type: 'play', item: 'Wind down' };
   if (/super ?computer|exponential|how (big|much memory)|why (does it|it) matter/.test(s)) return { type: 'play', item: 'Supercomputer' };
+  if (/sculpt|state prep|prepare (a|any|my) state|amplitude encod|load (my |some )?data|draw (a|my) (state|distribution|shape)/.test(s)) return { type: 'play', item: 'State sculptor' };
   if (/quantum (ai|a i|machine learning)|neural network|machine learning|\bai\b/.test(s)) return { type: 'play', item: 'Quantum AI' };
   if (/five minutes|my (cards|session|review)|today'? ?s (cards|session)|^(start )?today$|review my/.test(s)) return { type: 'play', item: 'Today' };
   if (/daily|today'? ?s (puzzle|challenge)/.test(s)) return { type: 'daily' };

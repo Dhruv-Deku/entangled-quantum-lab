@@ -55,6 +55,11 @@ for it (Qiskit, OpenQASM, PennyLane) writes itself beside you.
   (parameter-shift gradients, as on quantum hardware); its decision
   landscape reshapes until every point is on its side. XOR needs
   entanglement: switch the CNOT off and it cannot learn.
+- **State sculptor:** draw any probability distribution by tapping glass
+  bars on the desk, and Entangled writes the quantum program that loads it
+  (Grover-Rudolph state preparation with only Ry and CNOT, the way quantum
+  computers take in data). 1000 shots fill each bar to your line; the same
+  program opens in Qiskit, OpenQASM 3 and PennyLane, and runs on IBM.
 - **Today, five minutes a day:** a spaced-repetition session sized for a bus
   ride. Cards you have met come back just before you would forget them; one
   or two new ideas join each day; at least one card asks you to build a state
@@ -63,7 +68,7 @@ for it (Qiskit, OpenQASM, PennyLane) writes itself beside you.
 - **Learn:** 26 chapters (superposition to the surface code), 21 lessons, a
   course with quizzes, puzzles with par, a daily challenge the same for
   everyone, and a Code Lab where you write OpenQASM 3 on the panel.
-- **Play:** 34 items, including quantum tic-tac-toe on a tappable 3D board,
+- **Play:** 35 items, including quantum tic-tac-toe on a tappable 3D board,
   the double slit, Stern-Gerlach, the Elitzur-Vaidman bomb tester, a spy game
   (BB84), a Grover maze, teleportation booths and Quantum Rush.
 - **Real hardware:** the dilution refrigerator, a trapped-ion chamber, a
