@@ -7,7 +7,9 @@ import {
   Color,
   ConeGeometry,
   CustomBlending,
+  CircleGeometry,
   CylinderGeometry,
+  DoubleSide,
   Group,
   Line,
   LineBasicMaterial,
@@ -18,6 +20,7 @@ import {
   OneFactor,
   PlaneGeometry,
   QuadraticBezierCurve3,
+  RingGeometry,
   ShaderMaterial,
   Quaternion,
   SphereGeometry,
@@ -53,14 +56,47 @@ export const QUBIT_COLORS = ['#FF7759', '#3FC6C9', '#9B87F5', '#7BCB6A', '#FF8FB
 export const qubitColor = (i: number) => QUBIT_COLORS[i % QUBIT_COLORS.length];
 
 /** Orb finishes, unlocked by level: the same physics, a different look. */
-export type OrbSkinId = 'glass' | 'frost' | 'smoke' | 'tinted' | 'copper';
-export const ORB_SKINS: { id: OrbSkinId; name: string; level: number; note: string }[] = [
+export type OrbSkinId = 'glass' | 'frost' | 'smoke' | 'tinted' | 'copper' | 'pearl' | 'obsidian' | 'aurora' | 'hologram';
+export const ORB_SKINS: { id: OrbSkinId; name: string; level: number; note: string; unlock?: { achievement: string; text: string } }[] = [
   { id: 'glass', name: 'Glass', level: 1, note: 'Clear glass, the classic' },
   { id: 'frost', name: 'Frost', level: 2, note: 'Frosted glass with a cool rim' },
   { id: 'smoke', name: 'Smoke', level: 3, note: 'Dark smoked glass, arrows glow through' },
   { id: 'tinted', name: 'Tinted', level: 4, note: 'Each orb in its qubit colour' },
   { id: 'copper', name: 'Copper', level: 5, note: 'Glass on copper rings, like the fridge' },
+  { id: 'pearl', name: 'Pearl', level: 1, note: 'Soft pearl glass with a warm rim', unlock: { achievement: 'recall', text: 'Solid ground' } },
+  { id: 'obsidian', name: 'Obsidian', level: 1, note: 'Black volcanic glass, the state glowing through', unlock: { achievement: 'wall', text: 'The exponential wall' } },
+  { id: 'aurora', name: 'Aurora', level: 1, note: 'A rim that drifts slowly through the colours', unlock: { achievement: 'habit', text: 'Every day' } },
+  { id: 'hologram', name: 'Hologram', level: 1, note: 'Lines of light, the glass barely there', unlock: { achievement: 'qml', text: 'Quantum AI' } },
 ];
+
+/** Colour sets for the qubits (the first is the lab's own). */
+export const PALETTES: { id: string; name: string; colors: string[] }[] = [
+  { id: 'classic', name: 'Classic', colors: ['#FF7759', '#3FC6C9', '#9B87F5', '#7BCB6A', '#FF8FB6'] },
+  { id: 'neon', name: 'Neon', colors: ['#ff4f9a', '#2de2e6', '#a77bff', '#b7ff4a', '#ffd23f'] },
+  { id: 'pastel', name: 'Pastel', colors: ['#f4a29b', '#97d6d3', '#c3b6f2', '#b8dfa6', '#f7c4d8'] },
+  { id: 'ocean', name: 'Ocean', colors: ['#4fa3ff', '#2fd1c4', '#7c8cff', '#5ce1a6', '#a7c7ff'] },
+  { id: 'sunset', name: 'Sunset', colors: ['#ff6b4a', '#ffb347', '#e85d9b', '#ffd36e', '#c76bff'] },
+];
+
+/** Use a palette for the qubit colours (orbs made after this take it on). */
+export function setPalette(id: string): void {
+  const p = PALETTES.find((x) => x.id === id) ?? PALETTES[0];
+  QUBIT_COLORS.splice(0, QUBIT_COLORS.length, ...p.colors);
+}
+
+/** What each orb shows beyond its arrow. */
+export interface OrbOptions {
+  /** A liquid inside, filled to the chance of reading 1. */
+  liquid: boolean;
+  /** A gauge on the desk around its foot, and the chance of 1 by its name. */
+  gauge: boolean;
+  /** A colour ring at the equator, and a bead where the phase points. */
+  phase: boolean;
+  /** The arrow's trail. */
+  trail: boolean;
+}
+
+export const DEFAULT_ORB_OPTIONS: OrbOptions = { liquid: true, gauge: true, phase: false, trail: true };
 
 /** Small text on a transparent canvas, for labels that live in the 3D scene. */
 export function textTexture(parts: { text: string; color: string }[], weight = 600): CanvasTexture {
@@ -211,6 +247,70 @@ function pill(text: string, color: string): CanvasTexture {
 const TRAIL = 90;
 const UP = new Vector3(0, 1, 0);
 
+// ---- Qubit 2.0: the liquid, the gauge and the phase ring ----
+const liquidVert = `
+varying vec3 vPos;
+varying vec3 vN;
+varying vec3 vView;
+void main() {
+  vPos = position;
+  vec4 mv = modelViewMatrix * vec4(position, 1.0);
+  vView = -mv.xyz;
+  vN = normalize(normalMatrix * normal);
+  gl_Position = projectionMatrix * mv;
+}`;
+const liquidFrag = `
+uniform float uLevel;
+uniform vec3 uColor;
+uniform float uTime;
+uniform float uOpacity;
+uniform float uSlosh;
+varying vec3 vPos;
+varying vec3 vN;
+varying vec3 vView;
+void main() {
+  float wave = (0.012 + 0.05 * uSlosh) * (sin(vPos.x * 9.0 + uTime * 2.2) + sin(vPos.z * 7.0 - uTime * 1.7));
+  if (vPos.y > uLevel + wave) discard;
+  float f = pow(1.0 - abs(dot(normalize(vN), normalize(vView))), 2.0);
+  gl_FragColor = vec4(uColor * (0.55 + 0.7 * f), uOpacity * (0.3 + 0.7 * f));
+}`;
+const gaugeVert = `
+varying vec2 vP;
+void main() {
+  vP = position.xz;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}`;
+const gaugeFrag = `
+uniform float uFill;
+uniform vec3 uColor;
+varying vec2 vP;
+void main() {
+  float a = atan(vP.x, -vP.y);
+  if (a < 0.0) a += 6.2831853;
+  bool on = a / 6.2831853 <= uFill;
+  gl_FragColor = on ? vec4(uColor, 0.9) : vec4(1.0, 1.0, 1.0, 0.12);
+}`;
+const gaugeGeo = new RingGeometry(1.08, 1.17, 96, 1).rotateX(-Math.PI / 2);
+const meniscusGeo = new CircleGeometry(1, 48).rotateX(-Math.PI / 2);
+/** The phase ring: a torus at the equator whose colour turns with the azimuth (the phase). */
+let phaseGeo: TorusGeometry | null = null;
+function phaseRing(): TorusGeometry {
+  if (phaseGeo) return phaseGeo;
+  const g = new TorusGeometry(1, 0.014, 6, 120).rotateX(Math.PI / 2) as TorusGeometry;
+  const pos = g.getAttribute('position');
+  const col = new Float32Array(pos.count * 3);
+  const c = new Color();
+  for (let i = 0; i < pos.count; i++) {
+    // local x is Bloch y, local z is Bloch x: the azimuth is the phase
+    const phi = Math.atan2(pos.getX(i), pos.getZ(i));
+    c.setHSL(((phi / (2 * Math.PI)) + 1) % 1, 0.55, 0.62);
+    col.set([c.r, c.g, c.b], i * 3);
+  }
+  g.setAttribute('color', new BufferAttribute(col, 3));
+  return (phaseGeo = g);
+}
+const phaseMat = new MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.6, depthWrite: false });
+
 /** One sphere geometry per orb radius, so the grabbable root mesh needs no scale. */
 const orbGeoCache = new Map<number, SphereGeometry>();
 function orbGeometry(r: number): SphereGeometry {
@@ -266,6 +366,23 @@ export class OrbVisual {
   private readonly label: Mesh;
   private readonly shadow: Mesh;
   private readonly ground: number;
+  /** Qubit 2.0: the liquid (filled to the chance of 1), its surface, the gauge on the desk, the phase ring and bead. */
+  private readonly liquid: Mesh;
+  private readonly liquidMat: ShaderMaterial;
+  private readonly meniscus: Mesh;
+  private readonly meniscusMat: MeshBasicMaterial;
+  private readonly gauge: Mesh;
+  private readonly gaugeMat: ShaderMaterial;
+  private readonly phase: Mesh;
+  private readonly phaseBead: Mesh;
+  private options: OrbOptions = { ...DEFAULT_ORB_OPTIONS };
+  private skin: OrbSkinId = 'glass';
+  private level = -1;
+  private levelTarget = -1;
+  private slosh = 0;
+  private time = Math.random() * 10;
+  private pct = -1;
+  private owner: string | null = null;
 
   constructor(readonly index = 0, readonly radius = ORB_RADIUS, groundOffset = 0.15) {
     const r = radius;
@@ -378,13 +495,83 @@ export class OrbVisual {
     for (const o of [this.arc, this.arcHead, this.glyph]) (o as unknown as { pointerEvents: string }).pointerEvents = 'none';
     this.root.add(this.arc, this.glyph);
 
+    // the liquid: the chance of reading 1, as how full the orb is
+    this.liquidMat = new ShaderMaterial({
+      vertexShader: liquidVert,
+      fragmentShader: liquidFrag,
+      uniforms: { uLevel: { value: -1 }, uColor: { value: this.tint.clone().lerp(new Color('#ffffff'), 0.15) }, uTime: { value: 0 }, uOpacity: { value: 0.42 }, uSlosh: { value: 0 } },
+      transparent: true,
+      depthWrite: false,
+      side: DoubleSide,
+    });
+    this.liquid = new Mesh(sphereGeo, this.liquidMat);
+    this.liquid.scale.setScalar(r * 0.9);
+    this.liquid.renderOrder = 0;
+    this.meniscusMat = new MeshBasicMaterial({ color: this.tint.clone().lerp(new Color('#ffffff'), 0.45), transparent: true, opacity: 0.38, depthWrite: false, side: DoubleSide });
+    this.meniscus = new Mesh(meniscusGeo, this.meniscusMat);
+    // the gauge: an arc around the orb's foot, as long as the chance of 1
+    this.gaugeMat = new ShaderMaterial({ vertexShader: gaugeVert, fragmentShader: gaugeFrag, uniforms: { uFill: { value: 0 }, uColor: { value: this.tint.clone() } }, transparent: true, depthWrite: false });
+    this.gauge = new Mesh(gaugeGeo, this.gaugeMat);
+    this.gauge.scale.setScalar(r);
+    this.gauge.position.y = -groundOffset + 0.0015;
+    // the phase ring and the bead where the phase points
+    this.phase = new Mesh(phaseRing(), phaseMat);
+    this.phase.scale.setScalar(r * 1.01);
+    this.phaseBead = new Mesh(sphereGeo, tipMat);
+    this.phaseBead.scale.setScalar(r * 0.05);
+    for (const o of [this.liquid, this.meniscus, this.gauge, this.phase, this.phaseBead]) {
+      (o as unknown as { pointerEvents: string }).pointerEvents = 'none';
+      this.root.add(o);
+    }
+
     this.setBloch([0, 0, 1]);
+    this.setOptions(this.options);
+  }
+
+  /** Which layers the orb shows (the studio's toggles). */
+  setOptions(o: OrbOptions): void {
+    this.options = { ...o };
+    this.liquid.visible = o.liquid;
+    this.meniscus.visible = o.liquid;
+    this.gauge.visible = o.gauge;
+    this.phase.visible = o.phase;
+    this.phaseBead.visible = o.phase;
+    this.trail.visible = o.trail;
+    this.pct = -1;
+    this.relabel();
+  }
+
+  /** The name on the desk: q0, the chance of 1 when the gauge is on, and the owner in a shared lab. */
+  private relabel(): void {
+    const mat = this.label.material as MeshBasicMaterial;
+    const parts = [{ text: `q${this.index}`, color: qubitColor(this.index) }];
+    if (this.options.gauge && this.pct >= 0) parts.push({ text: ` ${this.pct}%`, color: '#c9ccd1' });
+    if (this.owner) parts.push({ text: ` ${this.owner.slice(0, 6)}`, color: '#c9ccd1' });
+    mat.map?.dispose();
+    mat.map = textTexture(parts, 700);
+    mat.needsUpdate = true;
   }
 
   /** Point the arrow along the Bloch vector; its length is |r| (shrinks when entangled). */
   setBloch(v: Vec3): void {
     const r = this.radius;
     const len = Math.hypot(v[0], v[1], v[2]);
+    // the chance of reading 1: the liquid's level, the gauge, the number by the name
+    const p1 = Math.min(1, Math.max(0, (1 - v[2]) / 2));
+    const target = 2 * p1 - 1;
+    if (Math.abs(target - this.levelTarget) > 0.02) this.slosh = Math.min(1, this.slosh + Math.abs(target - this.levelTarget));
+    this.levelTarget = target;
+    if (this.gaugeMat) this.gaugeMat.uniforms.uFill.value = p1;
+    const pct = Math.round(p1 * 100);
+    if (this.options && pct !== this.pct && this.options.gauge) {
+      this.pct = pct;
+      this.relabel();
+    }
+    if (this.phaseBead) {
+      const eq = Math.hypot(v[0], v[1]);
+      this.phaseBead.visible = this.options.phase && eq > 0.15;
+      if (eq > 1e-6) this.phaseBead.position.set((v[1] / eq) * r * 1.01, 0, (v[0] / eq) * r * 1.01);
+    }
     blochToLocal(v, this.tmp);
     if (len > 1e-6) this.arrow.quaternion.setFromUnitVectors(UP, this.tmp.clone().divideScalar(len));
     const L = len * r;
@@ -452,10 +639,17 @@ export class OrbVisual {
     else if (id === 'smoke') set('#16181c', 0.42, 0.08, '#e8ecf2', 0.55);
     else if (id === 'tinted') set(this.tint.clone().lerp(white, 0.1), 0.3, 0.06, this.tint.clone().lerp(white, 0.2), 0.6);
     else if (id === 'copper') set('#f3e6dc', 0.1, 0.06, '#ffd2b0', 0.3);
+    else if (id === 'pearl') set('#f6f1ea', 0.36, 0.28, '#ffe6cf', 0.45);
+    else if (id === 'obsidian') set('#08090b', 0.74, 0.03, '#e8ecf2', 0.55);
+    else if (id === 'aurora') set('#d6e8ff', 0.1, 0.05, '#9fe7ff', 0.75);
+    else if (id === 'hologram') set('#7fe9ff', 0.03, 0.1, '#7fe9ff', 0.95);
     else set('#d9e2ef', 0.12, 0.06, '#cfe0ff', 0.35);
+    this.skin = id;
+    // the hologram is all lines: the equator and meridian glow
     const copper = id === 'copper';
     for (const m of this.copperRings) m.visible = copper;
     this.equator.visible = !copper;
+    (this.equator.material as MeshBasicMaterial).opacity = id === 'hologram' ? 0.9 : 0.45;
   }
 
   clearTrail(): void {
@@ -489,6 +683,8 @@ export class OrbVisual {
     this.shadow.position.y = y + 0.0005;
     this.label.position.y = y + 0.002;
     this.select.position.y = y + 0.001;
+    this.gauge.position.y = y + 0.0015;
+    this.gauge.visible = this.options.gauge && height > 0;
     // lifted higher, the shadow spreads out; well above the desk it is gone
     const lift = Math.max(0, height - this.ground);
     this.shadow.scale.setScalar(this.radius * 1.9 * (1 + lift * 3));
@@ -504,10 +700,8 @@ export class OrbVisual {
    */
   /** In a shared lab: whose qubit this is, shown beside its name on the desk. */
   setOwner(name: string | null): void {
-    const mat = this.label.material as MeshBasicMaterial;
-    mat.map?.dispose();
-    mat.map = textTexture(name ? [{ text: `q${this.index} `, color: qubitColor(this.index) }, { text: name.slice(0, 6), color: '#c9ccd1' }] : [{ text: `q${this.index}`, color: qubitColor(this.index) }], 700);
-    mat.needsUpdate = true;
+    this.owner = name;
+    this.relabel();
   }
 
   showGate(label: string, axis: Vec3 | null, angle: number, from: Vec3, color: string = qubitColor(this.index)): void {
@@ -564,6 +758,23 @@ export class OrbVisual {
   }
 
   update(dt: number): void {
+    this.time += dt;
+    if (this.options.liquid) {
+      this.level += (this.levelTarget - this.level) * (1 - Math.exp(-dt * 4));
+      this.slosh = Math.max(0, this.slosh - dt * 0.8);
+      const u = this.liquidMat.uniforms;
+      u.uLevel.value = this.level;
+      u.uTime.value = this.time;
+      u.uSlosh.value = this.slosh;
+      // the surface: a disc where the liquid meets the air, none when empty or full
+      const L = this.level;
+      const R = this.radius * 0.9;
+      this.meniscus.visible = L > -0.97 && L < 0.97;
+      this.meniscus.position.y = L * R;
+      this.meniscus.scale.setScalar(Math.sqrt(Math.max(0, 1 - L * L)) * R);
+      this.liquid.visible = L > -0.985;
+    }
+    if (this.skin === 'aurora') (this.rim.uniforms.uColor.value as Color).setHSL((this.time * 0.04) % 1, 0.65, 0.68);
     if (this.hasTarget) {
       // how close the arrow tip is to the target, 0..1 (1 = on it)
       const close = Math.max(0, this.lastTip.clone().normalize().dot(this.targetDir));

@@ -79,8 +79,8 @@ the Meta Immersive Web SDK (IWSDK), three.js and TypeScript.
 
 **By the numbers:** 26 chapters, a 14-module course, 21 lessons, 12 puzzles, a
 daily challenge and Quantum Rush, a Play tab, 5 big-state views, 4 kinds of quantum computer
-in 3D at full size, a 49-qubit surface code, 42 achievements, 5 orb finishes, 34 Play tab items, the exponential wall, Quantum AI, Today (five minutes of spaced repetition) and your crystal that grows with it, Ket the lab partner, the lab on your real table, the double slit on your wall, look to select, a compact field-of-view layout, quantum tic-tac-toe, the double slit, Stern-Gerlach and the bomb tester, daily quests,
-voice control, shared labs and classes, and 397 unit tests.
+in 3D at full size, a 49-qubit surface code, 42 achievements, 9 orb finishes and 5 colour sets, a probability liquid in every qubit, 34 Play tab items, the exponential wall, Quantum AI, Today (five minutes of spaced repetition) and your crystal that grows with it, Ket the lab partner, the lab on your real table, the double slit on your wall, look to select, a compact field-of-view layout, quantum tic-tac-toe, the double slit, Stern-Gerlach and the bomb tester, daily quests,
+voice control, shared labs and classes, and 398 unit tests.
 
 ## The exponential wall: why a few qubits matter
 
@@ -99,6 +99,33 @@ item, and an achievement: The exponential wall (`src/quantum/scale.ts`,
 tested).
 
 ![The view down the aisle at 55 qubits: dark racks with blue and mint light strips on both sides, receding to a vanishing point, the label 55 qubits: 512 PB, 4,096 racks of memory, 1,696 more out of sight, floating over it](docs/screenshots/exponential-aisle.png)
+
+## Home: your lab, and qubits made your own
+
+![Home: the card reads Good morning, Level 4, Your lab: 2 qubits ready in your hands, Today 5 cards waiting, your crystal holds 20 ideas, with one-tap Today, Continue: Superposition and Qubit studio; on the desk q0 is half full of liquid after an H and q1 about four fifths full, each with a gauge ring on the desk, beside the crystal, and Ket explaining the H](docs/screenshots/home.png)
+
+The free lab is home. Its card greets you by the time of day with your
+level and streak, says what is waiting (today's cards, your crystal) and
+launches **Today**, **Continue** (the next chapter) or the **Qubit studio**
+with one tap; say "home" to come back to it.
+
+The qubits got an upgrade. Each orb now holds a **liquid filled to the chance
+of reading 1**: a sure 0 is empty, a sure 1 is full, H leaves it exactly half
+full, and it sloshes when a gate moves it. A **gauge** on the desk around its
+foot draws the same number, and its name reads it out ("q1 79%"). Turn on the
+**phase ring** and a colour wheel at the equator shows where the phase points.
+
+| Four new finishes: Obsidian, Aurora, Hologram (and Pearl) | The Qubit studio |
+| --- | --- |
+| ![Three pairs of orbs: Obsidian, black glass; Aurora, clear glass with a rim drifting through the colours; Hologram, glass barely there with bright cyan lines; each with its liquid and gauge](docs/screenshots/qubit-finishes.png) | ![The Qubit studio: nine finishes in a grid (Obsidian worn, Copper locked until level 5), five colour sets (Neon chosen), and Show toggles for Liquid, Gauge, Phase ring and Trail](docs/screenshots/qubit-studio.png) |
+
+The **Qubit studio** (home card, "customise my qubits", or the progress
+board) dresses them: nine finishes, the four new ones each unlocked by an
+achievement (Pearl by Solid ground, Obsidian by The exponential wall, Aurora
+by three days of Today in a row, Hologram by Quantum AI), five colour sets
+(Classic, Neon, Pastel, Ocean, Sunset; the board and labels follow), and
+what each orb shows: liquid, gauge, phase ring, trail. The physics never
+changes, only the look.
 
 ## Quantum AI: a quantum neural network learns on your desk
 
@@ -200,6 +227,7 @@ with the CNOT and not without.
 ## Contents
 
 - [The exponential wall: why a few qubits matter](#the-exponential-wall-why-a-few-qubits-matter)
+- [Home: your lab, and qubits made your own](#home-your-lab-and-qubits-made-your-own)
 - [Quantum AI: a quantum neural network learns on your desk](#quantum-ai-a-quantum-neural-network-learns-on-your-desk)
 - [Your room, every day, and everyone](#your-room-every-day-and-everyone)
 - [Try it](#try-it)
@@ -220,7 +248,7 @@ with the CNOT and not without.
 ```sh
 npm install
 npm run dev        # managed browser with the Quest 3 emulator (IWER)
-npm test           # 397 unit tests: physics, four kinds of quantum computer, gestures, spells, the course, 25 chapters, 15 lessons, puzzles, the daily challenge, achievements, builder, noise, chemistry, import, IBM compiling, Bell tests, error correction, benchmarking, voice, shared rooms and more
+npm test           # 398 unit tests: physics, four kinds of quantum computer, gestures, spells, the course, 25 chapters, 15 lessons, puzzles, the daily challenge, achievements, builder, noise, chemistry, import, IBM compiling, Bell tests, error correction, benchmarking, voice, shared rooms and more
 npm run typecheck
 npm run build
 ```
@@ -1297,9 +1325,10 @@ desk, then shrink away (a smaller burst for each achievement).
 The orbs are glass that reflects a soft studio, so highlights and edges read
 like the real thing while the arrow inside stays clear. Levelling up unlocks
 new finishes: Frost at level 2, Smoke at 3, Tinted (each orb in its qubit's
-colour) at 4 and Copper rings at 5. The **Looks** panel opens beside the
-progress board with a Wear button for each; say "next skin" to cycle. The
-physics never changes, only the look.
+colour) at 4 and Copper rings at 5, and four more come with achievements
+(see [Home](#home-your-lab-and-qubits-made-your-own)). The **Qubit studio**
+opens from the home card or beside the progress board; say "next skin" to
+cycle. The physics never changes, only the look.
 
 ### Puzzles
 

@@ -22,7 +22,7 @@ import { decodeCircuit, encodeCircuit, SHARE_PREFIX } from '../quantum/share';
 
 /** Replay links play a circuit back gate by gate. */
 const REPLAY_PREFIX = '#r=';
-import { ORB_SKINS, qubitColor, type OrbSkinId } from '../lab/visuals';
+import { ORB_SKINS, PALETTES, qubitColor, setPalette, type OrbSkinId } from '../lab/visuals';
 import type { GateName } from '../quantum/gates';
 import type { CampaignView } from './campaign';
 import { campaign } from './instance';
@@ -143,6 +143,10 @@ type GameId = 'dice' | 'penny' | 'cat' | 'spy' | 'decoder' | 'grover' | 'telepor
 const PLAY = ['Today', 'Wind down', 'Code lab', 'First five minutes', 'Supercomputer', 'Quantum AI', 'Daily quests', 'Quantum Rush', 'Zen Rush', 'Rush versus', 'Class challenge', 'Daily', 'Spy game', 'Be the decoder', 'Grover maze', 'Teleporter', 'Quantum tic-tac-toe', 'Double slit', 'Stern-Gerlach', 'Bomb tester', 'Shor in 3D', 'System Two', 'Photonic chip', 'Surface Code', 'Many worlds', 'Quantum dice', 'Penny flip', 'Schrodinger cat', 'State album', 'Giant sphere', 'Inside a qubit', 'Night sky', 'History', 'Ambient music'] as const;
 const PLAY_TAGS = ['5 min', 'calm', 'qasm', 'tour', '2^n', 'QNN', '3/day', '60s', 'zen', 'vs', 'class', 'day', 'BB84', 'd=3', '8', 'tp', 'X O', '2 slit', 'Ag', 'EV', '15', '3x', 'light',  '49q', 'H H', 'd8', 'coin', 'box', '15', '1 m', 'JJ', 'sky', '1981', 'hum'];
 
+/** What the studio's Show row toggles. */
+const STUDIO_OPTIONS = ['liquid', 'gauge', 'phase', 'trail'] as const;
+type StudioOption = (typeof STUDIO_OPTIONS)[number];
+
 /** The settings panel's tiles, in order. */
 const SETTING_KEYS = ['desk', 'pin', 'wall', 'fov', 'look', 'dwell', 'contrast', 'motion', 'captions', 'wrist', 'partner', 'speak'] as const;
 type SettingKey = (typeof SETTING_KEYS)[number];
@@ -250,6 +254,10 @@ export class UISystem extends createSystem({
   /** Settings: the room, the view and accessibility. */
   private settingsAsset: UIKitMLAsset | null = null;
   private settingsOpen = false;
+  /** Qubit studio, open on its own (not with the progress board). */
+  private studioOpen = false;
+  /** The sandbox card is the home hub (its choices launch Today, Continue, the studio). */
+  private homeShown = false;
   private settingsTimer = 0;
   /** Every button and what it does, for look to select. */
   private readonly clickables = new Map<Object3D, () => void>();
@@ -512,7 +520,9 @@ export class UISystem extends createSystem({
     for (const k of SETTING_KEYS) stIds.push(`st-${k}`, `st-${k}-m`, `st-${k}-b`, `st-${k}-bl`);
     for (const id of stIds) this.els.set(id, this.settingsAsset.requireElementById(id));
     const looksIds = ['looks-eyebrow', 'looks-close', 'looks-note'];
-    for (let i = 0; i < ORB_SKINS.length; i++) looksIds.push(`looks-r-${i}`, `looks-sw-${i}`, `looks-n-${i}`, `looks-m-${i}`, `looks-b-${i}`, `looks-bl-${i}`);
+    for (let i = 0; i < ORB_SKINS.length; i++) looksIds.push(`lk-t-${i}`, `lk-sw-${i}`, `lk-n-${i}`, `lk-m-${i}`);
+    for (let i = 0; i < PALETTES.length; i++) looksIds.push(`lk-p-${i}`, `lk-pd-${i}`, `lk-pl-${i}`);
+    for (const k of STUDIO_OPTIONS) looksIds.push(`lk-o-${k}`, `lk-o-${k}-l`);
     for (const id of looksIds) this.els.set(id, this.looksAsset.requireElementById(id));
     this.codeScale = this.code.scale.x;
     this.notesScale = this.notesAsset.scale.x;
@@ -538,7 +548,7 @@ export class UISystem extends createSystem({
       } else campaign.next();
       feedback('select');
     });
-    for (let i = 0; i < 3; i++) on(`choice-${i}`, () => (this.game === 'qml' ? this.qmlChoice(i) : this.game === 'super' ? this.superSet([this.superN + 10, 50, 2][i]) : this.game === 'today' ? this.todayPick(i) : this.game === 'spy' ? this.spyAnswer(i) : this.game === 'ttt' || this.game === 'slit' || this.game === 'sg' || this.game === 'bomb' ? this.modeChoice(i) : feedback(campaign.answer(i) ? 'success' : 'reject')));
+    for (let i = 0; i < 3; i++) on(`choice-${i}`, () => (!this.game && this.homeShown && campaign.mode === 'sandbox' ? this.homeChoice(i) : this.game === 'qml' ? this.qmlChoice(i) : this.game === 'super' ? this.superSet([this.superN + 10, 50, 2][i]) : this.game === 'today' ? this.todayPick(i) : this.game === 'spy' ? this.spyAnswer(i) : this.game === 'ttt' || this.game === 'slit' || this.game === 'sg' || this.game === 'bomb' ? this.modeChoice(i) : feedback(campaign.answer(i) ? 'success' : 'reject')));
     on('btn-replay', () => {
       if (this.rush || this.rushOver || this.racePending) return this.endRush(true);
       if (this.game) return this.endGame(true);
@@ -725,7 +735,9 @@ export class UISystem extends createSystem({
     on('btn-notes', () => (this.game === 'slit' ? this.toggleSlitWall() : campaign.mode === 'sandbox' ? this.toggleNoise() : this.toggleNotes()));
     on('btn-lib', () => this.toggleLibrary());
     on('lib-close', () => this.toggleLibrary());
-    on('looks-close', () => this.toggleProfile(false));
+    on('looks-close', () => (this.studioOpen ? this.toggleStudio(false) : this.toggleProfile(false)));
+    PALETTES.forEach((pal, i) => on(`lk-p-${i}`, () => this.choosePalette(pal.id)));
+    for (const k of STUDIO_OPTIONS) on(`lk-o-${k}`, () => this.toggleOrbOption(k));
     on('nav-set', () => this.toggleSettings());
     on('st-close', () => this.toggleSettings(false));
     for (const k of SETTING_KEYS) on(`st-${k}-b`, () => this.settingAction(k));
@@ -743,7 +755,7 @@ export class UISystem extends createSystem({
       feedback('select');
     });
     on('wr-u', () => lab.undo() && feedback('select'));
-    ORB_SKINS.forEach((skin, i) => on(`looks-b-${i}`, () => this.wearSkin(skin.id)));
+    ORB_SKINS.forEach((skin, i) => on(`lk-t-${i}`, () => this.wearSkin(skin.id)));
     // the finish saved with the profile
     this.world.getSystem(LabSystem)?.setSkin(this.currentSkin());
     on('lib-tab-circuits', () => this.libShow('circuit'));
@@ -1084,9 +1096,25 @@ export class UISystem extends createSystem({
       const lead = this.sharedOpen
         ? `A shared circuit: ${lab.history.length} steps on ${lab.n} qubits. Scrub the timeline to replay it.`
         : preset && preset.qubits === lab.n ? preset.note : `${lab.n} qubits.`;
-      this.text('chapter-eyebrow', 'Sandbox');
-      this.text('chapter-title', 'Free lab');
-      this.text('chapter-body', `${lead} Every gate and gesture is unlocked.`);
+      // the free lab is home: who you are, what is waiting, one tap to anything
+      const home = !this.sharedOpen && !this.room && !preset;
+      this.homeShown = home;
+      if (home) {
+        const today = dayKey();
+        const waiting = this.memory.sessions[today] ? 0 : planSession(this.memory, today).length;
+        const streak = sessionStreak(this.memory, today);
+        const g = growthOf(this.memory, today);
+        const next = campaign.chapters[this.nextChapter()];
+        this.text('chapter-eyebrow', `${GREETING[partOfDay(new Date().getHours())]}  /  Level ${this.level()}${streak ? `  /  ${streak} day streak` : ''}`);
+        this.text('chapter-title', 'Your lab');
+        this.text('chapter-body', `${lab.n} qubits, ready in your hands. ${waiting ? `Today: ${waiting} cards waiting, about ${Math.max(2, waiting)} minutes.` : 'Today is done: your crystal is awake.'}${g.shards.length ? ` Your crystal holds ${g.shards.length} ideas.` : ''}`);
+        this.modeChoices([waiting ? `Today: ${waiting} cards` : 'Today: done', `Continue: ${next?.title ?? 'chapters'}`, 'Qubit studio']);
+      } else {
+        this.text('chapter-eyebrow', 'Sandbox');
+        this.text('chapter-title', 'Free lab');
+        this.text('chapter-body', `${lead} Every gate and gesture is unlocked.`);
+        this.els.get('choices')?.setProperties({ display: 'none' });
+      }
       const goal =
         lab.n >= MAX_ORBS
           ? this.immersive ? 'Tap 100 shots, or a timeline step to rewind' : 'Space for 100 shots, [ ] for other circuits'
@@ -1282,14 +1310,19 @@ export class UISystem extends createSystem({
   private currentSkin(): OrbSkinId {
     const id = this.profile.data.skin as OrbSkinId | undefined;
     const skin = ORB_SKINS.find((s) => s.id === id);
-    return skin && skin.level <= this.level() ? skin.id : 'glass';
+    return skin && this.skinOpen(skin) ? skin.id : 'glass';
+  }
+
+  /** A finish is open at its level, and (for the newer ones) once its achievement is earned. */
+  private skinOpen(skin: (typeof ORB_SKINS)[number]): boolean {
+    return skin.level <= this.level() && (!skin.unlock || !!this.profile.data.unlocked[skin.unlock.achievement]);
   }
 
   /** Wear a finish (if the level allows it). */
   private wearSkin(id: OrbSkinId): void {
     const skin = ORB_SKINS.find((s) => s.id === id)!;
-    if (skin.level > this.level()) {
-      this.flash(`${skin.name} unlocks at level ${skin.level}.`);
+    if (!this.skinOpen(skin)) {
+      this.flash(skin.unlock ? `${skin.name} unlocks with the achievement ${skin.unlock.text}.` : `${skin.name} unlocks at level ${skin.level}.`);
       return feedback('reject');
     }
     this.profile.data.skin = id;
@@ -1303,7 +1336,7 @@ export class UISystem extends createSystem({
 
   /** The next unlocked finish (voice: "next skin"). */
   private nextSkin(): void {
-    const open = ORB_SKINS.filter((s) => s.level <= this.level());
+    const open = ORB_SKINS.filter((s) => this.skinOpen(s));
     const i = open.findIndex((s) => s.id === this.currentSkin());
     this.wearSkin(open[(i + 1) % open.length].id);
   }
@@ -1312,19 +1345,87 @@ export class UISystem extends createSystem({
     if (!this.looksAsset) return;
     const lvl = this.level();
     const now = this.currentSkin();
-    const swatch: Record<OrbSkinId, string> = { glass: '#d9e2ef', frost: '#f4f7fb', smoke: '#2a2d33', tinted: qubitColor(0), copper: '#c47c4e' };
-    this.text('looks-eyebrow', `Level ${lvl}  /  ${ORB_SKINS.filter((s) => s.level <= lvl).length} of ${ORB_SKINS.length} unlocked`);
+    const swatch: Record<OrbSkinId, string> = { glass: '#d9e2ef', frost: '#f4f7fb', smoke: '#2a2d33', tinted: qubitColor(0), copper: '#c47c4e', pearl: '#f6f1ea', obsidian: '#0a0b0d', aurora: '#9fe7ff', hologram: '#7fe9ff' };
+    this.text('looks-eyebrow', `Level ${lvl}  /  ${ORB_SKINS.filter((s) => this.skinOpen(s)).length} of ${ORB_SKINS.length} finishes`);
     ORB_SKINS.forEach((skin, i) => {
-      const open = skin.level <= lvl, on = skin.id === now;
-      this.text(`looks-n-${i}`, skin.name);
-      this.els.get(`looks-n-${i}`)?.setProperties({ color: open ? C.text : C.textDim });
-      this.text(`looks-m-${i}`, open ? skin.note : `Unlocks at level ${skin.level}`);
-      this.els.get(`looks-sw-${i}`)?.setProperties({ backgroundColor: open ? swatch[skin.id] : '#2d2f33', borderColor: on ? C.done : '#55585e' });
-      this.text(`looks-bl-${i}`, on ? 'Wearing' : open ? 'Wear' : `Level ${skin.level}`);
-      this.bg(`looks-b-${i}`, on ? '#1f3a30' : open ? C.primary : C.primaryIdle);
-      this.els.get(`looks-bl-${i}`)?.setProperties({ color: on ? C.done : open ? '#ffffff' : C.textDim });
+      const open = this.skinOpen(skin), on = skin.id === now;
+      this.text(`lk-n-${i}`, skin.name);
+      this.els.get(`lk-n-${i}`)?.setProperties({ color: open ? C.text : C.textDim });
+      this.text(`lk-m-${i}`, on ? 'Wearing' : open ? 'Tap to wear' : skin.unlock ? `Earn ${skin.unlock.text}` : `Level ${skin.level}`);
+      this.els.get(`lk-m-${i}`)?.setProperties({ color: on ? C.done : C.textDim });
+      this.els.get(`lk-sw-${i}`)?.setProperties({ backgroundColor: open ? swatch[skin.id] : '#2d2f33' });
+      this.els.get(`lk-t-${i}`)?.setProperties({ borderColor: on ? C.done : '#242528', backgroundColor: on ? '#1f2a26' : '#242528' });
     });
+    PALETTES.forEach((pal, i) => {
+      const on = pal.id === settings.palette;
+      this.text(`lk-pl-${i}`, pal.name);
+      this.els.get(`lk-pd-${i}`)?.setProperties({ backgroundColor: pal.colors[0] });
+      this.bg(`lk-p-${i}`, on ? C.primary : '#2d2f33');
+    });
+    const shown: Record<StudioOption, boolean> = { liquid: settings.orbLiquid, gauge: settings.orbGauge, phase: settings.orbPhase, trail: settings.orbTrail };
+    for (const k of STUDIO_OPTIONS) this.bg(`lk-o-${k}`, shown[k] ? C.primary : '#2d2f33');
     this.dirty = true;
+  }
+
+  // ---- Qubit studio: colours and what the orbs show
+
+  private toggleStudio(open = !this.studioOpen): void {
+    this.studioOpen = open;
+    if (open) {
+      this.libOpen = this.dbgOpen = this.classOpen = false;
+      this.settingsOpen = false;
+      if (this.notes?.open) this.notes.close();
+      this.noiseOpen = false;
+      this.renderLooks();
+    }
+    feedback('select');
+  }
+
+  private choosePalette(id: string): void {
+    settings.palette = id;
+    saveSettings();
+    setPalette(id);
+    this.world.getSystem(LabSystem)?.rebuildOrbs();
+    this.renderLooks();
+    this.renderDock();
+    feedback('select');
+  }
+
+  private toggleOrbOption(k: StudioOption): void {
+    if (k === 'liquid') settings.orbLiquid = !settings.orbLiquid;
+    else if (k === 'gauge') settings.orbGauge = !settings.orbGauge;
+    else if (k === 'phase') settings.orbPhase = !settings.orbPhase;
+    else settings.orbTrail = !settings.orbTrail;
+    saveSettings();
+    this.world.getSystem(LabSystem)?.setOrbOptions({ liquid: settings.orbLiquid, gauge: settings.orbGauge, phase: settings.orbPhase, trail: settings.orbTrail });
+    this.renderLooks();
+    feedback('select');
+  }
+
+  // ---- home: the free lab as a hub
+
+  /** The first chapter not yet finished (for Continue). */
+  private nextChapter(): number {
+    const done = new Set(campaign.view.completed);
+    for (let i = 0; i < campaign.chapters.length; i++) if (!done.has(i)) return i;
+    return campaign.chapters.length - 1;
+  }
+
+  private homeChoice(i: number): void {
+    if (i === 0) return this.startPlay(PLAY.indexOf('Today'));
+    if (i === 1) {
+      campaign.startChapter(this.nextChapter());
+      return feedback('select');
+    }
+    this.toggleStudio(true);
+  }
+
+  /** Back to the home card: the free lab with two qubits. */
+  private goHome(): void {
+    this.endRush(false);
+    this.endGame(false);
+    campaign.enterSandbox(2, []);
+    feedback('select');
   }
 
   // ---- Quantum Rush: build target states against the clock
@@ -3527,6 +3628,12 @@ export class UISystem extends createSystem({
       case 'ask':
         this.ketAnswer(c.text);
         return true;
+      case 'home':
+        this.goHome();
+        return true;
+      case 'studio':
+        this.toggleStudio(true);
+        return true;
       case 'partner':
         if (settings.partner !== c.on) this.settingAction('partner');
         return true;
@@ -5279,7 +5386,8 @@ export class UISystem extends createSystem({
       this.libAsset!.position.copy(PARKED);
     }
     // the finishes stand in front of the board while the progress board is up
-    if (this.profileOpen) {
+    if (this.studioOpen && (this.notes!.open || this.libOpen || this.noiseOpen || this.profileOpen || this.settingsOpen)) this.studioOpen = false;
+    if (this.profileOpen || this.studioOpen) {
       this.place(this.looksAsset!, 'notes-panel');
       this.looksAsset!.visible = true;
     } else {

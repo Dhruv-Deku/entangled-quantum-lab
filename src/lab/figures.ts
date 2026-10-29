@@ -1,4 +1,5 @@
 import { CHSH_ALICE, CHSH_BOB, logicalError, TSIRELSON, zenoSurvival, type ChshResult, type RbResult, type Unitary } from '../quantum/advanced';
+import { QUBIT_COLORS } from './visuals';
 
 /**
  * Figures a chapter puts on the circuit board: the CHSH score, the bit-flip
@@ -24,7 +25,8 @@ const MINT = '#3ddc97';
 const BLUE = '#2d7ff9';
 const SOFT_BLUE = '#7fa9f5';
 const CORAL = '#ff8a7a';
-const QUBIT = ['#FF7759', '#3FC6C9', '#9B87F5', '#7BCB6A', '#FF8FB6'];
+/** The qubit colours: the live set, so the studio's colour sets reach the board too. */
+const QUBIT = QUBIT_COLORS;
 const FONT = 'Inter, system-ui, sans-serif';
 
 function text(g: CanvasRenderingContext2D, s: string, x: number, y: number, color: string, font: string, align: CanvasTextAlign = 'left'): void {

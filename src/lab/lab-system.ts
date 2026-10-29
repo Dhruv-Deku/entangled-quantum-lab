@@ -76,7 +76,7 @@ import { manyWorlds } from '../quantum/paths';
 import { pureDensity, type StateView } from '../quantum/state-views';
 import { T5 } from '../quantum/routing';
 import { feedback, setListener, setSoundSource } from './feedback';
-import { GOLD, GroupVisual, ORB_RADIUS, OrbVisual, setOrbEnvironment, StrikeVisual, ThreadVisual, type OrbSkinId } from './visuals';
+import { GOLD, GroupVisual, ORB_RADIUS, OrbVisual, setOrbEnvironment, setPalette, StrikeVisual, ThreadVisual, type OrbOptions, type OrbSkinId } from './visuals';
 
 /** Desk-top workspace origin when there is no head pose to place it from (desktop view). */
 const DESK = new Vector3(0, 0.74, -0.42);
@@ -137,6 +137,8 @@ export class LabSystem extends createSystem({
   fullSize = false;
   /** The orbs' finish (unlocked by level). */
   private orbSkin: OrbSkinId = 'glass';
+  /** What every orb shows beyond its arrow (Qubit studio). */
+  private orbOptions: OrbOptions = { liquid: settings.orbLiquid, gauge: settings.orbGauge, phase: settings.orbPhase, trail: settings.orbTrail };
   /** 0 on the desk .. 1 full size, eased. */
   private grow = 0;
   private roomShown: object | null = null;
@@ -419,6 +421,7 @@ export class LabSystem extends createSystem({
 
     // development: the lab system, for probing scenes from the managed browser
     if (import.meta.env.DEV) (globalThis as { __entangledLab?: LabSystem }).__entangledLab = this;
+    setPalette(settings.palette);
     this.syncOrbs(true);
     this.cleanupFuncs.push(lab.on((e) => this.onLabEvent(e)));
 
@@ -593,6 +596,7 @@ export class LabSystem extends createSystem({
       const i = this.orbs.length;
       const visual = new OrbVisual(i, ORB_RADIUS, ORB_HEIGHT);
       visual.applySkin(this.orbSkin);
+      visual.setOptions(this.orbOptions);
       visual.root.name = `Qubit${i}`;
       if (this.owners[i]) visual.setOwner(this.owners[i]);
       const entity = this.world.createTransformEntity(visual.root, { parent: this.workspace });
@@ -788,6 +792,20 @@ export class LabSystem extends createSystem({
       o.entity.removeComponent(DepthOccludable);
       o.entity.addComponent(DepthOccludable, { mode: OcclusionShadersMode.SoftOcclusion });
     }
+  }
+
+  /** Qubit studio: what the orbs show. */
+  setOrbOptions(o: OrbOptions): void {
+    this.orbOptions = { ...o };
+    for (const orb of this.orbs) orb.visual.setOptions(this.orbOptions);
+  }
+
+  /** Make the orbs again (a new colour set lives in their materials and labels). */
+  rebuildOrbs(): void {
+    while (this.orbs.length) this.orbs.pop()!.entity.dispose();
+    this.syncOrbs(true);
+    this.orbs.forEach((o, i) => o.visual.setSelected(i === lab.selected));
+    this.stateVersion++;
   }
 
   /** Recentre the desk in front of the player (also used by the recenter button); a pinned lab stays put until next time. */

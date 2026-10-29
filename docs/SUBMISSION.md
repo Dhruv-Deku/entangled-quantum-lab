@@ -45,6 +45,10 @@ for it (Qiskit, OpenQASM, PennyLane) writes itself beside you.
   phone, a laptop, a server, then racks of memory lining an aisle that runs
   away from your desk through your room. Around 49 qubits no supercomputer
   has the memory. It is the welcome tour's finale.
+- **Home and Qubit 2.0:** the free lab is a home hub (greeting, streak,
+  one-tap Today, Continue, Qubit studio). Every qubit holds a liquid filled
+  to its chance of reading 1, with a gauge on the desk; nine finishes (four
+  unlocked by achievements) and five colour sets in the Qubit studio.
 - **Quantum AI:** a real quantum neural network trains live on your desk
   (parameter-shift gradients, as on quantum hardware); its decision
   landscape reshapes until every point is on its side. XOR needs

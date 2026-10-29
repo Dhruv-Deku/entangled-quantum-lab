@@ -29,4 +29,13 @@ describe('settings', () => {
     expect(layoutFor('auto', null)).toBe('wide');
     expect(layoutFor('compact', 120)).toBe('compact');
   });
+
+  it('keeps the qubit studio choices: a colour set by name, and what the orbs show', () => {
+    const s = parseSettings(JSON.stringify({ palette: 'neon', orbLiquid: false, orbPhase: true }));
+    expect(s.palette).toBe('neon');
+    expect(s.orbLiquid).toBe(false);
+    expect(s.orbPhase).toBe(true);
+    expect(s.orbGauge).toBe(DEFAULT_SETTINGS.orbGauge);
+    expect(parseSettings(JSON.stringify({ palette: '<script>' })).palette).toBe('classic');
+  });
 });

@@ -24,6 +24,7 @@ export type VoiceCommand =
   | { type: 'settings' | 'contrast' | 'look' | 'captions' | 'wall' }
   | { type: 'pin'; on: boolean }
   | { type: 'ask'; text: string }
+  | { type: 'home' | 'studio' }
   | { type: 'partner'; on: boolean }
   | { type: 'machine'; id: 'superconducting' | 'ions' | 'atoms' | 'photons' }
   | { type: 'compare' }
@@ -126,6 +127,8 @@ export function parseVoice(text: string): VoiceCommand | null {
   if (/(start|share|open) (a |the )?(shared )?lab|share (this|the circuit)/.test(s)) return { type: 'share' };
   if (/class ?room|class panel|my class|the class/.test(s)) return { type: 'classroom' };
   if (/\b(listen|play (the|this) (state|chord)|hear (it|the state))\b/.test(s)) return { type: 'listen' };
+  if (/^(go )?home$|home screen|my lab$/.test(s)) return { type: 'home' };
+  if (/studio|customi[sz]e|change (the )?colou?rs?|dress (my|the) qubits/.test(s)) return { type: 'studio' };
   if (/wind(ing)? down|calm review|bed ?time|before (bed|sleep)/.test(s)) return { type: 'play', item: 'Wind down' };
   if (/super ?computer|exponential|how (big|much memory)|why (does it|it) matter/.test(s)) return { type: 'play', item: 'Supercomputer' };
   if (/quantum (ai|a i|machine learning)|neural network|machine learning|\bai\b/.test(s)) return { type: 'play', item: 'Quantum AI' };
@@ -276,6 +279,10 @@ export function describe(c: VoiceCommand): string {
       return 'the double slit on your wall';
     case 'ask':
       return `asking Ket: ${c.text}`;
+    case 'home':
+      return 'home';
+    case 'studio':
+      return 'the qubit studio';
     case 'partner':
       return c.on ? 'Ket, back on' : 'Ket, quiet';
     case 'machine':
