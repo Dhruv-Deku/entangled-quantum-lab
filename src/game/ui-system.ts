@@ -143,8 +143,8 @@ const TABS = ['course', 'campaign', 'learn', 'puzzle', 'build', 'sandbox', 'play
 /** The Play tab: arcade and showcase picks. */
 type GameId = 'dice' | 'penny' | 'cat' | 'spy' | 'decoder' | 'grover' | 'teleport' | 'ttt' | 'slit' | 'sg' | 'bomb' | 'today' | 'super' | 'qml' | 'sculpt' | SceneId;
 
-const PLAY = ['Today', 'Wind down', 'Code lab', 'First five minutes', 'Supercomputer', 'Quantum AI', 'State sculptor', 'Inside an atom', 'Quantum Galton board', 'Tunnelling', 'Pull a molecule apart', 'Ride your circuit', 'Daily quests', 'Quantum Rush', 'Zen Rush', 'Rush versus', 'Class challenge', 'Daily', 'Spy game', 'Be the decoder', 'Grover maze', 'Teleporter', 'Quantum tic-tac-toe', 'Double slit', 'Stern-Gerlach', 'Bomb tester', 'Shor in 3D', 'System Two', 'Photonic chip', 'Surface Code', 'Many worlds', 'Quantum dice', 'Penny flip', 'Schrodinger cat', 'State album', 'Giant sphere', 'Inside a qubit', 'Night sky', 'History', 'Ambient music'] as const;
-const PLAY_TAGS = ['5 min', 'calm', 'qasm', 'tour', '2^n', 'QNN', 'prep', 'H', 'walk', 'wall', 'H2', 'ride', '3/day', '60s', 'zen', 'vs', 'class', 'day', 'BB84', 'd=3', '8', 'tp', 'X O', '2 slit', 'Ag', 'EV', '15', '3x', 'light',  '49q', 'H H', 'd8', 'coin', 'box', '15', '1 m', 'JJ', 'sky', '1981', 'hum'];
+const PLAY = ['Today', 'Wind down', 'Code lab', 'First five minutes', 'Supercomputer', 'Quantum AI', 'State sculptor', 'Bell test in your room', 'Wave hands', 'Light from a box', 'Inside an atom', 'Quantum Galton board', 'Tunnelling', 'Pull a molecule apart', 'Ride your circuit', 'Daily quests', 'Quantum Rush', 'Zen Rush', 'Rush versus', 'Class challenge', 'Daily', 'Spy game', 'Be the decoder', 'Grover maze', 'Teleporter', 'Quantum tic-tac-toe', 'Double slit', 'Stern-Gerlach', 'Bomb tester', 'Shor in 3D', 'System Two', 'Photonic chip', 'Surface Code', 'Many worlds', 'Quantum dice', 'Penny flip', 'Schrodinger cat', 'State album', 'Giant sphere', 'Inside a qubit', 'Night sky', 'History', 'Ambient music'] as const;
+const PLAY_TAGS = ['5 min', 'calm', 'qasm', 'tour', '2^n', 'QNN', 'prep', 'Nobel', 'hands', 'QLED', 'H', 'walk', 'wall', 'H2', 'ride', '3/day', '60s', 'zen', 'vs', 'class', 'day', 'BB84', 'd=3', '8', 'tp', 'X O', '2 slit', 'Ag', 'EV', '15', '3x', 'light',  '49q', 'H H', 'd8', 'coin', 'box', '15', '1 m', 'JJ', 'sky', '1981', 'hum'];
 
 /** Shots in one State sculptor run. */
 const SCULPT_SHOTS = 1000;
@@ -298,6 +298,7 @@ export class UISystem extends createSystem({
         this.updateBoardMode();
       },
       celebrate: () => this.world.getSystem(LabSystem)?.celebrate(false),
+      hands: () => this.world.getSystem(GestureSystem)?.hands ?? { left: null, right: null },
     }));
   }
 

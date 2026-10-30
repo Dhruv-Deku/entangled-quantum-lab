@@ -60,6 +60,16 @@ for it (Qiskit, OpenQASM, PennyLane) writes itself beside you.
   (Grover-Rudolph state preparation with only Ry and CNOT, the way quantum
   computers take in data). 1000 shots fill each bar to your line; the same
   program opens in Qiskit, OpenQASM 3 and PennyLane, and runs on IBM.
+- **The Bell test in your room:** the 2022 Nobel prize experiment at room
+  scale. Two detectors on your real walls, entangled pairs flying from the
+  desk, dials set at random mid-flight; the score climbs past the classical
+  limit of 2 toward 2.83, and a hidden-instructions mode shows it cannot.
+- **Wave hands:** dip your fingertips into a tank of quantum waves on the
+  desk; each fingertip is a source and the interference pattern follows
+  your fingers live, while photons build the fringes on a screen.
+- **Light from a box:** your palms are the walls of a box holding an
+  electron; squeeze to raise its energy, fold a finger to drop a level, and
+  it gives out light in its true colour (how QLED quantum dots work).
 - **Five desk scenes:** a hydrogen atom as nine thousand sampled electron
   positions you collapse by looking; a quantum Galton board where marbles
   make a bell curve and quantum walkers pile up at the edges; tunnelling
@@ -74,7 +84,7 @@ for it (Qiskit, OpenQASM, PennyLane) writes itself beside you.
 - **Learn:** 26 chapters (superposition to the surface code), 21 lessons, a
   course with quizzes, puzzles with par, a daily challenge the same for
   everyone, and a Code Lab where you write OpenQASM 3 on the panel.
-- **Play:** 40 items, including quantum tic-tac-toe on a tappable 3D board,
+- **Play:** 43 items, including quantum tic-tac-toe on a tappable 3D board,
   the double slit, Stern-Gerlach, the Elitzur-Vaidman bomb tester, a spy game
   (BB84), a Grover maze, teleportation booths and Quantum Rush.
 - **Real hardware:** the dilution refrigerator, a trapped-ion chamber, a

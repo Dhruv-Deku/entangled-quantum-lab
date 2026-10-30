@@ -1753,3 +1753,185 @@ export function moleculeFigure(v: MoleculeView): Figure {
     },
   };
 }
+
+// ---------------------------------------------------------------- wave hands
+
+export interface WavesView {
+  sources: number;
+  hands: boolean;
+  /** Expected intensity across the screen and the photons counted per bin. */
+  intensity: number[];
+  hits: number[];
+  /** Source spacing and screen distance (metres) and wavelength, for the formula (null when not two sources). */
+  spacing: number | null;
+  distance: number;
+  wavelength: number;
+}
+
+export function wavesFigure(v: WavesView): Figure {
+  const n = v.hits.reduce((a, b) => a + b, 0);
+  return {
+    key: `waves:${v.sources}:${v.hands}:${digest(v.intensity)}:${n}:${digest(v.hits)}`,
+    draw: (g, w, h) => {
+      panel(g, w, h, `Wave hands  /  ${v.sources} source${v.sources === 1 ? '' : 's'}${v.hands ? ', your fingertips' : ''}`, `${n} photons`);
+      const x0 = 70, y0 = 110, pw = 1000, ph = 380;
+      const max = Math.max(1e-9, ...v.intensity);
+      const hmax = Math.max(1, ...v.hits);
+      const bw = pw / v.intensity.length;
+      g.strokeStyle = LINE;
+      g.lineWidth = 2;
+      g.strokeRect(x0, y0, pw, ph);
+      v.hits.forEach((c, i) => {
+        if (!c) return;
+        const bh = (c / hmax) * ph * 0.92;
+        g.fillStyle = 'rgba(228,230,235,0.55)';
+        g.fillRect(x0 + i * bw + 1, y0 + ph - bh, Math.max(1, bw - 2), bh);
+      });
+      g.strokeStyle = SOFT_BLUE;
+      g.lineWidth = 4;
+      g.beginPath();
+      v.intensity.forEach((val, i) => {
+        const px = x0 + (i + 0.5) * bw, py = y0 + ph - (val / max) * ph * 0.92;
+        if (i) g.lineTo(px, py);
+        else g.moveTo(px, py);
+      });
+      g.stroke();
+      text(g, 'across the detector screen', x0 + pw / 2, y0 + ph + 34, DIM, '600 22px', 'center');
+      const rx = 1120;
+      text(g, 'Blue: |psi|^2, where the', rx, 150, SOFT_BLUE, '600 22px');
+      text(g, 'waves say photons land.', rx, 178, DIM, '500 21px');
+      text(g, 'White: where they did.', rx, 228, INK, '600 22px');
+      if (v.spacing) {
+        const s = (v.wavelength * v.distance) / v.spacing;
+        text(g, 'Fringe spacing', rx, 290, DIM, '600 22px');
+        text(g, `lambda L / d = ${(s * 100).toFixed(1)} cm`, rx, 324, INK, '700 26px');
+        text(g, `d = ${(v.spacing * 100).toFixed(1)} cm apart`, rx, 358, DIM, '500 21px');
+      }
+      for (const [i, line] of wrap(g, 'Move the sources apart and the fringes crowd together. Each photon lands in one place; only together do they show the waves.', '500 21px', 440).entries()) text(g, line, rx, 410 + i * 28, DIM, '500 21px');
+      text(g, 'The same sum of waves is why a single photon or electron makes an interference pattern: it goes every way at once.', 44, h - 26, DIM, '500 21px');
+    },
+  };
+}
+
+// ---------------------------------------------------------------- light from a box
+
+export interface BoxView {
+  n: number;
+  lengthNm: number;
+  /** Energies of levels 1..4 (eV). */
+  levels: number[];
+  /** The last photon given out: wavelength and its colour (null: invisible). */
+  photon: { from: number; to: number; nm: number; rgb: [number, number, number] | null; name: string } | null;
+  hands: boolean;
+}
+
+export function boxFigure(v: BoxView): Figure {
+  return {
+    key: `box:${v.n}:${v.lengthNm.toFixed(3)}:${v.photon ? `${v.photon.from}-${v.photon.to}-${v.photon.nm.toFixed(0)}` : '-'}:${v.hands}`,
+    draw: (g, w, h) => {
+      panel(g, w, h, `Light from a box  /  an electron in ${v.lengthNm.toFixed(2)} nm`, v.hands ? 'your hands are the walls' : 'squeeze or widen the box');
+      // the ladder
+      const lx = 90, ly = 110, lh = 400, lw = 300;
+      const top = Math.max(...v.levels) * 1.05;
+      text(g, 'energy (eV)', lx, ly - 12, DIM, '600 20px');
+      v.levels.forEach((e, i) => {
+        const y = ly + lh - (e / top) * lh;
+        const on = i + 1 === v.n;
+        g.strokeStyle = on ? BLUE : '#8a8d93';
+        g.lineWidth = on ? 6 : 3;
+        g.beginPath();
+        g.moveTo(lx, y);
+        g.lineTo(lx + lw, y);
+        g.stroke();
+        text(g, `n = ${i + 1}`, lx + lw + 16, y + 8, on ? INK : DIM, '600 20px');
+        text(g, `${e.toFixed(2)}`, lx - 12, y + 8, DIM, '500 18px', 'right');
+      });
+      if (v.photon) {
+        const yf = ly + lh - (v.levels[v.photon.from - 1] / top) * lh, yt = ly + lh - (v.levels[v.photon.to - 1] / top) * lh;
+        const col = v.photon.rgb ? `rgb(${v.photon.rgb.map((c) => Math.round(c * 255)).join(',')})` : DIM;
+        g.strokeStyle = col;
+        g.lineWidth = 4;
+        g.setLineDash(v.photon.rgb ? [] : [8, 6]);
+        g.beginPath();
+        g.moveTo(lx + lw * 0.6, yf);
+        g.lineTo(lx + lw * 0.6, yt);
+        g.stroke();
+        g.setLineDash([]);
+      }
+      // the spectrum, with the photon marked
+      const sx = 560, sy = 150, sw = 980, sh = 60;
+      const toX = (nm: number) => sx + ((nm - 300) / (900 - 300)) * sw;
+      for (let nm = 300; nm < 900; nm += 2) {
+        const r = spectrumColor(nm);
+        g.fillStyle = r ?? '#26282c';
+        g.fillRect(toX(nm), sy, toX(nm + 2) - toX(nm) + 0.5, sh);
+      }
+      text(g, 'ultraviolet', sx, sy + sh + 28, DIM, '500 18px');
+      text(g, 'infrared', sx + sw, sy + sh + 28, DIM, '500 18px', 'right');
+      [400, 500, 600, 700, 800].forEach((nm) => text(g, `${nm}`, toX(nm), sy - 10, DIM, '500 18px', 'center'));
+      if (v.photon) {
+        const x = toX(Math.max(300, Math.min(898, v.photon.nm)));
+        g.strokeStyle = '#ffffff';
+        g.lineWidth = 3;
+        g.beginPath();
+        g.moveTo(x, sy - 4);
+        g.lineTo(x, sy + sh + 4);
+        g.stroke();
+        text(g, `${Math.round(v.photon.nm)} nm: ${v.photon.name}`, sx, 300, INK, '700 34px');
+        text(g, `from n = ${v.photon.from} to n = ${v.photon.to}`, sx, 338, DIM, '600 22px');
+      } else text(g, 'Drop a level to give out light', sx, 300, DIM, '600 26px');
+      for (const [i, line] of wrap(g, 'Every level rises as 1 / L^2: squeeze the box and the light it gives out turns bluer. Quantum dots in QLED screens choose their colours this way, by their size.', '500 21px', 960).entries()) text(g, line, sx, 400 + i * 30, DIM, '500 21px');
+      text(g, `Level ${v.n}: ${v.levels[v.n - 1].toFixed(2)} eV. E = n^2 h^2 / (8 m L^2).`, 44, h - 26, DIM, '500 21px');
+    },
+  };
+}
+
+function spectrumColor(nm: number): string | null {
+  if (nm < 380 || nm > 750) return null;
+  let r = 0, gg = 0, b = 0;
+  if (nm < 440) { r = -(nm - 440) / 60; b = 1; }
+  else if (nm < 490) { gg = (nm - 440) / 50; b = 1; }
+  else if (nm < 510) { gg = 1; b = -(nm - 510) / 20; }
+  else if (nm < 580) { r = (nm - 510) / 70; gg = 1; }
+  else if (nm < 645) { r = 1; gg = -(nm - 645) / 65; }
+  else r = 1;
+  const f = nm < 420 ? 0.3 + (0.7 * (nm - 380)) / 40 : nm > 700 ? 0.3 + (0.7 * (750 - nm)) / 50 : 1;
+  return `rgb(${Math.round(r * f * 255)},${Math.round(gg * f * 255)},${Math.round(b * f * 255)})`;
+}
+
+// ---------------------------------------------------------------- the Bell test across the room
+
+export interface BellRoomView {
+  mode: 'quantum' | 'hidden';
+  /** S after each round so far (thinned), and the latest score. */
+  history: number[];
+  s: number;
+  se: number;
+  rounds: number;
+  e: number[][];
+}
+
+export function bellRoomFigure(v: BellRoomView): Figure {
+  return {
+    key: `bellroom:${v.mode}:${v.rounds}`,
+    draw: (g, w, h) => {
+      panel(g, w, h, `The Bell test across your room  /  ${v.mode === 'quantum' ? 'entangled pairs' : 'hidden instructions'}`, `${v.rounds} rounds`);
+      const a = axes(g, 110, 110, 900, 400, [0, Math.max(20, v.history.length - 1)], [0, 4], [], [0, 1, 2, 2.83, 4], 'rounds', 'score S (4 is the most any game allows)');
+      polyline(g, a, [[0, 2], [Math.max(20, v.history.length - 1), 2]], CORAL, 3, [10, 8]);
+      polyline(g, a, [[0, 2 * Math.SQRT2], [Math.max(20, v.history.length - 1), 2 * Math.SQRT2]], GOLD, 2, [4, 6]);
+      if (v.history.length > 1) polyline(g, a, v.history.map((s, i) => [i, Math.max(0, Math.min(4, s))]), v.mode === 'quantum' ? SOFT_BLUE : INK, 4);
+      text(g, 'classical limit 2', a.sx(0) + 10, a.sy(2) + 26, CORAL, '600 20px');
+      text(g, 'quantum limit 2.83', a.sx(0) + 10, a.sy(2 * Math.SQRT2) - 12, GOLD, '600 20px');
+      const rx = 1080;
+      text(g, `S = ${v.s.toFixed(2)}`, rx, 170, INK, '700 52px');
+      text(g, `+- ${v.se.toFixed(2)}`, rx, 210, DIM, '600 24px');
+      const sigma = v.se > 0 ? (v.s - 2) / v.se : 0;
+      if (v.rounds >= 20)
+        text(g, v.s > 2 && sigma > 3 ? `${sigma.toFixed(1)} sigma past the classical limit` : v.s > 2 ? 'past 2, but not yet sure' : 'within the classical limit', rx, 256, v.s > 2 && sigma > 3 ? MINT : DIM, '600 22px');
+      const names = [['0, 45', '0, -45'], ['90, 45', '90, -45']];
+      text(g, 'Correlations (dial angles)', rx, 320, DIM, '600 21px');
+      for (let x = 0; x < 2; x++) for (let y = 0; y < 2; y++) text(g, `E(${names[x][y]}) = ${v.e[x][y] >= 0 ? '+' : ''}${v.e[x][y].toFixed(2)}`, rx, 356 + (x * 2 + y) * 30, INK, '500 21px');
+      text(g, 'S = E1 + E2 + E3 - E4. Hidden instructions can never beat 2; entangled particles reach 2 sqrt 2 (Nobel prize in physics, 2022).', 44, h - 26, DIM, '500 21px');
+    },
+  };
+}

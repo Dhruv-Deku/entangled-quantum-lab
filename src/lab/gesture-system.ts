@@ -29,6 +29,8 @@ export class GestureSystem extends createSystem({
   /** Told about each finger tap (the UI shows what it did). */
   onTap: ((finger: TapFinger, hand: 'left' | 'right') => void) | null = null;
   private joints = { left: new Float32Array(75), right: new Float32Array(75) };
+  /** This frame's joints for each tracked hand (world space, 25 x xyz), null when that hand is not tracked. */
+  readonly hands: { left: Float32Array | null; right: Float32Array | null } = { left: null, right: null };
   private readonly v = new Vector3();
   private readonly orbPos = new Vector3();
   private readonly palm = new Vector3();
@@ -188,10 +190,14 @@ export class GestureSystem extends createSystem({
 
   update(delta: number): void {
     const dt = Math.min(delta, 0.05);
+    // while a scene has the desk (orbs hidden), hands are for the scene: no gates, measurements or spells on unseen qubits
+    const quiet = this.world.getSystem(LabSystem)?.orbsHidden ?? false;
     for (const hand of ['left', 'right'] as const) {
       const joints = this.readHand(hand);
+      this.hands[hand] = joints;
       const events = this.trackers[hand].update(joints, dt);
       const tap = settings.fingerTaps ? this.taps[hand].update(joints, dt) : null;
+      if (quiet) continue;
       if (tap) this.fingerTap(tap, hand);
       for (const ev of events) this.onGesture(hand, ev);
     }

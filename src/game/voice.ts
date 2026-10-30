@@ -132,6 +132,9 @@ export function parseVoice(text: string): VoiceCommand | null {
   if (/wind(ing)? down|calm review|bed ?time|before (bed|sleep)/.test(s)) return { type: 'play', item: 'Wind down' };
   if (/super ?computer|exponential|how (big|much memory)|why (does it|it) matter/.test(s)) return { type: 'play', item: 'Supercomputer' };
   if (/sculpt|state prep|prepare (a|any|my) state|amplitude encod|load (my |some )?data|draw (a|my) (state|distribution|shape)/.test(s)) return { type: 'play', item: 'State sculptor' };
+  if (/bell test|nobel|spooky|across (my|the) room|beat (the )?classical/.test(s)) return { type: 'play', item: 'Bell test in your room' };
+  if (/wave hands|make waves|ripple|wave tank|my fingers?/.test(s)) return { type: 'play', item: 'Wave hands' };
+  if (/light (from a|in a) box|quantum dots?|particle in a box|qled|box of light/.test(s)) return { type: 'play', item: 'Light from a box' };
   if (/molecule|\bh ?2\b|break (a|the) bond|pull (it|them|the atoms) apart/.test(s)) return { type: 'play', item: 'Pull a molecule apart' };
   if (/\batom\b|orbital|electron cloud/.test(s)) return { type: 'play', item: 'Inside an atom' };
   if (/galton|marbles?\b|quantum walk board/.test(s)) return { type: 'play', item: 'Quantum Galton board' };

@@ -35,6 +35,9 @@ import { GaltonVisual } from './galton-3d';
 import { TunnelVisual } from './tunnel-3d';
 import { MoleculeVisual, PER_ANGSTROM } from './molecule-3d';
 import { RailsVisual } from './rails-3d';
+import { WaveTankVisual } from './wave-tank-3d';
+import { BoxVisual } from './box-3d';
+import { BellRoomVisual } from './bell-room-3d';
 import type { Scale } from '../quantum/scale';
 import { LookSelectSystem } from './look-select';
 import { horizontalFov, saveSettings, settings } from '../game/settings';
@@ -189,6 +192,11 @@ export class LabSystem extends createSystem({
   molecule!: MoleculeVisual;
   rails!: RailsVisual;
   private moleculeHandle: Entity | null = null;
+  /** Hands-first scenes: a wave tank for your fingertips, a box between your palms, a Bell test across the room. */
+  waveTank!: WaveTankVisual;
+  lightBox!: BoxVisual;
+  bellRoom!: BellRoomVisual;
+  private boxHandle: Entity | null = null;
   /** These modes have the desk to themselves: the orbs step aside. */
   orbsHidden = false;
   /** The real room: detected tables, floor, walls and furniture (empty until the headset reports them). */
@@ -434,6 +442,24 @@ export class LabSystem extends createSystem({
     this.moleculeHandle.addComponent(OneHandGrabbable, { rotate: false, translate: true, translateMin: [0.15 * PER_ANGSTROM, 0, 0], translateMax: [1.25 * PER_ANGSTROM, 0, 0] });
     this.molecule.root.position.set(0, 0.16, -0.05);
     useStudio(this.molecule.root, env, 0.8);
+    this.waveTank = new WaveTankVisual();
+    this.waveTank.root.position.set(0, 0, -0.04);
+    ws.add(this.waveTank.root);
+    useStudio(this.waveTank.root, env, 0.6);
+    // the light box: its right wall slides along the box when grabbed
+    this.lightBox = new BoxVisual();
+    this.lightBox.root.position.set(0, 0.16, -0.05);
+    const boxEntity = this.world.createTransformEntity(this.lightBox.root, { parent: this.workspace });
+    const boxHandlePos = this.lightBox.handle.position.clone();
+    this.boxHandle = this.world.createTransformEntity(this.lightBox.handle, { parent: boxEntity });
+    this.lightBox.handle.position.copy(boxHandlePos);
+    this.boxHandle.addComponent(OneHandGrabbable, { rotate: false, translate: true, translateMin: [0.03, 0, 0], translateMax: [0.2, 0, 0] });
+    this.lightBox.root.position.set(0, 0.16, -0.05);
+    useStudio(this.lightBox.root, env, 0.8);
+    // the Bell test spans the room, so it lives in the room, not on the desk
+    this.bellRoom = new BellRoomVisual();
+    this.scene.add(this.bellRoom.root);
+    useStudio(this.bellRoom.root, env, 0.9);
     this.qml = new QmlVisual();
     this.qml.root.position.set(0, 0.12, -0.06);
     ws.add(this.qml.root);
@@ -690,6 +716,33 @@ export class LabSystem extends createSystem({
   }
 
   /** Whether a hand is holding the molecule's right atom. */
+  /** Whether the light box is on the desk (its wall grabbable) rather than between your hands. */
+  lightBoxOnDesk = true;
+
+  get boxHeld(): boolean {
+    return this.boxHandle?.hasComponent(Grabbed) ?? false;
+  }
+
+  /** Where the Bell test goes: the source on the desk, Alice and Bob on the walls to your left and right (or 1.5 m out when the room is unknown), facing you. */
+  bellPlaces(): { source: Vector3; alice: Vector3; bob: Vector3; face: Vector3 } {
+    const headObj = this.player.head;
+    headObj.updateWorldMatrix(true, false);
+    const head = headObj.getWorldPosition(new Vector3());
+    const m = headObj.matrixWorld.elements;
+    const right = new Vector3(m[0], 0, m[2]).normalize();
+    const fwd = new Vector3(-m[8], 0, -m[10]).normalize();
+    const y = head.y - 0.1;
+    const place = (dir: Vector3) => {
+      const hit = this.surfaces.length ? pickWall(this.surfaces, head, dir) : null;
+      if (hit && hit.distance > 0.8) return hit.point.clone().addScaledVector(hit.normal, 0.2).setY(y);
+      return head.clone().addScaledVector(dir, 2).setY(y);
+    };
+    const source = this.workspace.object3D!.getWorldPosition(new Vector3()).add(new Vector3(0, 0.08, -0.05));
+    // ahead and well apart: about 38 degrees either side, so both stay in view
+    const side = (s: number) => right.clone().multiplyScalar(0.62 * s).addScaledVector(fwd, 0.78).normalize();
+    return { source, alice: place(side(-1)), bob: place(side(1)), face: head };
+  }
+
   get moleculeHeld(): boolean {
     return this.moleculeHandle?.hasComponent(Grabbed) ?? false;
   }
@@ -1019,6 +1072,7 @@ export class LabSystem extends createSystem({
     for (const t of this.ttt.tiles) t.pointerEvents = tttTaps;
     for (const h of this.sculpt.hits) h.pointerEvents = barTaps;
     this.molecule.handle.pointerEvents = this.molecule.root.visible ? 'auto' : 'none';
+    this.lightBox.handle.pointerEvents = this.lightBox.root.visible && this.lightBoxOnDesk ? 'auto' : 'none';
     if (this.scaleView.root.visible) {
       this.player.head.updateWorldMatrix(true, false);
       this.scaleView.update(dt, this.va.setFromMatrixPosition(this.player.head.matrixWorld));

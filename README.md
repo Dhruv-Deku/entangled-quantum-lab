@@ -91,8 +91,8 @@ the Meta Immersive Web SDK (IWSDK), three.js and TypeScript.
 
 **By the numbers:** 26 chapters, a 14-module course, 21 lessons, 12 puzzles, a
 daily challenge and Quantum Rush, a Play tab, 5 big-state views, 4 kinds of quantum computer
-in 3D at full size, a 49-qubit surface code, 48 achievements, 9 orb finishes and 5 colour sets, a probability liquid in every qubit, 40 Play tab items, the exponential wall, Quantum AI, the State sculptor, five desk scenes (an atom, a quantum Galton board, tunnelling, a molecule to pull apart, your circuit as a railway), Today (five minutes of spaced repetition) and your crystal that grows with it, Ket the lab partner, the lab on your real table, the double slit on your wall, look to select, a compact field-of-view layout, quantum tic-tac-toe, the double slit, Stern-Gerlach and the bomb tester, daily quests,
-voice control, shared labs and classes, and 428 unit tests.
+in 3D at full size, a 49-qubit surface code, 51 achievements, 9 orb finishes and 5 colour sets, a probability liquid in every qubit, 43 Play tab items, the exponential wall, Quantum AI, the State sculptor, a Bell test across your room, wave hands, light from a box between your hands, five desk scenes (an atom, a quantum Galton board, tunnelling, a molecule to pull apart, your circuit as a railway), Today (five minutes of spaced repetition) and your crystal that grows with it, Ket the lab partner, the lab on your real table, the double slit on your wall, look to select, a compact field-of-view layout, quantum tic-tac-toe, the double slit, Stern-Gerlach and the bomb tester, daily quests,
+voice control, shared labs and classes, and 440 unit tests.
 
 ## The exponential wall: why a few qubits matter
 
@@ -190,6 +190,51 @@ sculptor"), and an achievement for shaping a state yourself and measuring it
 to 97%. `src/quantum/stateprep.ts` is tested: random distributions on 1 to 5
 qubits load to 1e-9, gate counts stay within the bounds, every shape is
 exact.
+
+## Your hands and your room
+
+| The Bell test across your room | Its score: past the classical limit |
+| --- | --- |
+| ![Two glass detectors, Alice and Bob, stand far apart on either side of the room with dials and glowing cores, a gold thread spanning the room between them, particle pairs flying out from the desk, the card reading S = 2.76](docs/screenshots/hands-bell.png) | ![The score S climbing past the dashed classical limit of 2 and settling near the quantum limit 2.83: S = 2.91 +- 0.17 after 251 rounds, 5.2 sigma past the classical limit](docs/screenshots/hands-bell-board.png) |
+| **Wave hands: two sources** | **Wave hands: ten fingertips in the water** |
+| ![A tank of blue waves on the desk with two sources making the classic interference pattern of fanning bright and dark lines, and a detector screen along the back wall building the fringes from photons](docs/screenshots/hands-waves.png) | ![Two hands dipped into the tank, every fingertip ringed as a source, the waves from ten fingertips interfering into a woven pattern](docs/screenshots/hands-waves-fingers.png) |
+| **Light from a box: your hands are the walls** | **Drop a level, and out comes orange light** |
+| ![Two hands held up, palms facing, with glass walls at the palms and an electron's standing wave of four humps between them, level 4 in a 0.68 nm box](docs/screenshots/hands-box.png) | ![The box on the desk with one hump left and an orange photon rising from it as a wavy string of beads, Ket explaining 605 nm light, the board marking orange on the spectrum](docs/screenshots/hands-box-light.png) |
+
+Three scenes built for a headset, where your hands and your room are the
+apparatus:
+
+- **The Bell test in your room.** The experiment behind the 2022 Nobel
+  prize in physics, sized to your room. Two detectors, Alice and Bob, stand
+  metres apart: on your real walls when the headset knows them, otherwise
+  two metres out to either side. A source on the desk sends them entangled
+  pairs, a gold thread spanning the room. While each pair flies, each
+  detector turns its dial to a setting chosen at random; on arrival each
+  lights teal (+1) or red (-1). The board tracks the CHSH score: any
+  explanation with hidden instructions stays at 2 or below, and entangled
+  pairs climb to 2 sqrt 2. Switch to **hidden instructions** (the best local
+  model) and watch it stop at 2. Tested: 2.83 and 2.00 to within the error.
+- **Wave hands.** A tank of quantum waves on the desk. Dip your fingertips
+  in: every fingertip touching the water becomes a source, and the
+  interference pattern (computed per vertex on the GPU) follows your
+  fingers live. The detector screen along the back glows with |psi|^2;
+  **Fire 300 photons** and they land one at a time, building the fringes.
+  Without hands, posts make the waves (one to four, three spacings, three
+  wavelengths). Tested: fringe spacing lambda L / d, cancellation in the
+  dark fringes, detections following the intensity.
+- **Light from a box.** An electron in a box can only hold standing waves
+  that fit, so its energy comes in steps, E = n^2 h^2 / (8 m L^2). Hold up
+  both hands, palms facing: your palms become the walls, and the wave
+  stretches between them, swinging faster as you squeeze. Raise one to four
+  fingers on your right hand to pick the level; fold one down and the
+  electron drops, giving out a photon in the colour its wavelength really
+  is (dashed and pale when it is ultraviolet or infrared). Smaller boxes
+  shine bluer: quantum dots in QLED screens pick their colours by size. On
+  the desk, the buttons (or grabbing the right wall) do the same. Tested:
+  0.376 eV for a 1 nm box, 539 nm green for 2 to 1 in 0.7 nm, the colours.
+
+While any desk scene runs, hand gestures no longer act on the hidden
+qubits: your fingers in the tank never apply a gate.
 
 ## Five scenes on your desk
 
@@ -327,6 +372,7 @@ board", "tunnelling", "pull the molecule apart", "ride my circuit".
 - [Home: your lab, and qubits made your own](#home-your-lab-and-qubits-made-your-own)
 - [Quantum AI: a quantum neural network learns on your desk](#quantum-ai-a-quantum-neural-network-learns-on-your-desk)
 - [State sculptor: draw any state, get the quantum program](#state-sculptor-draw-any-state-get-the-quantum-program)
+- [Your hands and your room](#your-hands-and-your-room)
 - [Five scenes on your desk](#five-scenes-on-your-desk)
 - [Your room, every day, and everyone](#your-room-every-day-and-everyone)
 - [Try it](#try-it)
@@ -347,7 +393,7 @@ board", "tunnelling", "pull the molecule apart", "ride my circuit".
 ```sh
 npm install
 npm run dev        # managed browser with the Quest 3 emulator (IWER)
-npm test           # 428 unit tests: physics, four kinds of quantum computer, gestures, spells, the course, 25 chapters, 15 lessons, puzzles, the daily challenge, achievements, builder, noise, chemistry, import, IBM compiling, Bell tests, error correction, benchmarking, voice, shared rooms and more
+npm test           # 440 unit tests: physics, four kinds of quantum computer, gestures, spells, the course, 25 chapters, 15 lessons, puzzles, the daily challenge, achievements, builder, noise, chemistry, import, IBM compiling, Bell tests, error correction, benchmarking, voice, shared rooms and more
 npm run typecheck
 npm run build
 ```

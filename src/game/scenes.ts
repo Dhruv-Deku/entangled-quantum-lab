@@ -1,6 +1,6 @@
 import { AtomVisual } from '../lab/atom-3d';
 import { feedback } from '../lab/feedback';
-import { atomFigure, galtonFigure, moleculeFigure, tunnelFigure, type Figure } from '../lab/figures';
+import { atomFigure, bellRoomFigure, boxFigure, galtonFigure, moleculeFigure, tunnelFigure, wavesFigure, type BoxView, type Figure } from '../lab/figures';
 import { lab } from '../lab/instance';
 import type { LabSystem } from '../lab/lab-system';
 import type { RailFrame } from '../lab/rails-3d';
@@ -14,6 +14,12 @@ import { dissociationCurves, moleculeAt, R_EQ, R_MAX, R_MIN } from '../quantum/m
 import type { QState } from '../quantum/state';
 import { Packet, packetT } from '../quantum/tunnel';
 import { explainOp } from './partner';
+import { Vector3 } from '@iwsdk/core';
+import { TANK_D, TANK_W, SCREEN_Z } from '../lab/wave-tank-3d';
+import { detect, screenIntensity } from '../quantum/waves';
+import { handsToNm, levelEv, lightName, photonNm, spectrumRgb } from '../quantum/box';
+import { addRound, bellRound, emptyTally, score, type BellMode } from '../quantum/bell-room';
+import { fingerCurl, handFrame, J } from '../gestures/hand';
 
 /**
  * Five scenes that take over the desk: an atom's electron cloud, a quantum
@@ -23,7 +29,7 @@ import { explainOp } from './partner';
  * the UI treats them all the same way.
  */
 
-export type SceneId = 'atom' | 'galton' | 'tunnel' | 'molecule' | 'rails';
+export type SceneId = 'atom' | 'galton' | 'tunnel' | 'molecule' | 'rails' | 'waves' | 'box' | 'bell';
 
 export interface SceneCard {
   eyebrow: string;
@@ -46,6 +52,8 @@ export interface SceneHost {
   /** Redraw the card and the board. */
   refresh(): void;
   celebrate(): void;
+  /** This frame's tracked hand joints (world space), null for a hand not tracked. */
+  hands(): { left: Float32Array | null; right: Float32Array | null };
 }
 
 export interface Scene {
@@ -682,6 +690,445 @@ class RailsScene implements Scene {
   }
 }
 
+// ---------------------------------------------------------------- wave hands
+
+const FINGERTIPS = [J.thumbTip, J.indexTip, J.middleTip, J.ringTip, J.pinkyTip];
+const SPACINGS = [0.06, 0.035, 0.1];
+const SPACING_NAMES = ['medium', 'narrow', 'wide'];
+const WAVELENGTHS = [0.024, 0.016, 0.034];
+const WAVE_NAMES = ['medium', 'short', 'long'];
+const SCREEN_BINS = 96;
+const SCREEN_XS = Array.from({ length: SCREEN_BINS }, (_, i) => -TANK_W / 2 + ((i + 0.5) / SCREEN_BINS) * TANK_W);
+
+class WavesScene implements Scene {
+  readonly id = 'waves';
+  readonly play = 'Wave hands';
+  private count = 2;
+  private si = 0;
+  private wi = 0;
+  private sources: [number, number][] = [];
+  private fromHands = false;
+  private key = '';
+  private intensity: number[] = new Array(SCREEN_BINS).fill(0);
+  private hits: number[] = new Array(SCREEN_BINS).fill(0);
+  private toFire = 0;
+  private clock = 0;
+  private cardClock = 0;
+  private saidHands = false;
+  private readonly v = new Vector3();
+
+  constructor(private readonly host: SceneHost) {}
+
+  start(): void {
+    const t = this.host.lab()?.waveTank;
+    if (!t) return;
+    t.root.visible = true;
+    this.key = '';
+    this.saidHands = false;
+    this.host.say('A tank of quantum waves. Dip your fingertips in: each one sends out ripples, and where they meet they add up or cancel. No hands? The two posts make waves for you.', true);
+  }
+
+  private get wavelength(): number {
+    return WAVELENGTHS[this.wi];
+  }
+
+  /** Fingertips touching the water (tank coordinates), or the posts. */
+  private findSources(): [number, number][] {
+    const t = this.host.lab()?.waveTank;
+    const hands = this.host.hands();
+    const out: [number, number][] = [];
+    if (t) {
+      for (const p of [hands.left, hands.right]) {
+        if (!p) continue;
+        for (const j of FINGERTIPS) {
+          t.root.worldToLocal(this.v.set(p[j * 3], p[j * 3 + 1], p[j * 3 + 2]));
+          if (Math.abs(this.v.x) < TANK_W / 2 && Math.abs(this.v.z) < TANK_D / 2 && this.v.y > -0.02 && this.v.y < 0.06) out.push([this.v.x, this.v.z]);
+        }
+      }
+    }
+    this.fromHands = out.length > 0;
+    if (out.length) return out.slice(0, 10);
+    const d = SPACINGS[this.si];
+    return Array.from({ length: this.count }, (_, i) => [(i - (this.count - 1) / 2) * d, TANK_D / 2 - 0.06] as [number, number]);
+  }
+
+  next(): void {
+    this.toFire += 300;
+    this.host.use('waves:fired');
+    feedback('shots');
+  }
+
+  choice(i: number): void {
+    if (i === 0) this.count = (this.count % 4) + 1;
+    else if (i === 1) this.si = (this.si + 1) % SPACINGS.length;
+    else this.wi = (this.wi + 1) % WAVELENGTHS.length;
+    feedback('select');
+    this.host.refresh();
+  }
+
+  update(dt: number): void {
+    const t = this.host.lab()?.waveTank;
+    if (!t) return;
+    t.update(dt);
+    this.sources = this.findSources();
+    t.setSources(this.sources, this.wavelength);
+    if (this.fromHands && this.sources.length >= 2 && !this.saidHands) {
+      this.saidHands = true;
+      this.host.use('waves:hands');
+      this.host.say('Those are your fingertips making the waves. Spread them and the bright lines crowd together; close them and the lines spread out. Fire photons to see where they land.', true);
+    }
+    // the pattern changed enough to matter: a new screen, and the old photons no longer apply
+    const key = `${this.wi}:${this.sources.map(([x, z]) => `${Math.round(x * 200)},${Math.round(z * 200)}`).join(';')}`;
+    if (key !== this.key) {
+      this.key = key;
+      this.intensity = screenIntensity(this.sources, SCREEN_XS, SCREEN_Z, (2 * Math.PI) / this.wavelength);
+      this.hits = new Array(SCREEN_BINS).fill(0);
+      t.drawScreen(this.intensity, this.hits);
+      this.host.refresh();
+    }
+    if (this.toFire > 0) {
+      this.clock += dt;
+      // about 150 a second
+      const n = Math.min(this.toFire, Math.floor(this.clock * 150));
+      if (n > 0) {
+        this.clock -= n / 150;
+        this.toFire -= n;
+        for (let k = 0; k < n; k++) {
+          const x = detect(SCREEN_XS, this.intensity, rng);
+          this.hits[Math.min(SCREEN_BINS - 1, Math.max(0, Math.round(((x + TANK_W / 2) / TANK_W) * SCREEN_BINS - 0.5)))]++;
+        }
+        t.drawScreen(this.intensity, this.hits);
+        this.cardClock += dt;
+        if (this.cardClock > 0.2 || this.toFire === 0) {
+          this.cardClock = 0;
+          this.host.refresh();
+        }
+      }
+    }
+  }
+
+  card(): SceneCard {
+    const n = this.sources.length;
+    const two = n === 2 ? Math.hypot(this.sources[0][0] - this.sources[1][0], this.sources[0][1] - this.sources[1][1]) : 0;
+    const fired = this.hits.reduce((a, b) => a + b, 0);
+    return {
+      eyebrow: `Play  /  Wave hands  /  ${this.fromHands ? 'your fingertips' : 'the posts'}`,
+      title: this.fromHands ? `${n} fingertip${n === 1 ? '' : 's'} in the water` : n === 1 ? 'One source' : `${n} sources, one tank`,
+      body: 'Every source sends out circular waves. Where crest meets crest they add up (bright); where crest meets trough they cancel (dark). Dip your fingertips in the tank and each becomes a source; move them and the pattern follows.',
+      goal: two ? `Bright lines ${((this.wavelength * Math.abs(SCREEN_Z - this.sources[0][1])) / two * 100).toFixed(1)} cm apart on the screen` : fired ? `${fired} photons on the screen` : 'Fire photons at the screen',
+      done: fired > 0,
+      next: 'Fire 300 photons',
+      choices: [`Posts: ${this.count}`, `Spacing: ${SPACING_NAMES[this.si]}`, `Waves: ${WAVE_NAMES[this.wi]}`],
+    };
+  }
+
+  figure(): Figure {
+    const n = this.sources.length;
+    const spacing = n === 2 ? Math.hypot(this.sources[0][0] - this.sources[1][0], this.sources[0][1] - this.sources[1][1]) : null;
+    return wavesFigure({ sources: n, hands: this.fromHands, intensity: this.intensity, hits: this.hits, spacing, distance: n ? Math.abs(SCREEN_Z - this.sources[0][1]) : 0, wavelength: this.wavelength });
+  }
+
+  stop(): void {
+    const t = this.host.lab()?.waveTank;
+    if (t) t.root.visible = false;
+    this.toFire = 0;
+  }
+}
+
+// ---------------------------------------------------------------- light from a box
+
+const BOX_LEVELS = 4;
+
+class BoxScene implements Scene {
+  readonly id = 'box';
+  readonly play = 'Light from a box';
+  private n = 2;
+  private half = 0.1;
+  private wantHalf = 0.1;
+  private handsMode = false;
+  private lengthNm = 0.7;
+  private photon: BoxView['photon'] = null;
+  private colours = new Set<string>();
+  private fingers = 0;
+  private fingersFor = 0;
+  private cardClock = 0;
+  private said = new Set<string>();
+  private readonly a = new Vector3();
+  private readonly b = new Vector3();
+
+  constructor(private readonly host: SceneHost) {}
+
+  start(): void {
+    const v = this.host.lab()?.lightBox;
+    if (!v) return;
+    v.root.visible = true;
+    this.n = 2;
+    this.photon = null;
+    this.said.clear();
+    this.half = this.wantHalf = 0.1;
+    v.handle.position.set(this.half, 0, 0);
+    this.host.say('An electron trapped in a box. Only standing waves that fit can live here, so its energy comes in steps. Drop a level and it gives out light. Hold up both hands, palms facing: your hands become the walls.', true);
+  }
+
+  private levels(): number[] {
+    return Array.from({ length: BOX_LEVELS }, (_, i) => levelEv(i + 1, this.lengthNm));
+  }
+
+  /** Down from level n to n-1: a photon with exactly the difference. */
+  private drop(to: number): void {
+    if (to < 1 || to >= this.n) return;
+    const from = this.n;
+    this.n = to;
+    const nm = photonNm(from, to, this.lengthNm);
+    const rgb = spectrumRgb(nm);
+    const name = lightName(nm);
+    this.photon = { from, to, nm, rgb, name };
+    this.host.lab()?.lightBox.emit(rgb);
+    feedback(rgb ? 'success' : 'measure');
+    if (rgb) this.colours.add(name);
+    if (this.colours.size >= 3) this.host.use('box:rainbow');
+    const key = rgb ? 'seen' : 'unseen';
+    if (!this.said.has(key)) {
+      this.said.add(key);
+      this.host.say(
+        rgb
+          ? `${name[0].toUpperCase()}${name.slice(1)} light, ${Math.round(nm)} nm: exactly the energy between level ${from} and level ${to}. Squeeze the box and drop again: smaller boxes shine bluer. Quantum dots in QLED screens get their colours this way.`
+          : `${Math.round(nm)} nm: ${name}. Your eyes cannot see it. Change the size of the box until the light comes out visible.`,
+        true,
+      );
+    }
+    this.host.refresh();
+  }
+
+  next(): void {
+    this.drop(this.n - 1);
+  }
+
+  choice(i: number): void {
+    if (i === 0) {
+      if (this.n < BOX_LEVELS) this.n++;
+      feedback('select');
+    } else this.wantHalf = Math.max(0.03, Math.min(0.2, this.wantHalf + (i === 1 ? -0.025 : 0.025)));
+    this.host.refresh();
+  }
+
+  update(dt: number): void {
+    const ls = this.host.lab();
+    const v = ls?.lightBox;
+    if (!ls || !v) return;
+    const hands = this.host.hands();
+    let between: [Vector3, Vector3] | null = null;
+    if (hands.left && hands.right) {
+      const l = handFrame(hands.left, 'left').center, r = handFrame(hands.right, 'right').center;
+      this.a.set(l[0], l[1], l[2]);
+      this.b.set(r[0], r[1], r[2]);
+      const d = this.a.distanceTo(this.b);
+      if (d > 0.06 && d < 0.6) between = [v.root.worldToLocal(this.a.clone()), v.root.worldToLocal(this.b.clone())];
+    }
+    this.handsMode = !!between;
+    ls.lightBoxOnDesk = !between;
+    let lengthM: number;
+    if (between) {
+      v.span(between[0], between[1]);
+      v.followFrame();
+      lengthM = between[0].distanceTo(between[1]);
+      // fingers raised on the right hand pick the level; fold one to drop and give out light
+      const p = hands.right!;
+      const up = (['index', 'middle', 'ring', 'pinky'] as const).filter((f) => fingerCurl(p, f) < 0.35).length;
+      if (up !== this.fingers) {
+        this.fingers = up;
+        this.fingersFor = 0;
+      } else this.fingersFor += dt;
+      if (up >= 1 && this.fingersFor > 0.25 && this.fingersFor - dt <= 0.25 && up !== this.n) {
+        if (up < this.n) this.drop(up);
+        else {
+          this.n = up;
+          feedback('select');
+        }
+      }
+      if (!this.said.has('hands')) {
+        this.said.add('hands');
+        this.host.use('box:hands');
+        this.host.say('Your hands are the walls now. Squeeze them together and the wave gets frantic: more energy. Raise fingers on your right hand to pick a level, then fold one down to give out light.', true);
+      }
+    } else {
+      if (ls.boxHeld) this.wantHalf = Math.max(0.03, Math.min(0.2, v.handle.position.x));
+      else {
+        this.half += (this.wantHalf - this.half) * (1 - Math.exp(-dt * 8));
+        v.handle.position.set(this.half, 0, 0);
+      }
+      this.half = ls.boxHeld ? this.wantHalf : this.half;
+      v.span(this.a.set(-this.half, 0, 0), this.b.set(this.half, 0, 0));
+      lengthM = this.half * 2;
+    }
+    this.lengthNm = handsToNm(lengthM);
+    const levels = this.levels();
+    v.setLevel(this.n, levels[this.n - 1] / levelEv(1, 0.7), levels);
+    v.update(dt);
+    this.cardClock += dt;
+    if (this.cardClock > 0.25) {
+      this.cardClock = 0;
+      this.host.refresh();
+    }
+  }
+
+  card(): SceneCard {
+    const e = levelEv(this.n, this.lengthNm);
+    const p = this.photon;
+    return {
+      eyebrow: `Play  /  Light from a box  /  ${this.handsMode ? 'between your hands' : 'on the desk'}`,
+      title: p ? `${p.name[0].toUpperCase()}${p.name.slice(1)}: ${Math.round(p.nm)} nm` : `Level ${this.n} in a ${this.lengthNm.toFixed(2)} nm box`,
+      body: this.handsMode
+        ? 'Your palms are the walls. Squeeze to raise every level (as 1/L^2). Raise 1 to 4 fingers on your right hand to pick the level; fold one down and the electron drops, giving out light in the colour of the energy it lost.'
+        : 'An electron between two walls holds only waves that fit, so its energy comes in steps. Drop a level to give out light; squeeze the box (or grab the right wall) and the light turns bluer. Hold up both hands, palms facing, to be the walls yourself.',
+      goal: `Level ${this.n}: ${e.toFixed(2)} eV${this.colours.size ? `; colours made: ${this.colours.size}` : ''}`,
+      done: this.colours.size >= 3,
+      next: this.n > 1 ? 'Drop a level' : 'At the bottom',
+      choices: this.handsMode ? [null, null, null] : [this.n < BOX_LEVELS ? 'Level up' : 'Top level', 'Squeeze', 'Widen'],
+    };
+  }
+
+  figure(): Figure {
+    return boxFigure({ n: this.n, lengthNm: this.lengthNm, levels: this.levels(), photon: this.photon, hands: this.handsMode });
+  }
+
+  stop(): void {
+    const ls = this.host.lab();
+    if (ls) {
+      ls.lightBox.root.visible = false;
+      ls.lightBoxOnDesk = true;
+    }
+  }
+}
+
+// ---------------------------------------------------------------- the Bell test in your room
+
+class BellScene implements Scene {
+  readonly id = 'bell';
+  readonly play = 'Bell test in your room';
+  private mode: BellMode = 'quantum';
+  private tally = emptyTally();
+  private history: number[] = [];
+  private queue = 0;
+  private inFlight = 0;
+  private clock = 0;
+  private rate = 8;
+  private cardClock = 0;
+  private said = new Set<string>();
+
+  constructor(private readonly host: SceneHost) {}
+
+  start(): void {
+    const ls = this.host.lab();
+    if (!ls) return;
+    const p = ls.bellPlaces();
+    ls.bellRoom.place(p.source, p.alice, p.bob, p.face);
+    ls.bellRoom.root.visible = true;
+    this.mode = 'quantum';
+    ls.bellRoom.setMode(this.mode);
+    this.reset();
+    this.host.say('A Bell test the size of your room. Look left and right: Alice and Bob. Each round a pair flies out, and while it flies each picks a dial setting at random. If the pairs carried hidden instructions, the score could never pass 2. Run it.', true);
+  }
+
+  private reset(): void {
+    this.tally = emptyTally();
+    this.history = [];
+    this.queue = 0;
+    this.said.delete('passed');
+    this.host.refresh();
+  }
+
+  next(): void {
+    this.queue += 100;
+    feedback('shots');
+    this.host.refresh();
+  }
+
+  choice(i: number): void {
+    if (i === 0) {
+      this.mode = this.mode === 'quantum' ? 'hidden' : 'quantum';
+      this.host.lab()?.bellRoom.setMode(this.mode);
+      this.reset();
+      if (this.mode === 'hidden') this.host.say('Now each pair carries hidden instructions, fixed when it leaves the desk: the best any classical explanation can do. Run it and watch the score.', true);
+    } else if (i === 1) this.rate = this.rate >= 32 ? 8 : this.rate * 2;
+    else this.reset();
+    feedback('select');
+    this.host.refresh();
+  }
+
+  update(dt: number): void {
+    const v = this.host.lab()?.bellRoom;
+    if (!v) return;
+    v.update(dt);
+    if (this.queue > 0) {
+      this.clock += dt;
+      while (this.queue > 0 && this.clock >= 1 / this.rate && this.inFlight < 6) {
+        this.clock -= 1 / this.rate;
+        this.queue--;
+        this.inFlight++;
+        const r = bellRound(this.mode, rng);
+        v.fire(r, () => {
+          this.inFlight--;
+          addRound(this.tally, r);
+          const s = score(this.tally);
+          this.history.push(s.s);
+          if (s.rounds % 4 === 0) feedback('measure');
+          this.check(s);
+        });
+      }
+    } else this.clock = 0;
+    this.cardClock += dt;
+    if (this.cardClock > 0.25) {
+      this.cardClock = 0;
+      this.host.refresh();
+    }
+  }
+
+  private check(s: ReturnType<typeof score>): void {
+    if (this.mode === 'quantum' && s.rounds >= 100 && s.s > 2 + 3 * s.se && !this.said.has('passed')) {
+      this.said.add('passed');
+      this.host.use('bell:room');
+      this.host.celebrate();
+      this.host.say(`S = ${s.s.toFixed(2)}, more than three sigma past 2. No hidden instructions can do that: the answers did not exist until each side measured. This experiment won the 2022 Nobel prize in physics.`, true);
+    }
+    if (this.mode === 'hidden' && s.rounds >= 100 && !this.said.has('hidden')) {
+      this.said.add('hidden');
+      this.host.say(`S = ${s.s.toFixed(2)}: hidden instructions reach 2 at best, never more. Switch back to entangled pairs and beat it.`, true);
+    }
+  }
+
+  card(): SceneCard {
+    const s = score(this.tally);
+    const sigma = s.se > 0 ? (s.s - 2) / s.se : 0;
+    return {
+      eyebrow: `Play  /  Bell test in your room  /  ${s.rounds} rounds`,
+      title: s.rounds ? `S = ${s.s.toFixed(2)} +- ${s.se.toFixed(2)}` : 'Beat the classical limit',
+      body: this.mode === 'quantum'
+        ? 'Entangled pairs (the gold thread). Each side picks its dial at random while the pair is in flight, then reads +1 (teal) or -1 (red). Any explanation with hidden instructions keeps the score at 2 or below.'
+        : 'Hidden instructions: each pair carries its answers from the start, the best a classical world allows. The score cannot pass 2.',
+      goal: s.rounds >= 20 ? (s.s > 2 && sigma > 3 ? `${sigma.toFixed(1)} sigma past the classical limit` : `Classical limit 2: ${s.s > 2 ? 'past it, keep going' : 'not past it'}`) : 'Run rounds to score',
+      done: this.said.has('passed'),
+      next: this.queue > 0 ? `Running... ${this.queue} to go` : 'Run 100 rounds',
+      choices: [this.mode === 'quantum' ? 'Pairs: entangled' : 'Pairs: hidden instructions', `Speed: ${this.rate}/s`, 'Start over'],
+      active: this.mode === 'hidden' ? 0 : -1,
+    };
+  }
+
+  figure(): Figure {
+    const s = score(this.tally);
+    // at most 300 points on the curve
+    const step = Math.max(1, Math.ceil(this.history.length / 300));
+    const hist = this.history.filter((_, i) => i % step === 0);
+    return bellRoomFigure({ mode: this.mode, history: hist, s: s.s, se: s.se, rounds: s.rounds, e: s.e });
+  }
+
+  stop(): void {
+    const v = this.host.lab()?.bellRoom;
+    if (v) v.root.visible = false;
+    this.queue = 0;
+  }
+}
+
 export function makeScenes(host: SceneHost): Record<SceneId, Scene> {
   return {
     atom: new AtomScene(host),
@@ -689,11 +1136,17 @@ export function makeScenes(host: SceneHost): Record<SceneId, Scene> {
     tunnel: new TunnelScene(host),
     molecule: new MoleculeScene(host),
     rails: new RailsScene(host),
+    waves: new WavesScene(host),
+    box: new BoxScene(host),
+    bell: new BellScene(host),
   };
 }
 
 /** Play tab names, in order, with their tags. */
 export const SCENE_PLAY: { item: string; id: SceneId; tag: string }[] = [
+  { item: 'Bell test in your room', id: 'bell', tag: 'Nobel' },
+  { item: 'Wave hands', id: 'waves', tag: 'hands' },
+  { item: 'Light from a box', id: 'box', tag: 'QLED' },
   { item: 'Inside an atom', id: 'atom', tag: 'H' },
   { item: 'Quantum Galton board', id: 'galton', tag: 'walk' },
   { item: 'Tunnelling', id: 'tunnel', tag: 'wall' },
