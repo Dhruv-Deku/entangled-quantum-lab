@@ -7,6 +7,7 @@ import {
   MeshBasicMaterial,
   SphereGeometry,
   OneHandGrabbable,
+  Grabbed,
   PokeInteractable,
   Pressed,
   Quaternion,
@@ -29,6 +30,11 @@ import { CrystalVisual } from './crystal-3d';
 import { ScaleVisual } from './scale-3d';
 import { QmlVisual } from './qml-3d';
 import { SculptVisual } from './sculpt-3d';
+import { AtomVisual } from './atom-3d';
+import { GaltonVisual } from './galton-3d';
+import { TunnelVisual } from './tunnel-3d';
+import { MoleculeVisual, PER_ANGSTROM } from './molecule-3d';
+import { RailsVisual } from './rails-3d';
 import type { Scale } from '../quantum/scale';
 import { LookSelectSystem } from './look-select';
 import { horizontalFov, saveSettings, settings } from '../game/settings';
@@ -176,6 +182,13 @@ export class LabSystem extends createSystem({
   sculpt!: SculptVisual;
   /** A sculptor bar was tapped (its outcome). */
   barTap: ((k: number) => void) | null = null;
+  /** The desk scenes: an atom, a Galton board, a tunnelling track, a molecule to pull apart, your circuit as a railway. */
+  atom!: AtomVisual;
+  galton!: GaltonVisual;
+  tunnel!: TunnelVisual;
+  molecule!: MoleculeVisual;
+  rails!: RailsVisual;
+  private moleculeHandle: Entity | null = null;
   /** These modes have the desk to themselves: the orbs step aside. */
   orbsHidden = false;
   /** The real room: detected tables, floor, walls and furniture (empty until the headset reports them). */
@@ -397,6 +410,30 @@ export class LabSystem extends createSystem({
     });
     this.sculpt.root.position.set(0, 0.02, -0.03);
     useStudio(this.sculpt.root, env, 0.8);
+    this.atom = new AtomVisual();
+    this.atom.root.position.set(0, 0.17, -0.05);
+    ws.add(this.atom.root);
+    this.galton = new GaltonVisual();
+    this.galton.root.position.set(0, 0, -0.08);
+    ws.add(this.galton.root);
+    useStudio(this.galton.root, env, 0.8);
+    this.tunnel = new TunnelVisual();
+    this.tunnel.root.position.set(0, 0.015, -0.03);
+    ws.add(this.tunnel.root);
+    useStudio(this.tunnel.root, env, 0.7);
+    this.rails = new RailsVisual();
+    ws.add(this.rails.root);
+    useStudio(this.rails.root, env, 0.8);
+    // the molecule: the right atom's handle is grabbable, sliding only along the bond
+    this.molecule = new MoleculeVisual();
+    this.molecule.root.position.set(0, 0.16, -0.05);
+    const molEntity = this.world.createTransformEntity(this.molecule.root, { parent: this.workspace });
+    const handlePos = this.molecule.handle.position.clone();
+    this.moleculeHandle = this.world.createTransformEntity(this.molecule.handle, { parent: molEntity });
+    this.molecule.handle.position.copy(handlePos);
+    this.moleculeHandle.addComponent(OneHandGrabbable, { rotate: false, translate: true, translateMin: [0.15 * PER_ANGSTROM, 0, 0], translateMax: [1.25 * PER_ANGSTROM, 0, 0] });
+    this.molecule.root.position.set(0, 0.16, -0.05);
+    useStudio(this.molecule.root, env, 0.8);
     this.qml = new QmlVisual();
     this.qml.root.position.set(0, 0.12, -0.06);
     ws.add(this.qml.root);
@@ -650,6 +687,11 @@ export class LabSystem extends createSystem({
       }
     }
     this.orbs.forEach((o, i) => o.visual.setSelected(i === lab.selected));
+  }
+
+  /** Whether a hand is holding the molecule's right atom. */
+  get moleculeHeld(): boolean {
+    return this.moleculeHandle?.hasComponent(Grabbed) ?? false;
   }
 
   /** The desk workspace every panel and orb is placed relative to. */
@@ -976,6 +1018,7 @@ export class LabSystem extends createSystem({
     const barTaps = this.sculpt.root.visible ? 'auto' : 'none';
     for (const t of this.ttt.tiles) t.pointerEvents = tttTaps;
     for (const h of this.sculpt.hits) h.pointerEvents = barTaps;
+    this.molecule.handle.pointerEvents = this.molecule.root.visible ? 'auto' : 'none';
     if (this.scaleView.root.visible) {
       this.player.head.updateWorldMatrix(true, false);
       this.scaleView.update(dt, this.va.setFromMatrixPosition(this.player.head.matrixWorld));

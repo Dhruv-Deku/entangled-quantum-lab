@@ -91,8 +91,8 @@ the Meta Immersive Web SDK (IWSDK), three.js and TypeScript.
 
 **By the numbers:** 26 chapters, a 14-module course, 21 lessons, 12 puzzles, a
 daily challenge and Quantum Rush, a Play tab, 5 big-state views, 4 kinds of quantum computer
-in 3D at full size, a 49-qubit surface code, 43 achievements, 9 orb finishes and 5 colour sets, a probability liquid in every qubit, 35 Play tab items, the exponential wall, Quantum AI, the State sculptor, Today (five minutes of spaced repetition) and your crystal that grows with it, Ket the lab partner, the lab on your real table, the double slit on your wall, look to select, a compact field-of-view layout, quantum tic-tac-toe, the double slit, Stern-Gerlach and the bomb tester, daily quests,
-voice control, shared labs and classes, and 412 unit tests.
+in 3D at full size, a 49-qubit surface code, 48 achievements, 9 orb finishes and 5 colour sets, a probability liquid in every qubit, 40 Play tab items, the exponential wall, Quantum AI, the State sculptor, five desk scenes (an atom, a quantum Galton board, tunnelling, a molecule to pull apart, your circuit as a railway), Today (five minutes of spaced repetition) and your crystal that grows with it, Ket the lab partner, the lab on your real table, the double slit on your wall, look to select, a compact field-of-view layout, quantum tic-tac-toe, the double slit, Stern-Gerlach and the bomb tester, daily quests,
+voice control, shared labs and classes, and 428 unit tests.
 
 ## The exponential wall: why a few qubits matter
 
@@ -191,6 +191,56 @@ to 97%. `src/quantum/stateprep.ts` is tested: random distributions on 1 to 5
 qubits load to 1e-9, gate counts stay within the bounds, every shape is
 exact.
 
+## Five scenes on your desk
+
+| Inside an atom | A quantum Galton board |
+| --- | --- |
+| ![A hydrogen 3d z2 orbital as a cloud of nine thousand dots over the desk: two teal lobes up and down and a red ring around the middle, the card naming it, the board plotting the chance of finding the electron by distance](docs/screenshots/scene-atom.png) | ![Two upright pegboards: on the left silver marbles bounce down and pile into a bell curve; on the right the pegs glow blue with the quantum walk and the bars pile up at the edges](docs/screenshots/scene-galton.png) |
+| **Tunnelling through a wall** | **Pull a molecule apart** |
+| ![A wave packet in rainbow phase colours has hit a dark wall taller than its energy line: most of it reflected to the left, a tenth came out on the right, traced again ten times taller in grey](docs/screenshots/scene-tunnel.png) | ![Two hydrogen nuclei pulled 1.83 angstroms apart inside their electron cloud, joined by a gold thread under a label reading Spins: a Bell pair, Ket explaining that the bond is breaking](docs/screenshots/scene-molecule.png) |
+| **Ride your circuit** | **The molecule's board: exact against mean field** |
+| ![Four lanes run away from you on the desk with glass gate blocks on them; four coloured riders at the front, joined by gold threads, turn as each gate passes under them; the board above shows the same circuit with its cursor](docs/screenshots/scene-rails.png) | ![The H2 dissociation curve: the exact energy flattens as the bond breaks while the dashed mean-field curve climbs away, 5.26 eV off at 2.19 angstroms, with a gold bar at 97 percent one electron on each atom](docs/screenshots/scene-molecule-board.png) |
+
+Each takes over the desk from the Play tab, has its own card, board and Ket
+lines, and is real physics, tested:
+
+- **Inside an atom.** Hydrogen's exact wavefunctions (Laguerre radial parts,
+  real spherical harmonics) for nine orbitals from 1s to 4f, drawn as nine
+  thousand electron positions sampled from |psi|^2, teal where psi is
+  positive and red where negative. Switching orbital flows every dot to its
+  new place. **Find the electron** collapses the whole cloud into the one
+  spot it was found; the board's histogram of your looks builds up the
+  radial curve. **True sizes** puts every orbital on one scale. Tested:
+  normalisation, the textbook mean radius (3n^2 - l(l+1))/2, nodes, and the
+  sampler.
+- **A quantum Galton board.** Two pegboards side by side: marbles take one
+  path and stack a bell curve; a Hadamard walker takes every path at once,
+  the pegs glowing with its probability row by row, and measured walkers pile
+  up at the edges. The spread grows like sqrt(rows) against rows. Tested,
+  including against the quantum-walk chapter's circuit.
+- **Tunnelling.** The Schrodinger equation solved live by the split-step
+  Fourier method on 2048 points: a wave packet in phase colours hits a wall
+  taller than its energy and part of it comes out the other side. Three
+  walls, five energies, a ten-times magnifier for what gets through, and a
+  board where your shots land on the textbook curve (they agree to 1%,
+  tested).
+- **Pull a molecule apart.** Grab the right hydrogen atom and pull (or use
+  the buttons). The ground state of the same 4-qubit Hamiltonian the VQE
+  chapter solves, exactly, at every bond length; the electron cloud splits;
+  past about 1.8 angstroms the electrons sit one on each atom with their
+  spins in a Bell pair, shown as a gold thread, while mean-field
+  (Hartree-Fock) energy goes 5 eV wrong. Let go and it springs back and
+  wobbles to rest on the energy curve. Tested: the exact (FCI) and
+  Hartree-Fock energies at every computed bond length.
+- **Ride your circuit.** Whatever circuit is in the lab becomes a railway:
+  a lane per qubit, a glass block per gate, and a rider per qubit whose arrow
+  turns as each gate passes under it, with gold threads joining entangled
+  riders. Ket narrates each gate and the board's cursor follows the ride.
+  An empty lab gets a short demo ride.
+
+Five achievements go with them, and voice: "inside an atom", "the Galton
+board", "tunnelling", "pull the molecule apart", "ride my circuit".
+
 ## Your room, every day, and everyone
 
 | Today: five minutes a day | The double slit on your real wall |
@@ -277,6 +327,7 @@ exact.
 - [Home: your lab, and qubits made your own](#home-your-lab-and-qubits-made-your-own)
 - [Quantum AI: a quantum neural network learns on your desk](#quantum-ai-a-quantum-neural-network-learns-on-your-desk)
 - [State sculptor: draw any state, get the quantum program](#state-sculptor-draw-any-state-get-the-quantum-program)
+- [Five scenes on your desk](#five-scenes-on-your-desk)
 - [Your room, every day, and everyone](#your-room-every-day-and-everyone)
 - [Try it](#try-it)
 - [Part 1: Your hands are the quantum computer](#part-1-your-hands-are-the-quantum-computer)
@@ -296,7 +347,7 @@ exact.
 ```sh
 npm install
 npm run dev        # managed browser with the Quest 3 emulator (IWER)
-npm test           # 412 unit tests: physics, four kinds of quantum computer, gestures, spells, the course, 25 chapters, 15 lessons, puzzles, the daily challenge, achievements, builder, noise, chemistry, import, IBM compiling, Bell tests, error correction, benchmarking, voice, shared rooms and more
+npm test           # 428 unit tests: physics, four kinds of quantum computer, gestures, spells, the course, 25 chapters, 15 lessons, puzzles, the daily challenge, achievements, builder, noise, chemistry, import, IBM compiling, Bell tests, error correction, benchmarking, voice, shared rooms and more
 npm run typecheck
 npm run build
 ```

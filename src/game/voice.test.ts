@@ -144,6 +144,11 @@ group('voice: the Play tab', () => {
     expect(parseVoice('neural network')).toEqual({ type: 'play', item: 'Quantum AI' });
     expect(parseVoice('open the state sculptor')).toEqual({ type: 'play', item: 'State sculptor' });
     expect(parseVoice('load my data')).toEqual({ type: 'play', item: 'State sculptor' });
+    expect(parseVoice('show me inside an atom')).toEqual({ type: 'play', item: 'Inside an atom' });
+    expect(parseVoice('the galton board')).toEqual({ type: 'play', item: 'Quantum Galton board' });
+    expect(parseVoice('quantum tunnelling')).toEqual({ type: 'play', item: 'Tunnelling' });
+    expect(parseVoice('pull the molecule apart')).toEqual({ type: 'play', item: 'Pull a molecule apart' });
+    expect(parseVoice('ride my circuit')).toEqual({ type: 'play', item: 'Ride your circuit' });
     expect(parseVoice('something calm before bed')).toEqual({ type: 'play', item: 'Wind down' });
     expect(parseVoice("start today's cards")).toEqual({ type: 'play', item: 'Today' });
     expect(parseVoice("today's puzzle")).toEqual({ type: 'daily' });

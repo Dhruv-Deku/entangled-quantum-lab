@@ -1552,3 +1552,204 @@ export function sculptFigure(v: SculptView): Figure {
     },
   };
 }
+
+// ---------------------------------------------------------------- inside an atom
+
+export interface AtomView {
+  name: string;
+  /** r^2 R^2 against r, in Bohr radii. */
+  curve: [number, number][];
+  mean: number;
+  /** Distances where the electron was found. */
+  found: number[];
+}
+
+/** Where the electron is likely to be found, by distance, and the places you found it. */
+export function atomFigure(v: AtomView): Figure {
+  return {
+    key: `atom:${v.name}:${v.found.length}`,
+    draw: (g, w, h) => {
+      panel(g, w, h, `Inside an atom  /  hydrogen ${v.name}`, `${v.found.length} look${v.found.length === 1 ? '' : 's'}`);
+      const rmax = v.curve[v.curve.length - 1][0];
+      const pmax = Math.max(...v.curve.map(([, p]) => p)) * 1.12;
+      const ticks = [0, 0.25, 0.5, 0.75, 1].map((f) => Math.round(f * rmax));
+      const a = axes(g, 110, 110, 980, 400, [0, rmax], [0, pmax], ticks, [], 'distance from the nucleus (Bohr radii, 1 = 52.9 pm)', 'chance of finding it at that distance');
+      // the looks so far, as a histogram on the same scale
+      if (v.found.length) {
+        const bins = 40;
+        const counts = new Array(bins).fill(0);
+        for (const r of v.found) counts[Math.min(bins - 1, Math.floor((r / rmax) * bins))]++;
+        const dr = rmax / bins;
+        counts.forEach((c, i) => {
+          if (!c) return;
+          const p = Math.min(pmax, c / v.found.length / dr);
+          const x0 = a.sx(i * dr), x1 = a.sx((i + 1) * dr);
+          g.fillStyle = 'rgba(228,230,235,0.28)';
+          g.fillRect(x0 + 1, a.sy(p), x1 - x0 - 2, a.sy(0) - a.sy(p));
+        });
+      }
+      polyline(g, a, v.curve, SOFT_BLUE, 4);
+      g.setLineDash([8, 8]);
+      g.strokeStyle = MINT;
+      g.lineWidth = 2;
+      g.beginPath();
+      g.moveTo(a.sx(v.mean), a.y0);
+      g.lineTo(a.sx(v.mean), a.y0 + a.h);
+      g.stroke();
+      g.setLineDash([]);
+      text(g, `average ${v.mean} Bohr radii`, a.sx(v.mean) + 10, a.y0 + 26, MINT, '600 20px');
+      const rx = 1150;
+      text(g, 'Blue: the chance by distance,', rx, 150, SOFT_BLUE, '600 22px');
+      text(g, 'from the exact wavefunction.', rx, 180, DIM, '500 21px');
+      text(g, 'Grey: where you found it.', rx, 230, INK, '600 22px');
+      text(g, 'Each look lands somewhere new;', rx, 260, DIM, '500 21px');
+      text(g, 'together they draw the curve.', rx, 290, DIM, '500 21px');
+      for (const [i, line] of wrap(g, 'The electron is not orbiting: until you look, it has no position, only these chances.', '500 21px', 380).entries()) text(g, line, rx, 350 + i * 30, DIM, '500 21px');
+      text(g, 'The cloud is drawn from |psi|^2: teal where psi is positive, red where it is negative.', 44, h - 26, DIM, '500 21px');
+    },
+  };
+}
+
+// ---------------------------------------------------------------- the quantum Galton board
+
+export interface GaltonView {
+  rows: number;
+  classical: number[];
+  quantum: number[];
+  /** Theory over positions -rows..rows. */
+  coin: number[];
+  walk: number[];
+  coinSpread: number;
+  walkSpread: number;
+}
+
+export function galtonFigure(v: GaltonView): Figure {
+  const nc = v.classical.reduce((a, b) => a + b, 0), nq = v.quantum.reduce((a, b) => a + b, 0);
+  return {
+    key: `galton:${v.rows}:${nc}:${nq}:${digest(v.classical)}:${digest(v.quantum)}`,
+    draw: (g, w, h) => {
+      panel(g, w, h, 'Quantum Galton board', `${v.rows} rows  /  ${nc} marbles, ${nq} walkers`);
+      const half = (x0: number, title: string, color: string, counts: number[], theory: number[], n: number, spread: number, rate: string) => {
+        const pw = 680, ph = 330, y0 = 150;
+        text(g, title, x0, y0 - 34, color, '700 24px');
+        text(g, `spread ${spread.toFixed(1)}  (${rate})`, x0 + pw, y0 - 34, INK, '600 21px', 'right');
+        const bins = v.rows + 1;
+        const slot = pw / bins;
+        const pmax = Math.max(0.05, ...theory) * 1.15;
+        g.strokeStyle = LINE;
+        g.lineWidth = 2;
+        g.beginPath();
+        g.moveTo(x0, y0 + ph);
+        g.lineTo(x0 + pw, y0 + ph);
+        g.stroke();
+        for (let k = 0; k < bins; k++) {
+          const cx = x0 + slot * (k + 0.5);
+          const p = n ? counts[k] / n : 0;
+          const bh = (Math.min(pmax, p) / pmax) * ph;
+          g.globalAlpha = 0.85;
+          g.fillStyle = color;
+          g.fillRect(cx - slot * 0.32, y0 + ph - bh, slot * 0.64, bh);
+          g.globalAlpha = 1;
+          // the exact answer: a dot at the expected height
+          const t = theory[2 * k] ?? 0;
+          dot(g, cx, y0 + ph - (t / pmax) * ph, 6, INK);
+          text(g, String(2 * k - v.rows), cx, y0 + ph + 28, DIM, '500 18px', 'center');
+        }
+      };
+      half(60, 'A coin: marbles', '#c8ccd2', v.classical, v.coin, nc, v.coinSpread, 'grows like sqrt rows');
+      half(860, 'A qubit coin: quantum walkers', BLUE, v.quantum, v.walk, nq, v.walkSpread, 'grows like rows');
+      text(g, 'Dots: the exact distributions. The walker spreads in proportion to the rows, quadratically faster: the speed-up behind quantum-walk search.', 44, h - 26, DIM, '500 21px');
+    },
+  };
+}
+
+// ---------------------------------------------------------------- tunnelling
+
+export interface TunnelView {
+  width: number;
+  energy: number;
+  /** Expected transmission against energy for this wall. */
+  curve: [number, number][];
+  /** Shots fired at this wall: energy and the share that came through. */
+  shots: [number, number][];
+  flying: boolean;
+}
+
+export function tunnelFigure(v: TunnelView): Figure {
+  return {
+    key: `tunnel:${v.width}:${v.energy}:${v.shots.map(([e, t]) => `${e}/${t.toFixed(4)}`).join(',')}:${v.flying}`,
+    draw: (g, w, h) => {
+      panel(g, w, h, `Tunnelling  /  a wall ${v.width} wide`, `energy ${Math.round(v.energy * 100)}% of the wall`);
+      const a = axes(g, 120, 110, 900, 400, [0, 1.4], [0, 1], [0, 0.2, 0.4, 0.6, 0.8, 1, 1.2, 1.4], [0, 0.25, 0.5, 0.75, 1], 'energy (the wall is 1)', 'share that comes through');
+      // a ball: nothing below the top of the wall, everything above
+      polyline(g, a, [[0, 0], [1, 0], [1, 1], [1.4, 1]], 'rgba(138,141,147,0.9)', 3, [10, 8]);
+      polyline(g, a, v.curve, SOFT_BLUE, 4);
+      for (const [e, t] of v.shots) {
+        dot(g, a.sx(e), a.sy(t), 10, '#ffffff');
+        dot(g, a.sx(e), a.sy(t), 7, MINT);
+      }
+      g.strokeStyle = 'rgba(45,127,249,0.6)';
+      g.lineWidth = 2;
+      g.beginPath();
+      g.moveTo(a.sx(v.energy), a.y0);
+      g.lineTo(a.sx(v.energy), a.y0 + a.h);
+      g.stroke();
+      const rx = 1090;
+      text(g, 'Grey dashes: a ball.', rx, 150, DIM, '600 22px');
+      text(g, 'Nothing gets over a wall', rx, 180, DIM, '500 21px');
+      text(g, 'taller than its energy.', rx, 208, DIM, '500 21px');
+      text(g, 'Blue: the quantum answer', rx, 258, SOFT_BLUE, '600 22px');
+      text(g, '(Schrodinger equation).', rx, 286, DIM, '500 21px');
+      text(g, 'Mint: your shots, simulated', rx, 336, MINT, '600 22px');
+      text(g, 'step by step on the desk.', rx, 364, DIM, '500 21px');
+      for (const [i, line] of wrap(g, 'Above the wall some still bounce back; below it some still get through. Thicker walls let exponentially less through.', '500 21px', 440).entries()) text(g, line, rx, 420 + i * 28, DIM, '500 21px');
+      text(g, 'Electrons tunnel through the oxide of every flash-memory cell, and through the Josephson junction of every superconducting qubit.', 44, h - 26, DIM, '500 21px');
+    },
+  };
+}
+
+// ---------------------------------------------------------------- pull a molecule apart
+
+export interface MoleculeView {
+  r: number;
+  energy: number;
+  hf: number;
+  covalent: number;
+  curves: { r: number; exact: number; hf: number }[];
+}
+
+export function moleculeFigure(v: MoleculeView): Figure {
+  return {
+    key: `mol:${v.r.toFixed(3)}`,
+    draw: (g, w, h) => {
+      panel(g, w, h, 'Pull a molecule apart  /  H2', `${v.r.toFixed(2)} A apart`);
+      const a = axes(g, 130, 110, 860, 400, [0.3, 2.5], [-1.2, -0.5], [0.5, 1, 1.5, 2, 2.5], [-1.2, -1.0, -0.8, -0.6], 'distance between the atoms (angstroms)', 'energy (hartree)');
+      const clip = (y: number) => Math.min(-0.5, y);
+      polyline(g, a, v.curves.map((c) => [c.r, clip(c.hf)]), CORAL, 3, [10, 8]);
+      polyline(g, a, v.curves.map((c) => [c.r, clip(c.exact)]), SOFT_BLUE, 4);
+      dot(g, a.sx(v.r), a.sy(v.energy), 12, '#ffffff');
+      dot(g, a.sx(v.r), a.sy(v.energy), 8, BLUE);
+      text(g, 'exact (what VQE finds)', a.sx(1.15), a.sy(-1.12), SOFT_BLUE, '600 20px');
+      text(g, 'mean field (Hartree-Fock)', a.sx(2.45), a.sy(clip(v.curves[v.curves.length - 1].hf)) - 16, CORAL, '600 20px', 'right');
+      const rx = 1060;
+      const off = (v.hf - v.energy) * 27.2114;
+      text(g, `${v.energy.toFixed(3)} Ha`, rx, 160, INK, '700 44px');
+      text(g, `mean field off by ${off.toFixed(2)} eV`, rx, 200, off > 1 ? CORAL : DIM, '600 22px');
+      text(g, 'One electron on each atom:', rx, 270, DIM, '600 22px');
+      const bw = 440;
+      roundRect(g, rx, 290, bw, 26, 13);
+      g.fillStyle = '#26282c';
+      g.fill();
+      const f = Math.max(0, Math.min(1, (v.covalent - 0.5) / 0.5));
+      roundRect(g, rx, 290, Math.max(26, bw * f), 26, 13);
+      g.fillStyle = v.covalent > 0.9 ? GOLD : SOFT_BLUE;
+      g.fill();
+      text(g, `${Math.round(v.covalent * 100)}%`, rx + bw, 350, INK, '700 26px', 'right');
+      const story = v.covalent > 0.9
+        ? 'Stretched: each atom keeps one electron, and their spins form a Bell pair. No single picture of the electrons describes that, so mean field fails.'
+        : 'Near the bond both electrons share one orbital, and the simple mean-field picture is nearly right.';
+      for (const [i, line] of wrap(g, story, '500 21px', 460).entries()) text(g, line, rx, 400 + i * 28, DIM, '500 21px');
+      text(g, 'From the same 4-qubit Hamiltonian the VQE chapter solves (STO-3G). Breaking bonds is where quantum computers are expected to beat classical methods.', 44, h - 26, DIM, '500 21px');
+    },
+  };
+}

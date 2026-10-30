@@ -74,6 +74,7 @@ import { deviceFor, scaleFor, type Device } from '../quantum/scale';
 import { accuracy as qmlAccuracy, field as qmlField, initialWeights, loss as qmlLoss, predict as qmlPredict, trainStep, xorData, type Point as QmlPoint } from '../quantum/qml';
 import { FIELD_N } from '../lab/qml-3d';
 import { gateCounts, prepare as prepareState, SHAPES as PREP_SHAPES } from '../quantum/stateprep';
+import { makeScenes, SCENE_PLAY, type Scene, type SceneCard, type SceneId } from './scenes';
 import { bitLabel, levelsFor, match as shotMatch, MAX_LEVEL, probsOf, resample, sampleOne, tapLevel } from './sculpt';
 import { answerTopic, classify, describeState, explainOp, moveWords, nextMove, type Line as KetLine } from './partner';
 import { GREETING, partOfDay, planWindDown } from './today';
@@ -140,10 +141,10 @@ const LAB_LINES = 10;
 const LAB_KEYS = ['h', 'x', 'y', 'z', 's', 'sdg', 't', 'tdg', 'rx', 'ry', 'rz', 'cx', 'cz', 'swap', 'ccx', 'measure', 'q0', 'q1', 'q2', 'q3', 'q4', 'pi', 'pi2', 'pi4', 'mpi2', 'up', 'down', 'delete', 'clear', 'link', 'subqubit', 'addqubit', 'example', 'fromorbs'];
 const TABS = ['course', 'campaign', 'learn', 'puzzle', 'build', 'sandbox', 'play'] as const;
 /** The Play tab: arcade and showcase picks. */
-type GameId = 'dice' | 'penny' | 'cat' | 'spy' | 'decoder' | 'grover' | 'teleport' | 'ttt' | 'slit' | 'sg' | 'bomb' | 'today' | 'super' | 'qml' | 'sculpt';
+type GameId = 'dice' | 'penny' | 'cat' | 'spy' | 'decoder' | 'grover' | 'teleport' | 'ttt' | 'slit' | 'sg' | 'bomb' | 'today' | 'super' | 'qml' | 'sculpt' | SceneId;
 
-const PLAY = ['Today', 'Wind down', 'Code lab', 'First five minutes', 'Supercomputer', 'Quantum AI', 'State sculptor', 'Daily quests', 'Quantum Rush', 'Zen Rush', 'Rush versus', 'Class challenge', 'Daily', 'Spy game', 'Be the decoder', 'Grover maze', 'Teleporter', 'Quantum tic-tac-toe', 'Double slit', 'Stern-Gerlach', 'Bomb tester', 'Shor in 3D', 'System Two', 'Photonic chip', 'Surface Code', 'Many worlds', 'Quantum dice', 'Penny flip', 'Schrodinger cat', 'State album', 'Giant sphere', 'Inside a qubit', 'Night sky', 'History', 'Ambient music'] as const;
-const PLAY_TAGS = ['5 min', 'calm', 'qasm', 'tour', '2^n', 'QNN', 'prep', '3/day', '60s', 'zen', 'vs', 'class', 'day', 'BB84', 'd=3', '8', 'tp', 'X O', '2 slit', 'Ag', 'EV', '15', '3x', 'light',  '49q', 'H H', 'd8', 'coin', 'box', '15', '1 m', 'JJ', 'sky', '1981', 'hum'];
+const PLAY = ['Today', 'Wind down', 'Code lab', 'First five minutes', 'Supercomputer', 'Quantum AI', 'State sculptor', 'Inside an atom', 'Quantum Galton board', 'Tunnelling', 'Pull a molecule apart', 'Ride your circuit', 'Daily quests', 'Quantum Rush', 'Zen Rush', 'Rush versus', 'Class challenge', 'Daily', 'Spy game', 'Be the decoder', 'Grover maze', 'Teleporter', 'Quantum tic-tac-toe', 'Double slit', 'Stern-Gerlach', 'Bomb tester', 'Shor in 3D', 'System Two', 'Photonic chip', 'Surface Code', 'Many worlds', 'Quantum dice', 'Penny flip', 'Schrodinger cat', 'State album', 'Giant sphere', 'Inside a qubit', 'Night sky', 'History', 'Ambient music'] as const;
+const PLAY_TAGS = ['5 min', 'calm', 'qasm', 'tour', '2^n', 'QNN', 'prep', 'H', 'walk', 'wall', 'H2', 'ride', '3/day', '60s', 'zen', 'vs', 'class', 'day', 'BB84', 'd=3', '8', 'tp', 'X O', '2 slit', 'Ag', 'EV', '15', '3x', 'light',  '49q', 'H H', 'd8', 'coin', 'box', '15', '1 m', 'JJ', 'sky', '1981', 'hum'];
 
 /** Shots in one State sculptor run. */
 const SCULPT_SHOTS = 1000;
@@ -285,6 +286,40 @@ export class UISystem extends createSystem({
   private todayCardTimer = 0;
   /** The exponential wall: how many qubits are on the table. */
   private superN = 2;
+  private scenesMade: Record<SceneId, Scene> | null = null;
+  /** The desk scenes (atom, Galton board, tunnelling, molecule, railway), each behind one interface. */
+  private get scenes(): Record<SceneId, Scene> {
+    return (this.scenesMade ??= makeScenes({
+      lab: () => this.world.getSystem(LabSystem),
+      say: (text, urgent = true) => this.ketSay({ text, point: null }, urgent),
+      use: (key) => this.use(key),
+      refresh: () => {
+        this.renderGameCard();
+        this.updateBoardMode();
+      },
+      celebrate: () => this.world.getSystem(LabSystem)?.celebrate(false),
+    }));
+  }
+
+  /** The scene running now, if the game is one. */
+  private deskScene(): Scene | null {
+    return this.game && SCENE_PLAY.some((s) => s.id === this.game) ? this.scenes[this.game as SceneId] : null;
+  }
+
+  private renderSceneCard(c: SceneCard): void {
+    this.els.get('btn-notes')?.setProperties({ display: 'none' });
+    this.els.get('btn-lib')?.setProperties({ display: 'none' });
+    this.text('btn-replay-label', 'Done');
+    this.bg('btn-next', C.primary);
+    this.bg('goal-dot', c.done ? C.done : C.current);
+    this.text('chapter-eyebrow', c.eyebrow);
+    this.text('chapter-title', c.title);
+    this.text('chapter-body', c.body);
+    this.text('goal-text', c.goal);
+    this.text('btn-next-label', c.next);
+    this.modeChoices(c.choices, c.active ?? -1);
+  }
+
   /** State sculptor: the qubits, each bar's height, the ready-made shape (-1: your own), the program it wrote, and the run. */
   private sculptN = 3;
   private sculptLevels: number[] = [];
@@ -565,7 +600,7 @@ export class UISystem extends createSystem({
       } else campaign.next();
       feedback('select');
     });
-    for (let i = 0; i < 3; i++) on(`choice-${i}`, () => (!this.game && this.homeShown && campaign.mode === 'sandbox' ? this.homeChoice(i) : this.game === 'sculpt' ? this.sculptChoice(i) : this.game === 'qml' ? this.qmlChoice(i) : this.game === 'super' ? this.superSet([this.superN + 10, 50, 2][i]) : this.game === 'today' ? this.todayPick(i) : this.game === 'spy' ? this.spyAnswer(i) : this.game === 'ttt' || this.game === 'slit' || this.game === 'sg' || this.game === 'bomb' ? this.modeChoice(i) : feedback(campaign.answer(i) ? 'success' : 'reject')));
+    for (let i = 0; i < 3; i++) on(`choice-${i}`, () => (!this.game && this.homeShown && campaign.mode === 'sandbox' ? this.homeChoice(i) : this.deskScene() ? this.deskScene()!.choice(i) : this.game === 'sculpt' ? this.sculptChoice(i) : this.game === 'qml' ? this.qmlChoice(i) : this.game === 'super' ? this.superSet([this.superN + 10, 50, 2][i]) : this.game === 'today' ? this.todayPick(i) : this.game === 'spy' ? this.spyAnswer(i) : this.game === 'ttt' || this.game === 'slit' || this.game === 'sg' || this.game === 'bomb' ? this.modeChoice(i) : feedback(campaign.answer(i) ? 'success' : 'reject')));
     on('btn-replay', () => {
       if (this.rush || this.rushOver || this.racePending) return this.endRush(true);
       if (this.game) return this.endGame(true);
@@ -1762,6 +1797,12 @@ export class UISystem extends createSystem({
     const lsys = this.world.getSystem(LabSystem);
     this.quest('wonder');
     if (item === 'Code lab') return this.labOpen ? this.closeCodeLab() : this.openCodeLab(false);
+    const desk = SCENE_PLAY.find((s) => s.item === item);
+    if (desk) {
+      this.endRush(false);
+      this.endGame(false);
+      return this.startGame(desk.id);
+    }
     if (item === 'State sculptor') {
       this.endRush(false);
       this.endGame(false);
@@ -1877,6 +1918,8 @@ export class UISystem extends createSystem({
 
   /** Is this Play item running (for the navigator's highlight)? */
   private playOn(item: (typeof PLAY)[number]): boolean {
+    const desk = SCENE_PLAY.find((s) => s.item === item);
+    if (desk) return this.game === desk.id;
     switch (item) {
       case 'Code lab':
         return this.labOpen;
@@ -1988,6 +2031,13 @@ export class UISystem extends createSystem({
     } else if (g === 'today') {
       this.game = g;
       this.todayBegin();
+    } else if (SCENE_PLAY.some((s) => s.id === g)) {
+      // the railway rides whatever circuit is in the lab; the others start from a clean desk
+      if (g !== 'rails') campaign.enterSandbox(1, []);
+      this.game = g;
+      const ls = this.world.getSystem(LabSystem);
+      if (ls) ls.orbsHidden = true;
+      this.scenes[g as SceneId].start();
     } else if (g === 'sculpt') {
       campaign.enterSandbox(this.sculptN, []);
       this.game = g;
@@ -2031,7 +2081,9 @@ export class UISystem extends createSystem({
 
   private endGame(render: boolean): void {
     if (!this.game) return;
+    const was = this.deskScene();
     this.game = null;
+    was?.stop();
     const ls = this.world.getSystem(LabSystem);
     ls?.dice.hide();
     ls?.spy.hide();
@@ -2061,6 +2113,11 @@ export class UISystem extends createSystem({
 
   /** The card's main button in a mini-game. */
   private gameNext(): void {
+    const desk = this.deskScene();
+    if (desk) {
+      desk.next();
+      return this.renderGameCard();
+    }
     const lsys = this.world.getSystem(LabSystem);
     if (this.game === 'spy') return this.spyNext();
     if (this.game === 'decoder') return this.decoderNext();
@@ -2120,6 +2177,7 @@ export class UISystem extends createSystem({
     if (this.game === 'today') this.todayUpdate(dt);
     if (this.game === 'qml') this.qmlUpdate(dt);
     if (this.game === 'sculpt') this.sculptUpdate(dt);
+    this.deskScene()?.update(dt);
     if (this.game === 'teleport' && this.tele.phase === 'flying' && ls?.teleporter.arrived) {
       this.tele.phase = 'fix';
       this.renderGameCard();
@@ -2148,6 +2206,8 @@ export class UISystem extends createSystem({
 
   private renderGameCard(): void {
     for (let i = 0; i < 5; i++) this.els.get(`pip-${i}`)?.setProperties({ display: 'none' });
+    const desk = this.deskScene();
+    if (desk) return this.renderSceneCard(desk.card());
     if (this.game === 'today') return this.renderTodayCard();
     if (this.game === 'super') return this.renderSuperCard();
     if (this.game === 'qml') return this.renderQmlCard();
@@ -2372,6 +2432,8 @@ export class UISystem extends createSystem({
 
   /** The board's figure for the mode (redrawn at most five times a second while particles stream). */
   private modeFigure(): Figure | null {
+    const desk = this.deskScene();
+    if (desk) return desk.figure();
     if (this.game === 'today') return memoryFigure(this.todayView());
     if (this.game === 'sculpt') {
       const c = gateCounts(this.sculptOps);
